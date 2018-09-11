@@ -62,6 +62,10 @@ search:
     users: true
     anonymous: false
 
+trending:
+  videos:
+    interval_days: 7 # Compute trending videos for the last x days
+
 cache:
   previews:
     size: 500 # Max number of previews you want to cache
@@ -74,6 +78,7 @@ admin:
 signup:
   enabled: false
   limit: 10 # When the limit is reached, registrations are disabled. -1 == unlimited
+  requires_email_verification: false
   filters:
     cidr: # You can specify CIDR ranges to whitelist (empty = no filtering) or blacklist
       whitelist: []
@@ -83,6 +88,7 @@ user:
   # Default value of maximum video BYTES the user can upload (does not take into account transcoded files).
   # -1 == unlimited
   video_quota: -1
+  video_quota_daily: -1
 
 # If enabled, the video will be transcoded to mp4 (x264) with "faststart" flag
 # In addition, if some resolutions are enabled the mp4 video file will be transcoded to these new resolutions.
@@ -121,6 +127,9 @@ instance:
   robots: |
     User-agent: *
     Disallow: ''
+  # Security.txt rules. To discourage researchers from testing your instance and disable security.txt integration, set this to an empty string.
+  securitytxt:
+    "# If you would like to report a security issue\n# you may report it to:\nContact: https://github.com/Chocobozzz/PeerTube/blob/develop/SECURITY.md\nContact: mailto:"
 
 services:
   # Cards configuration to format video in Twitter

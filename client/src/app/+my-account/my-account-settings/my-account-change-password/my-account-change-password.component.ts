@@ -4,6 +4,7 @@ import { FormReactive, UserService } from '../../../shared'
 import { I18n } from '@ngx-translate/i18n-polyfill'
 import { FormValidatorService } from '@app/shared/forms/form-validators/form-validator.service'
 import { UserValidatorsService } from '@app/shared/forms/form-validators/user-validators.service'
+import { filter } from 'rxjs/operators'
 
 @Component({
   selector: 'my-account-change-password',
@@ -26,23 +27,23 @@ export class MyAccountChangePasswordComponent extends FormReactive implements On
   ngOnInit () {
     this.buildForm({
       'new-password': this.userValidatorsService.USER_PASSWORD,
-      'new-confirmed-password': this.userValidatorsService.USER_PASSWORD
+      'new-confirmed-password': this.userValidatorsService.USER_CONFIRM_PASSWORD
     })
+
+    const confirmPasswordControl = this.form.get('new-confirmed-password')
+
+    confirmPasswordControl.valueChanges
+                          .pipe(filter(v => v !== this.form.value[ 'new-password' ]))
+                          .subscribe(() => confirmPasswordControl.setErrors({ matchPassword: true }))
   }
 
   changePassword () {
-    const newPassword = this.form.value['new-password']
-    const newConfirmedPassword = this.form.value['new-confirmed-password']
+    this.userService.changePassword(this.form.value[ 'new-password' ]).subscribe(
+      () => {
+        this.notificationsService.success(this.i18n('Success'), this.i18n('Password updated.'))
 
-    this.error = null
-
-    if (newPassword !== newConfirmedPassword) {
-      this.error = this.i18n('The new password and the confirmed password do not correspond.')
-      return
-    }
-
-    this.userService.changePassword(newPassword).subscribe(
-      () => this.notificationsService.success(this.i18n('Success'), this.i18n('Password updated.')),
+        this.form.reset()
+      },
 
       err => this.error = err.message
     )

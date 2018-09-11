@@ -26,7 +26,7 @@ p-table {
   }
 
   tr {
-    background-color: #fff !important;
+    background-color: var(--mainBackgroundColor) !important;
     height: 46px;
   }
 
@@ -84,6 +84,7 @@ p-table {
 
         color: #000;
         font-size: 11px;
+        top: 0;
 
         &.pi-sort-up {
           @extend .glyphicon-triangle-top;
@@ -166,7 +167,7 @@ p-table {
           &.ui-state-active {
             &, &:hover, &:active, &:focus {
               color: #fff !important;
-              background-color: $orange-color !important;
+              background-color: var(--mainColor) !important;
             }
           }
         }

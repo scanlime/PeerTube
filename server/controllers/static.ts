@@ -1,7 +1,7 @@
 import * as cors from 'cors'
 import { createReadStream } from 'fs-extra'
 import * as express from 'express'
-import { CONFIG, STATIC_DOWNLOAD_PATHS, STATIC_MAX_AGE, STATIC_PATHS, ROUTE_CACHE_LIFETIME } from '../initializers'
+import { CONFIG, ROUTE_CACHE_LIFETIME, STATIC_DOWNLOAD_PATHS, STATIC_MAX_AGE, STATIC_PATHS } from '../initializers'
 import { VideosPreviewCache } from '../lib/cache'
 import { cacheRoute } from '../middlewares/cache'
 import { asyncMiddleware, videosGetValidator } from '../middlewares'
@@ -9,7 +9,7 @@ import { VideoModel } from '../models/video/video'
 import { VideosCaptionCache } from '../lib/cache/videos-caption-cache'
 import { UserModel } from '../models/account/user'
 import { VideoCommentModel } from '../models/video/video-comment'
-import { HttpNodeinfoDiasporaSoftwareNsSchema20 } from '../models/nodeinfo'
+import { HttpNodeinfoDiasporaSoftwareNsSchema20 } from '../../shared/models/nodeinfo'
 
 const packageJSON = require('../../../package.json')
 const staticRouter = express.Router()
@@ -76,6 +76,21 @@ staticRouter.get('/robots.txt',
   (_, res: express.Response) => {
     res.type('text/plain')
     return res.send(CONFIG.INSTANCE.ROBOTS)
+  }
+)
+
+// security.txt service
+staticRouter.get('/security.txt',
+  (_, res: express.Response) => {
+    return res.redirect(301, '/.well-known/security.txt')
+  }
+)
+
+staticRouter.get('/.well-known/security.txt',
+  asyncMiddleware(cacheRoute(ROUTE_CACHE_LIFETIME.SECURITYTXT)),
+  (_, res: express.Response) => {
+    res.type('text/plain')
+    return res.send(CONFIG.INSTANCE.SECURITYTXT + CONFIG.INSTANCE.SECURITYTXT_CONTACT)
   }
 )
 

@@ -1,5 +1,6 @@
+import { Observable } from 'rxjs'
 import { catchError, map } from 'rxjs/operators'
-import { HttpClient } from '@angular/common/http'
+import { HttpClient, HttpParams } from '@angular/common/http'
 import { Injectable } from '@angular/core'
 import { UserCreate, UserUpdateMe, UserVideoQuota } from '../../../../../shared'
 import { environment } from '../../../environments/environment'
@@ -93,5 +94,37 @@ export class UserService {
                  map(this.restExtractor.extractDataBool),
                  catchError(res => this.restExtractor.handleError(res))
                )
+  }
+
+  verifyEmail (userId: number, verificationString: string) {
+    const url = `${UserService.BASE_USERS_URL}/${userId}/verify-email`
+    const body = {
+      verificationString
+    }
+
+    return this.authHttp.post(url, body)
+               .pipe(
+                 map(this.restExtractor.extractDataBool),
+                 catchError(res => this.restExtractor.handleError(res))
+               )
+  }
+
+  askSendVerifyEmail (email: string) {
+    const url = UserService.BASE_USERS_URL + '/ask-send-verify-email'
+
+    return this.authHttp.post(url, { email })
+               .pipe(
+                 map(this.restExtractor.extractDataBool),
+                 catchError(err => this.restExtractor.handleError(err))
+               )
+  }
+
+  autocomplete (search: string): Observable<string[]> {
+    const url = UserService.BASE_USERS_URL + 'autocomplete'
+    const params = new HttpParams().append('search', search)
+
+    return this.authHttp
+      .get<string[]>(url, { params })
+      .pipe(catchError(res => this.restExtractor.handleError(res)))
   }
 }

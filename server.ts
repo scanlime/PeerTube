@@ -55,7 +55,8 @@ app.set('trust proxy', CONFIG.TRUST_PROXY)
 app.use(helmet({
   frameguard: {
     action: 'deny' // we only allow it for /videos/embed, see server/controllers/client.ts
-  }
+  },
+  hsts: false
 }))
 
 // ----------- Database -----------
@@ -166,7 +167,10 @@ app.use(function (err, req, res, next) {
     error = err.stack || err.message || err
   }
 
-  logger.error('Error in controller.', { err: error })
+  // Sequelize error
+  const sql = err.parent ? err.parent.sql : undefined
+
+  logger.error('Error in controller.', { err: error, sql })
   return res.status(err.status || 500).end()
 })
 

@@ -18,6 +18,7 @@ import {
   setDefaultPagination,
   setDefaultSort,
   token,
+  userAutocompleteValidator,
   usersAddValidator,
   usersGetValidator,
   usersRegisterValidator,
@@ -25,7 +26,10 @@ import {
   usersSortValidator,
   usersUpdateValidator
 } from '../../../middlewares'
-import { usersAskResetPasswordValidator, usersBlockingValidator, usersResetPasswordValidator } from '../../../middlewares/validators'
+import {
+  usersAskResetPasswordValidator, usersBlockingValidator, usersResetPasswordValidator,
+  usersAskSendVerifyEmailValidator, usersVerifyEmailValidator
+} from '../../../middlewares/validators'
 import { UserModel } from '../../../models/account/user'
 import { OAuthTokenModel } from '../../../models/oauth/oauth-token'
 import { auditLoggerFactory, UserAuditView } from '../../../helpers/audit-logger'
@@ -39,8 +43,19 @@ const loginRateLimiter = new RateLimit({
   delayMs: 0
 })
 
+const askSendEmailLimiter = new RateLimit({
+  windowMs: RATES_LIMIT.ASK_SEND_EMAIL.WINDOW_MS,
+  max: RATES_LIMIT.ASK_SEND_EMAIL.MAX,
+  delayMs: 0
+})
+
 const usersRouter = express.Router()
 usersRouter.use('/', meRouter)
+
+usersRouter.get('/autocomplete',
+  userAutocompleteValidator,
+  asyncMiddleware(autocompleteUsers)
+)
 
 usersRouter.get('/',
   authenticate,
@@ -110,6 +125,17 @@ usersRouter.post('/:id/reset-password',
   asyncMiddleware(resetUserPassword)
 )
 
+usersRouter.post('/ask-send-verify-email',
+  askSendEmailLimiter,
+  asyncMiddleware(usersAskSendVerifyEmailValidator),
+  asyncMiddleware(askSendVerifyUserEmail)
+)
+
+usersRouter.post('/:id/verify-email',
+  asyncMiddleware(usersVerifyEmailValidator),
+  asyncMiddleware(verifyUserEmail)
+)
+
 usersRouter.post('/token',
   loginRateLimiter,
   token,
@@ -134,7 +160,8 @@ async function createUser (req: express.Request, res: express.Response) {
     nsfwPolicy: CONFIG.INSTANCE.DEFAULT_NSFW_POLICY,
     autoPlayVideo: true,
     role: body.role,
-    videoQuota: body.videoQuota
+    videoQuota: body.videoQuota,
+    videoQuotaDaily: body.videoQuotaDaily
   })
 
   const { user, account } = await createUserAccountAndChannel(userToCreate)
@@ -163,13 +190,19 @@ async function registerUser (req: express.Request, res: express.Response) {
     nsfwPolicy: CONFIG.INSTANCE.DEFAULT_NSFW_POLICY,
     autoPlayVideo: true,
     role: UserRole.USER,
-    videoQuota: CONFIG.USER.VIDEO_QUOTA
+    videoQuota: CONFIG.USER.VIDEO_QUOTA,
+    videoQuotaDaily: CONFIG.USER.VIDEO_QUOTA_DAILY,
+    emailVerified: CONFIG.SIGNUP.REQUIRES_EMAIL_VERIFICATION ? false : null
   })
 
   const { user } = await createUserAccountAndChannel(userToCreate)
 
   auditLogger.create(body.username, new UserAuditView(user.toFormattedJSON()))
   logger.info('User %s with its channel and account registered.', body.username)
+
+  if (CONFIG.SIGNUP.REQUIRES_EMAIL_VERIFICATION) {
+    await sendVerifyUserEmail(user)
+  }
 
   return res.type('json').status(204).end()
 }
@@ -193,6 +226,12 @@ async function blockUser (req: express.Request, res: express.Response, next: exp
 
 function getUser (req: express.Request, res: express.Response, next: express.NextFunction) {
   return res.json((res.locals.user as UserModel).toFormattedJSON())
+}
+
+async function autocompleteUsers (req: express.Request, res: express.Response, next: express.NextFunction) {
+  const resultList = await UserModel.autoComplete(req.query.search as string)
+
+  return res.json(resultList)
 }
 
 async function listUsers (req: express.Request, res: express.Response, next: express.NextFunction) {
@@ -219,6 +258,7 @@ async function updateUser (req: express.Request, res: express.Response, next: ex
 
   if (body.email !== undefined) userToUpdate.email = body.email
   if (body.videoQuota !== undefined) userToUpdate.videoQuota = body.videoQuota
+  if (body.videoQuotaDaily !== undefined) userToUpdate.videoQuotaDaily = body.videoQuotaDaily
   if (body.role !== undefined) userToUpdate.role = body.role
 
   const user = await userToUpdate.save()
@@ -252,6 +292,30 @@ async function askResetUserPassword (req: express.Request, res: express.Response
 async function resetUserPassword (req: express.Request, res: express.Response, next: express.NextFunction) {
   const user = res.locals.user as UserModel
   user.password = req.body.password
+
+  await user.save()
+
+  return res.status(204).end()
+}
+
+async function sendVerifyUserEmail (user: UserModel) {
+  const verificationString = await Redis.Instance.setVerifyEmailVerificationString(user.id)
+  const url = CONFIG.WEBSERVER.URL + '/verify-account/email?userId=' + user.id + '&verificationString=' + verificationString
+  await Emailer.Instance.addVerifyEmailJob(user.email, url)
+  return
+}
+
+async function askSendVerifyUserEmail (req: express.Request, res: express.Response, next: express.NextFunction) {
+  const user = res.locals.user as UserModel
+
+  await sendVerifyUserEmail(user)
+
+  return res.status(204).end()
+}
+
+async function verifyUserEmail (req: express.Request, res: express.Response, next: express.NextFunction) {
+  const user = res.locals.user as UserModel
+  user.emailVerified = true
 
   await user.save()
 

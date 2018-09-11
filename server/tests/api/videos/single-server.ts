@@ -196,7 +196,7 @@ describe('Test a single server', function () {
   })
 
   it('Should have the views updated', async function () {
-    this.timeout(10000)
+    this.timeout(20000)
 
     await viewVideo(server.url, videoId)
     await viewVideo(server.url, videoId)
@@ -211,6 +211,9 @@ describe('Test a single server', function () {
 
     await viewVideo(server.url, videoId)
     await viewVideo(server.url, videoId)
+
+    // Wait the repeatable job
+    await wait(8000)
 
     const res = await getVideo(server.url, videoId)
 
@@ -334,6 +337,14 @@ describe('Test a single server', function () {
     expect(videos[5].name).to.equal('video_short1.webm name')
 
     videoId = videos[3].uuid
+  })
+
+  it('Should list and sort by trending in descending order', async function () {
+    const res = await getVideosListPagination(server.url, 0, 2, '-trending')
+
+    const videos = res.body.data
+    expect(res.body.total).to.equal(6)
+    expect(videos.length).to.equal(2)
   })
 
   it('Should update a video', async function () {

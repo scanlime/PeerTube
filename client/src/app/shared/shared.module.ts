@@ -12,6 +12,7 @@ import { BytesPipe, KeysPipe, NgPipesModule } from 'ngx-pipes'
 import { SharedModule as PrimeSharedModule } from 'primeng/components/common/shared'
 
 import { AUTH_INTERCEPTOR_PROVIDER } from './auth'
+import { ButtonComponent } from './buttons/button.component'
 import { DeleteButtonComponent } from './buttons/delete-button.component'
 import { EditButtonComponent } from './buttons/edit-button.component'
 import { FromNowPipe } from './misc/from-now.pipe'
@@ -22,6 +23,7 @@ import { RestExtractor, RestService } from './rest'
 import { UserService } from './users'
 import { VideoAbuseService } from './video-abuse'
 import { VideoBlacklistService } from './video-blacklist'
+import { VideoOwnershipService } from './video-ownership'
 import { VideoMiniatureComponent } from './video/video-miniature.component'
 import { VideoFeedComponent } from './video/video-feed.component'
 import { VideoThumbnailComponent } from './video/video-thumbnail.component'
@@ -40,7 +42,8 @@ import {
   VideoBlacklistValidatorsService,
   VideoChannelValidatorsService,
   VideoCommentValidatorsService,
-  VideoValidatorsService
+  VideoValidatorsService,
+  VideoChangeOwnershipValidatorsService, VideoAcceptOwnershipValidatorsService
 } from '@app/shared/forms'
 import { I18nPrimengCalendarService } from '@app/shared/i18n/i18n-primeng-calendar'
 import { ScreenService } from '@app/shared/misc/screen.service'
@@ -51,6 +54,8 @@ import { VideoImportService } from '@app/shared/video-import/video-import.servic
 import { ActionDropdownComponent } from '@app/shared/buttons/action-dropdown.component'
 import { NgbDropdownModule, NgbModalModule, NgbPopoverModule, NgbTabsetModule, NgbTooltipModule } from '@ng-bootstrap/ng-bootstrap'
 import { SubscribeButtonComponent, UserSubscriptionService } from '@app/shared/user-subscription'
+import { InstanceFeaturesTableComponent } from '@app/shared/instance/instance-features-table.component'
+import { OverviewService } from '@app/shared/overview'
 
 @NgModule({
   imports: [
@@ -75,6 +80,7 @@ import { SubscribeButtonComponent, UserSubscriptionService } from '@app/shared/u
     VideoThumbnailComponent,
     VideoMiniatureComponent,
     VideoFeedComponent,
+    ButtonComponent,
     DeleteButtonComponent,
     EditButtonComponent,
     ActionDropdownComponent,
@@ -86,7 +92,8 @@ import { SubscribeButtonComponent, UserSubscriptionService } from '@app/shared/u
     HelpComponent,
     ReactiveFileComponent,
     PeertubeCheckboxComponent,
-    SubscribeButtonComponent
+    SubscribeButtonComponent,
+    InstanceFeaturesTableComponent
   ],
 
   exports: [
@@ -110,6 +117,7 @@ import { SubscribeButtonComponent, UserSubscriptionService } from '@app/shared/u
     VideoThumbnailComponent,
     VideoMiniatureComponent,
     VideoFeedComponent,
+    ButtonComponent,
     DeleteButtonComponent,
     EditButtonComponent,
     ActionDropdownComponent,
@@ -119,6 +127,7 @@ import { SubscribeButtonComponent, UserSubscriptionService } from '@app/shared/u
     ReactiveFileComponent,
     PeertubeCheckboxComponent,
     SubscribeButtonComponent,
+    InstanceFeaturesTableComponent,
 
     NumberFormatterPipe,
     ObjectLengthPipe,
@@ -131,6 +140,7 @@ import { SubscribeButtonComponent, UserSubscriptionService } from '@app/shared/u
     RestService,
     VideoAbuseService,
     VideoBlacklistService,
+    VideoOwnershipService,
     UserService,
     VideoService,
     AccountService,
@@ -151,6 +161,9 @@ import { SubscribeButtonComponent, UserSubscriptionService } from '@app/shared/u
     VideoValidatorsService,
     VideoCaptionsValidatorsService,
     VideoBlacklistValidatorsService,
+    OverviewService,
+    VideoChangeOwnershipValidatorsService,
+    VideoAcceptOwnershipValidatorsService,
 
     I18nPrimengCalendarService,
     ScreenService,

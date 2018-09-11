@@ -1,6 +1,6 @@
 import { Component, OnInit, ViewChild } from '@angular/core'
 import { UserRight } from '../../../../shared/models/users/user-right.enum'
-import { AuthService, AuthStatus, RedirectService, ServerService } from '../core'
+import { AuthService, AuthStatus, RedirectService, ServerService, ThemeService } from '../core'
 import { User } from '../shared/users/user.model'
 import { LanguageChooserComponent } from '@app/menu/language-chooser.component'
 
@@ -26,7 +26,8 @@ export class MenuComponent implements OnInit {
   constructor (
     private authService: AuthService,
     private serverService: ServerService,
-    private redirectService: RedirectService
+    private redirectService: RedirectService,
+    private themeService: ThemeService
   ) {}
 
   ngOnInit () {
@@ -94,6 +95,10 @@ export class MenuComponent implements OnInit {
 
   openLanguageChooser () {
     this.languageChooserModal.show()
+  }
+
+  toggleDarkTheme () {
+    this.themeService.toggleDarkTheme()
   }
 
   private computeIsUserHasAdminAccess () {
