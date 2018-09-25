@@ -1,21 +1,22 @@
 import { IConfig } from 'config'
 import { dirname, join } from 'path'
-import { JobType, VideoRateType, VideoState } from '../../shared/models'
+import { JobType, VideoRateType, VideoState, VideosRedundancy } from '../../shared/models'
 import { ActivityPubActorType } from '../../shared/models/activitypub'
 import { FollowState } from '../../shared/models/actors'
 import { VideoAbuseState, VideoImportState, VideoPrivacy } from '../../shared/models/videos'
 // Do not use barrels, remain constants as independent as possible
-import { buildPath, isTestInstance, root, sanitizeHost, sanitizeUrl } from '../helpers/core-utils'
+import { buildPath, isTestInstance, parseDuration, root, sanitizeHost, sanitizeUrl } from '../helpers/core-utils'
 import { NSFWPolicyType } from '../../shared/models/videos/nsfw-policy.type'
 import { invert } from 'lodash'
 import { CronRepeatOptions, EveryRepeatOptions } from 'bull'
+import * as bytes from 'bytes'
 
 // Use a variable to reload the configuration if we need
 let config: IConfig = require('config')
 
 // ---------------------------------------------------------------------------
 
-const LAST_MIGRATION_VERSION = 265
+const LAST_MIGRATION_VERSION = 270
 
 // ---------------------------------------------------------------------------
 
@@ -65,7 +66,8 @@ const ROUTE_CACHE_LIFETIME = {
   },
   ACTIVITY_PUB: {
     VIDEOS: '1 second' // 1 second, cache concurrent requests after a broadcast for example
-  }
+  },
+  STATS: '4 hours'
 }
 
 // ---------------------------------------------------------------------------
@@ -208,6 +210,12 @@ const CONFIG = {
       INTERVAL_DAYS: config.get<number>('trending.videos.interval_days')
     }
   },
+  REDUNDANCY: {
+    VIDEOS: {
+      CHECK_INTERVAL: parseDuration(config.get<string>('redundancy.videos.check_interval')),
+      STRATEGIES: buildVideosRedundancy(config.get<any[]>('redundancy.videos.strategies'))
+    }
+  },
   ADMIN: {
     get EMAIL () { return config.get<string>('admin.email') }
   },
@@ -320,6 +328,9 @@ const CONSTRAINTS_FIELDS = {
         max: 1024 * 200 // 200 KB
       }
     }
+  },
+  VIDEOS_REDUNDANCY: {
+    URL: { min: 3, max: 2000 } // Length
   },
   VIDEOS: {
     NAME: { min: 3, max: 120 }, // Length
@@ -584,6 +595,16 @@ const CACHE = {
   }
 }
 
+const MEMOIZE_TTL = {
+  OVERVIEWS_SAMPLE: 1000 * 3600 * 4 // 4 hours
+}
+
+const REDUNDANCY = {
+  VIDEOS: {
+    RANDOMIZED_FACTOR: 5
+  }
+}
+
 const ACCEPT_HEADERS = [ 'html', 'application/json' ].concat(ACTIVITY_PUB.POTENTIAL_ACCEPT_HEADERS)
 
 // ---------------------------------------------------------------------------
@@ -631,11 +652,15 @@ if (isTestInstance() === true) {
   SCHEDULER_INTERVALS_MS.updateVideos = 5000
   REPEAT_JOBS['videos-views'] = { every: 5000 }
 
+  REDUNDANCY.VIDEOS.RANDOMIZED_FACTOR = 1
+
   VIDEO_VIEW_LIFETIME = 1000 // 1 second
 
   JOB_ATTEMPTS['email'] = 1
 
   CACHE.VIDEO_CAPTIONS.MAX_AGE = 3000
+  MEMOIZE_TTL.OVERVIEWS_SAMPLE = 1
+  ROUTE_CACHE_LIFETIME.OVERVIEWS.VIDEOS = '0ms'
 }
 
 updateWebserverConfig()
@@ -653,6 +678,7 @@ export {
   CONFIG,
   CONSTRAINTS_FIELDS,
   EMBED_SIZE,
+  REDUNDANCY,
   JOB_CONCURRENCY,
   JOB_ATTEMPTS,
   LAST_MIGRATION_VERSION,
@@ -689,6 +715,7 @@ export {
   VIDEO_ABUSE_STATES,
   JOB_REQUEST_TIMEOUT,
   USER_PASSWORD_RESET_LIFETIME,
+  MEMOIZE_TTL,
   USER_EMAIL_VERIFY_LIFETIME,
   IMAGE_MIMETYPE_EXT,
   OVERVIEWS,
@@ -720,6 +747,18 @@ function getLocalConfigFilePath () {
 function updateWebserverConfig () {
   CONFIG.WEBSERVER.URL = sanitizeUrl(CONFIG.WEBSERVER.SCHEME + '://' + CONFIG.WEBSERVER.HOSTNAME + ':' + CONFIG.WEBSERVER.PORT)
   CONFIG.WEBSERVER.HOST = sanitizeHost(CONFIG.WEBSERVER.HOSTNAME + ':' + CONFIG.WEBSERVER.PORT, REMOTE_SCHEME.HTTP)
+}
+
+function buildVideosRedundancy (objs: any[]): VideosRedundancy[] {
+  if (!objs) return []
+
+  return objs.map(obj => {
+    return Object.assign(obj, {
+      minLifetime: parseDuration(obj.min_lifetime),
+      size: bytes.parse(obj.size),
+      minViews: obj.min_views
+    })
+  })
 }
 
 function buildLanguages () {

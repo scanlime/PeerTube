@@ -9,7 +9,7 @@ $icon-font-path: '../../node_modules/@neos21/bootstrap3-glyphicons/assets/fonts/
 @import '~video.js/dist/video-js.css';
 
 $assets-path: '../assets/';
-@import './player/player';
+@import './player/index';
 @import './loading-bar';
 
 @import './primeng-custom';
@@ -26,6 +26,8 @@ body {
   --mainHoverColor: #{$orange-hoover-color};
   --mainBackgroundColor: #{$bg-color};
   --mainForegroundColor: #{$fg-color};
+  --menuBackgroundColor: #{$menu-background};
+  --menuForegroundColor: #{$menu-color};
   --submenuColor: #{$sub-menu-color};
   --inputColor: #{$input-background-color};
   --inputPlaceholderColor: #{$input-placeholder-color};
@@ -56,6 +58,10 @@ input.readonly {
 input, textarea {
   outline: none;
   color: var(--mainForegroundColor);
+}
+
+.btn-outline-secondary {
+  border-color: $input-border-color;
 }
 
 label {
@@ -279,6 +285,11 @@ ngb-tabset.bootstrap {
       color: var(--mainForegroundColor) !important;
     }
   }
+}
+
+.nav-tabs .nav-link.active {
+  background-color: var(--mainBackgroundColor) !important;
+  border-bottom: none;
 }
 
 .orange-button {

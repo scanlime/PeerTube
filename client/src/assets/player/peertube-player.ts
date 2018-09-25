@@ -2,7 +2,6 @@ import { VideoFile } from '../../../../shared/models/videos'
 
 import 'videojs-hotkeys'
 import 'videojs-dock'
-import 'videojs-contextmenu'
 import 'videojs-contextmenu-ui'
 import './peertube-link-button'
 import './resolution-menu-button'
@@ -70,7 +69,25 @@ function getVideojsOptions (options: {
     Object.assign(videojsOptions.plugins, {
       hotkeys: {
         enableVolumeScroll: false,
-        enableModifiersForNumbers: false
+        enableModifiersForNumbers: false,
+        customKeys: {
+          increasePlaybackRateKey: {
+            key: function (event) {
+              return event.key === '>'
+            },
+            handler: function (player) {
+              player.playbackRate((player.playbackRate() + 0.1).toFixed(2))
+            }
+          },
+          decreasePlaybackRateKey: {
+            key: function (event) {
+              return event.key === '<'
+            },
+            handler: function (player) {
+              player.playbackRate((player.playbackRate() - 0.1).toFixed(2))
+            }
+          }
+        }
       }
     })
   }

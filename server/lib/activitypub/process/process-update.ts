@@ -1,4 +1,4 @@
-import { ActivityUpdate, VideoTorrentObject } from '../../../../shared/models/activitypub'
+import { ActivityUpdate, CacheFileObject, VideoTorrentObject } from '../../../../shared/models/activitypub'
 import { ActivityPubActor } from '../../../../shared/models/activitypub/activitypub-actor'
 import { resetSequelizeInstance, retryTransactionWrapper } from '../../../helpers/database-utils'
 import { logger } from '../../../helpers/logger'
@@ -6,18 +6,31 @@ import { sequelizeTypescript } from '../../../initializers'
 import { AccountModel } from '../../../models/account/account'
 import { ActorModel } from '../../../models/activitypub/actor'
 import { VideoChannelModel } from '../../../models/video/video-channel'
-import { fetchAvatarIfExists, getOrCreateActorAndServerAndModel, updateActorAvatarInstance, updateActorInstance } from '../actor'
+import { fetchAvatarIfExists, updateActorAvatarInstance, updateActorInstance } from '../actor'
 import { getOrCreateVideoAndAccountAndChannel, getOrCreateVideoChannelFromVideoObject, updateVideoFromAP } from '../videos'
 import { sanitizeAndCheckVideoTorrentObject } from '../../../helpers/custom-validators/activitypub/videos'
+import { isCacheFileObjectValid } from '../../../helpers/custom-validators/activitypub/cache-file'
+import { VideoRedundancyModel } from '../../../models/redundancy/video-redundancy'
+import { createCacheFile, updateCacheFile } from '../cache-file'
+import { forwardVideoRelatedActivity } from '../send/utils'
 
-async function processUpdateActivity (activity: ActivityUpdate) {
-  const actor = await getOrCreateActorAndServerAndModel(activity.actor)
+async function processUpdateActivity (activity: ActivityUpdate, byActor: ActorModel) {
   const objectType = activity.object.type
 
   if (objectType === 'Video') {
-    return retryTransactionWrapper(processUpdateVideo, actor, activity)
-  } else if (objectType === 'Person' || objectType === 'Application' || objectType === 'Group') {
-    return retryTransactionWrapper(processUpdateActor, actor, activity)
+    return retryTransactionWrapper(processUpdateVideo, byActor, activity)
+  }
+
+  if (objectType === 'Person' || objectType === 'Application' || objectType === 'Group') {
+    // We need more attributes
+    const byActorFull = await ActorModel.loadByUrlAndPopulateAccountAndChannel(byActor.url)
+    return retryTransactionWrapper(processUpdateActor, byActorFull, activity)
+  }
+
+  if (objectType === 'CacheFile') {
+    // We need more attributes
+    const byActorFull = await ActorModel.loadByUrlAndPopulateAccountAndChannel(byActor.url)
+    return retryTransactionWrapper(processUpdateCacheFile, byActorFull, activity)
   }
 
   return undefined
@@ -39,10 +52,46 @@ async function processUpdateVideo (actor: ActorModel, activity: ActivityUpdate) 
     return undefined
   }
 
-  const { video } = await getOrCreateVideoAndAccountAndChannel(videoObject.id)
+  const { video } = await getOrCreateVideoAndAccountAndChannel({ videoObject: videoObject.id })
   const channelActor = await getOrCreateVideoChannelFromVideoObject(videoObject)
 
-  return updateVideoFromAP(video, videoObject, actor, channelActor, activity.to)
+  const updateOptions = {
+    video,
+    videoObject,
+    account: actor.Account,
+    channel: channelActor.VideoChannel,
+    updateViews: true,
+    overrideTo: activity.to
+  }
+  return updateVideoFromAP(updateOptions)
+}
+
+async function processUpdateCacheFile (byActor: ActorModel, activity: ActivityUpdate) {
+  const cacheFileObject = activity.object as CacheFileObject
+
+  if (!isCacheFileObjectValid(cacheFileObject)) {
+    logger.debug('Cache file object sent by update is not valid.', { cacheFileObject })
+    return undefined
+  }
+
+  const { video } = await getOrCreateVideoAndAccountAndChannel({ videoObject: cacheFileObject.object })
+
+  await sequelizeTypescript.transaction(async t => {
+    const redundancyModel = await VideoRedundancyModel.loadByUrl(cacheFileObject.id, t)
+
+    if (!redundancyModel) {
+      await createCacheFile(cacheFileObject, video, byActor, t)
+    } else {
+      await updateCacheFile(cacheFileObject, redundancyModel, video, byActor, t)
+    }
+  })
+
+  if (video.isOwned()) {
+    // Don't resend the activity to the sender
+    const exceptions = [ byActor ]
+
+    await forwardVideoRelatedActivity(activity, undefined, exceptions, video)
+  }
 }
 
 async function processUpdateActor (actor: ActorModel, activity: ActivityUpdate) {

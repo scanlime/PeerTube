@@ -1,42 +1,8 @@
 import * as config from 'config'
 import { promisify0 } from '../helpers/core-utils'
-import { UserModel } from '../models/account/user'
-import { ApplicationModel } from '../models/application/application'
-import { OAuthClientModel } from '../models/oauth/oauth-client'
-import { parse } from 'url'
-import { CONFIG } from './constants'
-import { logger } from '../helpers/logger'
-import { getServerActor } from '../helpers/utils'
+import { isArray } from '../helpers/custom-validators/misc'
 
-async function checkActivityPubUrls () {
-  const actor = await getServerActor()
-
-  const parsed = parse(actor.url)
-  if (CONFIG.WEBSERVER.HOST !== parsed.host) {
-    const NODE_ENV = config.util.getEnv('NODE_ENV')
-    const NODE_CONFIG_DIR = config.util.getEnv('NODE_CONFIG_DIR')
-
-    logger.warn(
-      'It seems PeerTube was started (and created some data) with another domain name. ' +
-      'This means you will not be able to federate! ' +
-      'Please use %s %s npm run update-host to fix this.',
-      NODE_CONFIG_DIR ? `NODE_CONFIG_DIR=${NODE_CONFIG_DIR}` : '',
-      NODE_ENV ? `NODE_ENV=${NODE_ENV}` : ''
-    )
-  }
-}
-
-// Some checks on configuration files
-// Return an error message, or null if everything is okay
-function checkConfig () {
-  const defaultNSFWPolicy = config.get<string>('instance.default_nsfw_policy')
-
-  if ([ 'do_not_list', 'blur', 'display' ].indexOf(defaultNSFWPolicy) === -1) {
-    return 'NSFW policy setting should be "do_not_list" or "blur" or "display" instead of ' + defaultNSFWPolicy
-  }
-
-  return null
-}
+// ONLY USE CORE MODULES IN THIS FILE!
 
 // Check the config files
 function checkMissedConfig () {
@@ -51,6 +17,7 @@ function checkMissedConfig () {
     'cache.previews.size', 'admin.email',
     'signup.enabled', 'signup.limit', 'signup.requires_email_verification',
     'signup.filters.cidr.whitelist', 'signup.filters.cidr.blacklist',
+    'redundancy.videos.strategies', 'redundancy.videos.check_interval',
     'transcoding.enabled', 'transcoding.threads',
     'import.videos.http.enabled', 'import.videos.torrent.enabled',
     'trending.videos.interval_days',
@@ -69,6 +36,14 @@ function checkMissedConfig () {
   for (const key of required) {
     if (!config.has(key)) {
       miss.push(key)
+    }
+  }
+
+  const redundancyVideos = config.get<any>('redundancy.videos.strategies')
+  if (isArray(redundancyVideos)) {
+    for (const r of redundancyVideos) {
+      if (!r.size) miss.push('redundancy.videos.strategies.size')
+      if (!r.min_lifetime) miss.push('redundancy.videos.strategies.min_lifetime')
     }
   }
 
@@ -126,36 +101,10 @@ async function checkFFmpegEncoders (): Promise<Map<string, boolean>> {
   }
 }
 
-// We get db by param to not import it in this file (import orders)
-async function clientsExist () {
-  const totalClients = await OAuthClientModel.countTotal()
-
-  return totalClients !== 0
-}
-
-// We get db by param to not import it in this file (import orders)
-async function usersExist () {
-  const totalUsers = await UserModel.countTotal()
-
-  return totalUsers !== 0
-}
-
-// We get db by param to not import it in this file (import orders)
-async function applicationExist () {
-  const totalApplication = await ApplicationModel.countTotal()
-
-  return totalApplication !== 0
-}
-
 // ---------------------------------------------------------------------------
 
 export {
-  checkConfig,
   checkFFmpeg,
   checkFFmpegEncoders,
-  checkMissedConfig,
-  clientsExist,
-  usersExist,
-  applicationExist,
-  checkActivityPubUrls
+  checkMissedConfig
 }

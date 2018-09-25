@@ -17,8 +17,6 @@ import {
 import { VideoChannelsSearchQuery, VideosSearchQuery } from '../../../shared/models/search'
 import { getOrCreateActorAndServerAndModel, getOrCreateVideoAndAccountAndChannel } from '../../lib/activitypub'
 import { logger } from '../../helpers/logger'
-import { User } from '../../../shared/models/users'
-import { CONFIG } from '../../initializers/constants'
 import { VideoChannelModel } from '../../models/video/video-channel'
 import { loadActorUrlOrGetFromWebfinger } from '../../helpers/webfinger'
 
@@ -58,6 +56,9 @@ function searchVideoChannels (req: express.Request, res: express.Response) {
   const isURISearch = search.startsWith('http://') || search.startsWith('https://')
 
   const parts = search.split('@')
+
+  // Handle strings like @toto@example.com
+  if (parts.length === 3 && parts[0].length === 0) parts.shift()
   const isWebfingerSearch = parts.length === 2 && parts.every(p => p.indexOf(' ') === -1)
 
   if (isURISearch || isWebfingerSearch) return searchVideoChannelURI(search, isWebfingerSearch, res)
@@ -88,7 +89,7 @@ async function searchVideoChannelURI (search: string, isWebfingerSearch: boolean
 
   if (isUserAbleToSearchRemoteURI(res)) {
     try {
-      const actor = await getOrCreateActorAndServerAndModel(uri, true, true)
+      const actor = await getOrCreateActorAndServerAndModel(uri, 'all', true, true)
       videoChannel = actor.VideoChannel
     } catch (err) {
       logger.info('Cannot search remote video channel %s.', uri, { err })
@@ -138,7 +139,7 @@ async function searchVideoURI (url: string, res: express.Response) {
         refreshVideo: false
       }
 
-      const result = await getOrCreateVideoAndAccountAndChannel(url, syncParam)
+      const result = await getOrCreateVideoAndAccountAndChannel({ videoObject: url, syncParam })
       video = result ? result.video : undefined
     } catch (err) {
       logger.info('Cannot search remote video %s.', url, { err })
