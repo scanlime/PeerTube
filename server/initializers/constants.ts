@@ -16,7 +16,7 @@ let config: IConfig = require('config')
 
 // ---------------------------------------------------------------------------
 
-const LAST_MIGRATION_VERSION = 270
+const LAST_MIGRATION_VERSION = 275
 
 // ---------------------------------------------------------------------------
 
@@ -119,7 +119,7 @@ const JOB_TTL: { [ id in JobType ]: number } = {
   'activitypub-follow': 60000 * 10, // 10 minutes
   'video-file-import': 1000 * 3600, // 1 hour
   'video-file': 1000 * 3600 * 48, // 2 days, transcoding could be long
-  'video-import': 1000 * 3600 * 5, // 5 hours
+  'video-import': 1000 * 3600, // 1 hour
   'email': 60000 * 10, // 10 minutes
   'videos-views': undefined // Unlimited
 }

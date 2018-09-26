@@ -21,7 +21,7 @@ import { getServerActor } from '../../helpers/utils'
 import { VideoModel } from '../video/video'
 import { VideoRedundancyStrategy } from '../../../shared/models/redundancy'
 import { logger } from '../../helpers/logger'
-import { CacheFileObject } from '../../../shared'
+import { CacheFileObject, VideoPrivacy } from '../../../shared'
 import { VideoChannelModel } from '../video/video-channel'
 import { ServerModel } from '../server/server'
 import { sample } from 'lodash'
@@ -160,6 +160,9 @@ export class VideoRedundancyModel extends Model<VideoRedundancyModel> {
       attributes: [ 'id', 'views' ],
       limit: randomizedFactor,
       order: getVideoSort('-views'),
+      where: {
+        privacy: VideoPrivacy.PUBLIC
+      },
       include: [
         await VideoRedundancyModel.buildVideoFileForDuplication(),
         VideoRedundancyModel.buildServerRedundancyInclude()
@@ -177,6 +180,9 @@ export class VideoRedundancyModel extends Model<VideoRedundancyModel> {
       group: 'VideoModel.id',
       limit: randomizedFactor,
       order: getVideoSort('-trending'),
+      where: {
+        privacy: VideoPrivacy.PUBLIC
+      },
       include: [
         await VideoRedundancyModel.buildVideoFileForDuplication(),
         VideoRedundancyModel.buildServerRedundancyInclude(),
@@ -195,6 +201,7 @@ export class VideoRedundancyModel extends Model<VideoRedundancyModel> {
       limit: randomizedFactor,
       order: getVideoSort('-publishedAt'),
       where: {
+        privacy: VideoPrivacy.PUBLIC,
         views: {
           [ Sequelize.Op.gte ]: minViews
         }
@@ -286,8 +293,8 @@ export class VideoRedundancyModel extends Model<VideoRedundancyModel> {
       raw: true,
       attributes: [
         [ Sequelize.fn('COALESCE', Sequelize.fn('SUM', Sequelize.col('VideoFile.size')), '0'), 'totalUsed' ],
-        [ Sequelize.fn('COUNT', Sequelize.fn('DISTINCT', 'videoId')), 'totalVideos' ],
-        [ Sequelize.fn('COUNT', 'videoFileId'), 'totalVideoFiles' ]
+        [ Sequelize.fn('COUNT', Sequelize.fn('DISTINCT', Sequelize.col('videoId'))), 'totalVideos' ],
+        [ Sequelize.fn('COUNT', Sequelize.col('videoFileId')), 'totalVideoFiles' ]
       ],
       where: {
         strategy,

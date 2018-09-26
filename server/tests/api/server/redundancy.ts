@@ -9,7 +9,7 @@ import {
   getFollowingListPaginationAndSort,
   getVideo,
   immutableAssign,
-  killallServers,
+  killallServers, makeGetRequest,
   root,
   ServerInfo,
   setAccessTokensToServers,
@@ -143,15 +143,27 @@ async function check2Webseeds (strategy: VideoRedundancyStrategy, videoUUID?: st
 
       for (const file of video.files) {
         checkMagnetWebseeds(file, webseeds, server)
+
+        // Only servers 1 and 2 have the video
+        if (server.serverNumber !== 3) {
+          await makeGetRequest({
+            url: server.url,
+            statusCodeExpected: 200,
+            path: '/static/webseed/' + `${videoUUID}-${file.resolution.id}.mp4`,
+            contentType: null
+          })
+        }
       }
     }
   }
 
-  const files = await readdir(join(root(), 'test1', 'videos'))
-  expect(files).to.have.lengthOf(4)
+  for (const directory of [ 'test1', 'test2' ]) {
+    const files = await readdir(join(root(), directory, 'videos'))
+    expect(files).to.have.length.at.least(4)
 
-  for (const resolution of [ 240, 360, 480, 720 ]) {
-    expect(files.find(f => f === `${videoUUID}-${resolution}.mp4`)).to.not.be.undefined
+    for (const resolution of [ 240, 360, 480, 720 ]) {
+      expect(files.find(f => f === `${videoUUID}-${resolution}.mp4`)).to.not.be.undefined
+    }
   }
 }
 
