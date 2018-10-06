@@ -1,5 +1,5 @@
 import { AbstractScheduler } from './abstract-scheduler'
-import { CONFIG, JOB_TTL, REDUNDANCY } from '../../initializers'
+import { CONFIG, REDUNDANCY, VIDEO_IMPORT_TIMEOUT } from '../../initializers'
 import { logger } from '../../helpers/logger'
 import { VideosRedundancy } from '../../../shared/models/redundancy'
 import { VideoRedundancyModel } from '../../models/redundancy/video-redundancy'
@@ -9,9 +9,9 @@ import { join } from 'path'
 import { rename } from 'fs-extra'
 import { getServerActor } from '../../helpers/utils'
 import { sendCreateCacheFile, sendUpdateCacheFile } from '../activitypub/send'
-import { VideoModel } from '../../models/video/video'
 import { getVideoCacheFileActivityPubUrl } from '../activitypub/url'
 import { removeVideoRedundancy } from '../redundancy'
+import { getOrCreateVideoAndAccountAndChannel } from '../activitypub'
 
 export class VideosRedundancyScheduler extends AbstractScheduler {
 
@@ -70,12 +70,26 @@ export class VideosRedundancyScheduler extends AbstractScheduler {
 
     for (const redundancyModel of expired) {
       try {
-        const redundancy = CONFIG.REDUNDANCY.VIDEOS.STRATEGIES.find(s => s.strategy === redundancyModel.strategy)
-        await this.extendsExpirationOf(redundancyModel, redundancy.minLifetime)
+        await this.extendsOrDeleteRedundancy(redundancyModel)
       } catch (err) {
         logger.error('Cannot extend expiration of %s video from our redundancy system.', this.buildEntryLogId(redundancyModel))
       }
     }
+  }
+
+  private async extendsOrDeleteRedundancy (redundancyModel: VideoRedundancyModel) {
+    // Refresh the video, maybe it was deleted
+    const video = await this.loadAndRefreshVideo(redundancyModel.VideoFile.Video.url)
+
+    if (!video) {
+      logger.info('Destroying existing redundancy %s, because the associated video does not exist anymore.', redundancyModel.url)
+
+      await redundancyModel.destroy()
+      return
+    }
+
+    const redundancy = CONFIG.REDUNDANCY.VIDEOS.STRATEGIES.find(s => s.strategy === redundancyModel.strategy)
+    await this.extendsExpirationOf(redundancyModel, redundancy.minLifetime)
   }
 
   private async purgeRemoteExpired () {
@@ -109,23 +123,27 @@ export class VideosRedundancyScheduler extends AbstractScheduler {
     const serverActor = await getServerActor()
 
     for (const file of filesToDuplicate) {
-      const existing = await VideoRedundancyModel.loadByFileId(file.id)
-      if (existing) {
-        await this.extendsExpirationOf(existing, redundancy.minLifetime)
+      const video = await this.loadAndRefreshVideo(file.Video.url)
+
+      const existingRedundancy = await VideoRedundancyModel.loadLocalByFileId(file.id)
+      if (existingRedundancy) {
+        await this.extendsOrDeleteRedundancy(existingRedundancy)
 
         continue
       }
 
-      // We need more attributes and check if the video still exists
-      const video = await VideoModel.loadAndPopulateAccountAndServerAndTags(file.Video.id)
-      if (!video) continue
+      if (!video) {
+        logger.info('Video %s we want to duplicate does not existing anymore, skipping.', file.Video.url)
+
+        continue
+      }
 
       logger.info('Duplicating %s - %d in videos redundancy with "%s" strategy.', video.url, file.resolution, redundancy.strategy)
 
       const { baseUrlHttp, baseUrlWs } = video.getBaseUrls()
       const magnetUri = video.generateMagnetUri(file, baseUrlHttp, baseUrlWs)
 
-      const tmpPath = await downloadWebTorrentVideo({ magnetUri }, JOB_TTL['video-import'])
+      const tmpPath = await downloadWebTorrentVideo({ magnetUri }, VIDEO_IMPORT_TIMEOUT)
 
       const destPath = join(CONFIG.STORAGE.VIDEOS_DIR, video.getVideoFilename(file))
       await rename(tmpPath, destPath)
@@ -141,6 +159,8 @@ export class VideosRedundancyScheduler extends AbstractScheduler {
       createdModel.VideoFile = file
 
       await sendCreateCacheFile(serverActor, createdModel)
+
+      logger.info('Duplicated %s - %d -> %s.', video.url, file.resolution, createdModel.url)
     }
   }
 
@@ -184,5 +204,17 @@ export class VideosRedundancyScheduler extends AbstractScheduler {
     const fileReducer = (previous: number, current: VideoFileModel) => previous + current.size
 
     return files.reduce(fileReducer, 0)
+  }
+
+  private async loadAndRefreshVideo (videoUrl: string) {
+    // We need more attributes and check if the video still exists
+    const getVideoOptions = {
+      videoObject: videoUrl,
+      syncParam: { likes: false, dislikes: false, shares: false, comments: false, thumbnail: false, refreshVideo: true },
+      fetchType: 'all' as 'all'
+    }
+    const { video } = await getOrCreateVideoAndAccountAndChannel(getVideoOptions)
+
+    return video
   }
 }

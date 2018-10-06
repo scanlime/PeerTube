@@ -1,19 +1,20 @@
 import * as express from 'express'
 import { body, param } from 'express-validator/check'
-import { UserRight } from '../../../shared'
-import { isAccountNameWithHostExist } from '../../helpers/custom-validators/accounts'
+import { UserRight } from '../../../../shared'
+import { isAccountNameWithHostExist } from '../../../helpers/custom-validators/accounts'
 import {
   isLocalVideoChannelNameExist,
   isVideoChannelDescriptionValid,
   isVideoChannelNameValid,
   isVideoChannelNameWithHostExist,
   isVideoChannelSupportValid
-} from '../../helpers/custom-validators/video-channels'
-import { logger } from '../../helpers/logger'
-import { UserModel } from '../../models/account/user'
-import { VideoChannelModel } from '../../models/video/video-channel'
-import { areValidationErrors } from './utils'
-import { isActorPreferredUsernameValid } from '../../helpers/custom-validators/activitypub/actor'
+} from '../../../helpers/custom-validators/video-channels'
+import { logger } from '../../../helpers/logger'
+import { UserModel } from '../../../models/account/user'
+import { VideoChannelModel } from '../../../models/video/video-channel'
+import { areValidationErrors } from '../utils'
+import { isActorPreferredUsernameValid } from '../../../helpers/custom-validators/activitypub/actor'
+import { ActorModel } from '../../../models/activitypub/actor'
 
 const listVideoAccountChannelsValidator = [
   param('accountName').exists().withMessage('Should have a valid account name'),
@@ -34,10 +35,18 @@ const videoChannelsAddValidator = [
   body('description').optional().custom(isVideoChannelDescriptionValid).withMessage('Should have a valid description'),
   body('support').optional().custom(isVideoChannelSupportValid).withMessage('Should have a valid support text'),
 
-  (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     logger.debug('Checking videoChannelsAdd parameters', { parameters: req.body })
 
     if (areValidationErrors(req, res)) return
+
+    const actor = await ActorModel.loadLocalByName(req.body.name)
+    if (actor) {
+      res.status(409)
+         .send({ error: 'Another actor (account/channel) with this name on this instance already exists or has already existed.' })
+         .end()
+      return false
+    }
 
     return next()
   }

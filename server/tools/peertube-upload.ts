@@ -15,6 +15,7 @@ program
   .option('-P, --privacy <privacy_number>', 'Privacy')
   .option('-N, --nsfw', 'Video is Not Safe For Work')
   .option('-c, --category <category_number>', 'Category number')
+  .option('-C, --channel-id <channel_id>', 'Channel ID')
   .option('-m, --comments-enabled', 'Enable comments')
   .option('-l, --licence <licence_number>', 'Licence number')
   .option('-L, --language <language_code>', 'Language ISO 639 code (fr or en...)')
@@ -108,6 +109,7 @@ async function run () {
   const videoAttributes = {
     name: program['videoName'],
     category: program['category'],
+    channelId: program['channelId'],
     licence: program['licence'],
     language: program['language'],
     nsfw: program['nsfw'],

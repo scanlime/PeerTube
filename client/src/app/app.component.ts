@@ -4,8 +4,10 @@ import { GuardsCheckStart, NavigationEnd, Router } from '@angular/router'
 import { AuthService, RedirectService, ServerService, ThemeService } from '@app/core'
 import { is18nPath } from '../../../shared/models/i18n'
 import { ScreenService } from '@app/shared/misc/screen.service'
-import { skip } from 'rxjs/operators'
+import { skip, debounceTime } from 'rxjs/operators'
 import { HotkeysService, Hotkey } from 'angular2-hotkeys'
+import { I18n } from '@ngx-translate/i18n-polyfill'
+import { fromEvent } from 'rxjs'
 
 @Component({
   selector: 'my-app',
@@ -27,10 +29,12 @@ export class AppComponent implements OnInit {
   }
 
   isMenuDisplayed = true
+  isMenuChangedByUser = false
 
   customCSS: SafeHtml
 
   constructor (
+    private i18n: I18n,
     private router: Router,
     private authService: AuthService,
     private serverService: ServerService,
@@ -43,6 +47,11 @@ export class AppComponent implements OnInit {
 
   get serverVersion () {
     return this.serverService.getConfig().serverVersion
+  }
+
+  get serverCommit () {
+    const commit = this.serverService.getConfig().serverCommit || ''
+    return (commit !== '') ? '...' + commit : commit
   }
 
   get instanceName () {
@@ -128,36 +137,40 @@ export class AppComponent implements OnInit {
       new Hotkey(['/', 's'], (event: KeyboardEvent): boolean => {
         document.getElementById('search-video').focus()
         return false
-      }, undefined, 'Focus the search bar'),
+      }, undefined, this.i18n('Focus the search bar')),
       new Hotkey('b', (event: KeyboardEvent): boolean => {
         this.toggleMenu()
         return false
-      }, undefined, 'Toggle the left menu'),
+      }, undefined, this.i18n('Toggle the left menu')),
       new Hotkey('g o', (event: KeyboardEvent): boolean => {
         this.router.navigate([ '/videos/overview' ])
         return false
-      }, undefined, 'Go to the videos overview page'),
+      }, undefined, this.i18n('Go to the videos overview page')),
       new Hotkey('g t', (event: KeyboardEvent): boolean => {
         this.router.navigate([ '/videos/trending' ])
         return false
-      }, undefined, 'Go to the trending videos page'),
+      }, undefined, this.i18n('Go to the trending videos page')),
       new Hotkey('g r', (event: KeyboardEvent): boolean => {
         this.router.navigate([ '/videos/recently-added' ])
         return false
-      }, undefined, 'Go to the recently added videos page'),
+      }, undefined, this.i18n('Go to the recently added videos page')),
       new Hotkey('g l', (event: KeyboardEvent): boolean => {
         this.router.navigate([ '/videos/local' ])
         return false
-      }, undefined, 'Go to the local videos page'),
+      }, undefined, this.i18n('Go to the local videos page')),
       new Hotkey('g u', (event: KeyboardEvent): boolean => {
         this.router.navigate([ '/videos/upload' ])
         return false
-      }, undefined, 'Go to the videos upload page'),
+      }, undefined, this.i18n('Go to the videos upload page')),
       new Hotkey('shift+t', (event: KeyboardEvent): boolean => {
         this.themeService.toggleDarkTheme()
         return false
-      }, undefined, 'Toggle Dark theme')
+      }, undefined, this.i18n('Toggle Dark theme'))
     ])
+
+    fromEvent(window, 'resize')
+      .pipe(debounceTime(200))
+      .subscribe(() => this.onResize())
   }
 
   isUserLoggedIn () {
@@ -166,5 +179,10 @@ export class AppComponent implements OnInit {
 
   toggleMenu () {
     this.isMenuDisplayed = !this.isMenuDisplayed
+    this.isMenuChangedByUser = true
+  }
+
+  onResize () {
+    this.isMenuDisplayed = window.innerWidth >= 800 && !this.isMenuChangedByUser
   }
 }

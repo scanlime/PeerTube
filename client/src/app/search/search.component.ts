@@ -30,7 +30,7 @@ export class SearchComponent implements OnInit, OnDestroy {
   currentSearch: string
 
   private subActivatedRoute: Subscription
-  private isInitialLoad = true
+  private isInitialLoad = false // set to false to show the search filters on first arrival
   private firstSearch = true
 
   private channelsPerPage = 2
@@ -51,15 +51,12 @@ export class SearchComponent implements OnInit, OnDestroy {
       queryParams => {
         const querySearch = queryParams['search']
 
-        // New empty search
-        if (this.currentSearch && !querySearch) return this.redirectService.redirectToHomepage()
-
         // Search updated, reset filters
         if (this.currentSearch !== querySearch) {
           this.resetPagination()
           this.advancedSearch.reset()
 
-          this.currentSearch = querySearch
+          this.currentSearch = querySearch || undefined
           this.updateTitle()
         }
 
@@ -137,6 +134,10 @@ export class SearchComponent implements OnInit, OnDestroy {
     this.updateUrlFromAdvancedSearch()
   }
 
+  numberOfFilters () {
+    return this.advancedSearch.size()
+  }
+
   private resetPagination () {
     this.pagination.currentPage = 1
     this.pagination.totalItems = null
@@ -150,9 +151,11 @@ export class SearchComponent implements OnInit, OnDestroy {
   }
 
   private updateUrlFromAdvancedSearch () {
+    const search = this.currentSearch || undefined
+
     this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: Object.assign({}, this.advancedSearch.toUrlObject(), { search: this.currentSearch })
+      queryParams: Object.assign({}, this.advancedSearch.toUrlObject(), { search })
     })
   }
 }

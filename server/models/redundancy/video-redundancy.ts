@@ -1,6 +1,6 @@
 import {
-  AfterDestroy,
   AllowNull,
+  BeforeDestroy,
   BelongsTo,
   Column,
   CreatedAt,
@@ -115,19 +115,28 @@ export class VideoRedundancyModel extends Model<VideoRedundancyModel> {
   })
   Actor: ActorModel
 
-  @AfterDestroy
-  static removeFile (instance: VideoRedundancyModel) {
+  @BeforeDestroy
+  static async removeFile (instance: VideoRedundancyModel) {
     // Not us
     if (!instance.strategy) return
 
-    logger.info('Removing duplicated video file %s-%s.', instance.VideoFile.Video.uuid, instance.VideoFile.resolution)
+    const videoFile = await VideoFileModel.loadWithVideo(instance.videoFileId)
 
-    return instance.VideoFile.Video.removeFile(instance.VideoFile)
+    const logIdentifier = `${videoFile.Video.uuid}-${videoFile.resolution}`
+    logger.info('Removing duplicated video file %s.', logIdentifier)
+
+    videoFile.Video.removeFile(videoFile)
+             .catch(err => logger.error('Cannot delete %s files.', logIdentifier, { err }))
+
+    return undefined
   }
 
-  static loadByFileId (videoFileId: number) {
+  static async loadLocalByFileId (videoFileId: number) {
+    const actor = await getServerActor()
+
     const query = {
       where: {
+        actorId: actor.id,
         videoFileId
       }
     }
@@ -144,6 +153,38 @@ export class VideoRedundancyModel extends Model<VideoRedundancyModel> {
     }
 
     return VideoRedundancyModel.findOne(query)
+  }
+
+  static async isLocalByVideoUUIDExists (uuid: string) {
+    const actor = await getServerActor()
+
+    const query = {
+      raw: true,
+      attributes: [ 'id' ],
+      where: {
+        actorId: actor.id
+      },
+      include: [
+        {
+          attributes: [ ],
+          model: VideoFileModel,
+          required: true,
+          include: [
+            {
+              attributes: [ ],
+              model: VideoModel,
+              required: true,
+              where: {
+                uuid
+              }
+            }
+          ]
+        }
+      ]
+    }
+
+    return VideoRedundancyModel.findOne(query)
+      .then(r => !!r)
   }
 
   static async getVideoSample (p: Bluebird<VideoModel[]>) {
@@ -284,6 +325,47 @@ export class VideoRedundancyModel extends Model<VideoRedundancyModel> {
     }
 
     return VideoRedundancyModel.scope([ ScopeNames.WITH_VIDEO ]).findAll(query)
+  }
+
+  static async listLocalOfServer (serverId: number) {
+    const actor = await getServerActor()
+
+    const query = {
+      where: {
+        actorId: actor.id
+      },
+      include: [
+        {
+          model: VideoFileModel,
+          required: true,
+          include: [
+            {
+              model: VideoModel,
+              required: true,
+              include: [
+                {
+                  attributes: [],
+                  model: VideoChannelModel.unscoped(),
+                  required: true,
+                  include: [
+                    {
+                      attributes: [],
+                      model: ActorModel.unscoped(),
+                      required: true,
+                      where: {
+                        serverId
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+
+    return VideoRedundancyModel.findAll(query)
   }
 
   static async getStats (strategy: VideoRedundancyStrategy) {

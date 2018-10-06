@@ -205,7 +205,7 @@ async function updateVideoFromAP (options: {
   let videoFieldsSave: any
 
   try {
-    const updatedVideo: VideoModel = await sequelizeTypescript.transaction(async t => {
+    await sequelizeTypescript.transaction(async t => {
       const sequelizeOptions = {
         transaction: t
       }
@@ -256,8 +256,12 @@ async function updateVideoFromAP (options: {
         await Promise.all(destroyTasks)
 
         // Update or add other one
-        const upsertTasks = videoFileAttributes.map(a => VideoFileModel.upsert(a, sequelizeOptions))
-        await Promise.all(upsertTasks)
+        const upsertTasks = videoFileAttributes.map(a => {
+          return VideoFileModel.upsert<VideoFileModel>(a, { returning: true, transaction: t })
+            .then(([ file ]) => file)
+        })
+
+        options.video.VideoFiles = await Promise.all(upsertTasks)
       }
 
       {
@@ -274,13 +278,11 @@ async function updateVideoFromAP (options: {
         const videoCaptionsPromises = options.videoObject.subtitleLanguage.map(c => {
           return VideoCaptionModel.insertOrReplaceLanguage(options.video.id, c.identifier, t)
         })
-        await Promise.all(videoCaptionsPromises)
+        options.video.VideoCaptions = await Promise.all(videoCaptionsPromises)
       }
     })
 
     logger.info('Remote video with uuid %s updated', options.videoObject.uuid)
-
-    return updatedVideo
   } catch (err) {
     if (options.video !== undefined && videoFieldsSave !== undefined) {
       resetSequelizeInstance(options.video, videoFieldsSave)
@@ -370,13 +372,15 @@ async function refreshVideoIfNeeded (options: {
   try {
     const { response, videoObject } = await fetchRemoteVideo(video.url)
     if (response.statusCode === 404) {
+      logger.info('Cannot refresh remote video %s: video does not exist anymore. Deleting it.', video.url)
+
       // Video does not exist anymore
       await video.destroy()
       return undefined
     }
 
     if (videoObject === undefined) {
-      logger.warn('Cannot refresh remote video: invalid body.')
+      logger.warn('Cannot refresh remote video %s: invalid body.', video.url)
       return video
     }
 
@@ -392,8 +396,10 @@ async function refreshVideoIfNeeded (options: {
     }
     await retryTransactionWrapper(updateVideoFromAP, updateOptions)
     await syncVideoExternalAttributes(video, videoObject, options.syncParam)
+
+    return video
   } catch (err) {
-    logger.warn('Cannot refresh video.', { err })
+    logger.warn('Cannot refresh video %s.', options.video.url, { err })
     return video
   }
 }
@@ -451,11 +457,11 @@ async function videoActivityObjectToDBAttributes (
   }
 }
 
-function videoFileActivityUrlToDBAttributes (videoCreated: VideoModel, videoObject: VideoTorrentObject) {
+function videoFileActivityUrlToDBAttributes (video: VideoModel, videoObject: VideoTorrentObject) {
   const fileUrls = videoObject.url.filter(u => isActivityVideoUrlObject(u)) as ActivityVideoUrlObject[]
 
   if (fileUrls.length === 0) {
-    throw new Error('Cannot find video files for ' + videoCreated.url)
+    throw new Error('Cannot find video files for ' + video.url)
   }
 
   const attributes: VideoFileModel[] = []
@@ -477,7 +483,7 @@ function videoFileActivityUrlToDBAttributes (videoCreated: VideoModel, videoObje
       infoHash: parsed.infoHash,
       resolution: fileUrl.height,
       size: fileUrl.size,
-      videoId: videoCreated.id,
+      videoId: video.id,
       fps: fileUrl.fps || -1
     } as VideoFileModel
     attributes.push(attribute)

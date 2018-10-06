@@ -1,5 +1,68 @@
 # Changelog
 
+## v1.0.0-rc.2
+
+### Bug fixes
+
+ * Fix config endpoint
+
+
+## v1.0.0-rc.1
+
+### Features
+
+ * Allow specification of channel ID in `peertube-upload.js` ([@anoadragon453](https://github.com/anoadragon453))
+ * Show last commit hash alongside server version in footer ([@rigelk](https://github.com/rigelk))
+ * Add comment feeds in watch page
+
+### Bug fixes
+
+ * Fix dnt route (yes again, but now we have unit tests for this route :D)
+ * Check video channel name is unique when creating a new one
+ * Fix video fps validator (prevent redundancy/refresh of some old videos)
+ * Allow empty search on client side ([@rigelk](https://github.com/rigelk))
+ * Correctly forward comment deletion
+
+
+## v1.0.0-beta.16
+
+### BREAKING CHANGES
+
+ * Add prompt to upgrade.sh to install pre-release version ([@Nutomic](https://github.com/nutomic))
+
+### Features
+
+ * Add shortcuts icon in menu
+ * Improve overview section titles
+ * Check old password before change ([@BO41](https://github.com/BO41))
+ * Adding frame-by-frame hotkey support in player ([@rigelk](https://github.com/rigelk))
+
+### Bug fixes
+
+ * Stop seeding torrents after a failed import
+ * Fix player crashing the web browser
+ * Fix player performance with small devices
+ * Fix some untranslated strings
+ * Fix video files duplicated when fps is null ([@rigelk](https://github.com/rigelk))
+ * Fix video import of some youtube videos
+ * Fix (long) video description when importing by url
+ * Fix Mastodon federation with a comment reply
+ * Correctly delete directories on import
+ * Remove duplicated videos on unfollow/delete redundancy
+ * Fix 404 on manifest
+ * Hide useless error when destroying fake renderer
+ * Display other videos on big screens on the right of the watch page
+ * Fix no other videos displayed on some videos
+ * Fix hidden advanced options in upload form
+ * Fix message space on video upload cancel ([@rigelk](https://github.com/rigelk))
+ * Fix error when updating many video captions
+ * Fix "my account" subtitles
+ * Fix error when clicking on the disabled publish button
+ * Increase timeout on upload endpoint
+ * Fix redundancy with videos already duplicated by another instance(s)
+ * Correctly delete files on failed import
+ 
+
 ## v1.0.0-beta.15
 
 ### Features

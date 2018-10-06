@@ -10,8 +10,10 @@ import {
   getVideoLikesActivityPubUrl,
   getVideoSharesActivityPubUrl
 } from '../../lib/activitypub'
+import { isArray } from '../../helpers/custom-validators/misc'
 
 export type VideoFormattingJSONOptions = {
+  completeDescription?: boolean
   additionalAttributes: {
     state?: boolean,
     waitTranscoding?: boolean,
@@ -22,6 +24,8 @@ export type VideoFormattingJSONOptions = {
 function videoModelToFormattedJSON (video: VideoModel, options?: VideoFormattingJSONOptions): Video {
   const formattedAccount = video.VideoChannel.Account.toFormattedJSON()
   const formattedVideoChannel = video.VideoChannel.toFormattedJSON()
+
+  const userHistory = isArray(video.UserVideoHistories) ? video.UserVideoHistories[0] : undefined
 
   const videoObject: Video = {
     id: video.id,
@@ -44,7 +48,7 @@ function videoModelToFormattedJSON (video: VideoModel, options?: VideoFormatting
       label: VideoModel.getPrivacyLabel(video.privacy)
     },
     nsfw: video.nsfw,
-    description: video.getTruncatedDescription(),
+    description: options && options.completeDescription === true ? video.description : video.getTruncatedDescription(),
     isLocal: video.isOwned(),
     duration: video.duration,
     views: video.views,
@@ -73,7 +77,11 @@ function videoModelToFormattedJSON (video: VideoModel, options?: VideoFormatting
       url: formattedVideoChannel.url,
       host: formattedVideoChannel.host,
       avatar: formattedVideoChannel.avatar
-    }
+    },
+
+    userHistory: userHistory ? {
+      currentTime: userHistory.currentTime
+    } : undefined
   }
 
   if (options) {

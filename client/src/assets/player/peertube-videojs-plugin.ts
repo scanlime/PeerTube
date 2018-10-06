@@ -3,7 +3,7 @@ import * as WebTorrent from 'webtorrent'
 import { VideoFile } from '../../../../shared/models/videos/video.model'
 import { renderVideo } from './video-renderer'
 import './settings-menu-button'
-import { PeertubePluginOptions, VideoJSCaption, VideoJSComponentInterface, videojsUntyped } from './peertube-videojs-typings'
+import { PeertubePluginOptions, UserWatching, VideoJSCaption, VideoJSComponentInterface, videojsUntyped } from './peertube-videojs-typings'
 import { isMobile, timeToInt, videoFileMaxByResolution, videoFileMinByResolution } from './utils'
 import * as CacheChunkStore from 'cache-chunk-store'
 import { PeertubeChunkStore } from './peertube-chunk-store'
@@ -32,7 +32,8 @@ class PeerTubePlugin extends Plugin {
     AUTO_QUALITY_THRESHOLD_PERCENT: 30, // Bandwidth should be 30% more important than a resolution bitrate to change to it
     AUTO_QUALITY_OBSERVATION_TIME: 10000, // Wait 10 seconds after having change the resolution before another check
     AUTO_QUALITY_HIGHER_RESOLUTION_DELAY: 5000, // Buffering higher resolution during 5 seconds
-    BANDWIDTH_AVERAGE_NUMBER_OF_VALUES: 5 // Last 5 seconds to build average bandwidth
+    BANDWIDTH_AVERAGE_NUMBER_OF_VALUES: 5, // Last 5 seconds to build average bandwidth
+    USER_WATCHING_VIDEO_INTERVAL: 5000 // Every 5 seconds, notify the user is watching the video
   }
 
   private readonly webtorrent = new WebTorrent({
@@ -55,8 +56,11 @@ class PeerTubePlugin extends Plugin {
   private currentVideoFile: VideoFile
   private torrent: WebTorrent.Torrent
   private videoCaptions: VideoJSCaption[]
+
   private renderer
   private fakeRenderer
+  private destoyingFakeRenderer = false
+
   private autoResolution = true
   private forbidAutoResolution = false
   private isAutoResolutionObservation = false
@@ -64,6 +68,7 @@ class PeerTubePlugin extends Plugin {
   private videoViewInterval
   private torrentInfoInterval
   private autoQualityInterval
+  private userWatchingVideoInterval
   private addTorrentDelay
   private qualityObservationTimer
   private runAutoQualitySchedulerTimer
@@ -97,6 +102,8 @@ class PeerTubePlugin extends Plugin {
       this.runTorrentInfoScheduler()
       this.runViewAdd()
 
+      if (options.userWatching) this.runUserWatchVideo(options.userWatching)
+
       this.player.one('play', () => {
         // Don't run immediately scheduler, wait some seconds the TCP connections are made
         this.runAutoQualitySchedulerTimer = setTimeout(() => this.runAutoQualityScheduler(), this.CONSTANTS.AUTO_QUALITY_SCHEDULER)
@@ -117,6 +124,8 @@ class PeerTubePlugin extends Plugin {
     clearInterval(this.videoViewInterval)
     clearInterval(this.torrentInfoInterval)
     clearInterval(this.autoQualityInterval)
+
+    if (this.userWatchingVideoInterval) clearInterval(this.userWatchingVideoInterval)
 
     // Don't need to destroy renderer, video player will be destroyed
     this.flushVideoFile(this.currentVideoFile, false)
@@ -521,6 +530,21 @@ class PeerTubePlugin extends Plugin {
     }, 1000)
   }
 
+  private runUserWatchVideo (options: UserWatching) {
+    let lastCurrentTime = 0
+
+    this.userWatchingVideoInterval = setInterval(() => {
+      const currentTime = Math.floor(this.player.currentTime())
+
+      if (currentTime - lastCurrentTime >= 1) {
+        lastCurrentTime = currentTime
+
+        this.notifyUserIsWatching(currentTime, options.url, options.authorizationHeader)
+          .catch(err => console.error('Cannot notify user is watching.', err))
+      }
+    }, this.CONSTANTS.USER_WATCHING_VIDEO_INTERVAL)
+  }
+
   private clearVideoViewInterval () {
     if (this.videoViewInterval !== undefined) {
       clearInterval(this.videoViewInterval)
@@ -532,6 +556,15 @@ class PeerTubePlugin extends Plugin {
     if (!this.videoViewUrl) return Promise.resolve(undefined)
 
     return fetch(this.videoViewUrl, { method: 'POST' })
+  }
+
+  private notifyUserIsWatching (currentTime: number, url: string, authorizationHeader: string) {
+    const body = new URLSearchParams()
+    body.append('currentTime', currentTime.toString())
+
+    const headers = new Headers({ 'Authorization': authorizationHeader })
+
+    return fetch(url, { method: 'PUT', body, headers })
   }
 
   private fallbackToHttp (done?: Function, play = true) {
@@ -599,11 +632,16 @@ class PeerTubePlugin extends Plugin {
   }
 
   private renderFileInFakeElement (file: WebTorrent.TorrentFile, delay: number) {
+    this.destoyingFakeRenderer = false
+
     const fakeVideoElem = document.createElement('video')
     renderVideo(file, fakeVideoElem, { autoplay: false, controls: false }, (err, renderer) => {
       this.fakeRenderer = renderer
 
-      if (err) console.error('Cannot render new torrent in fake video element.', err)
+      // The renderer returns an error when we destroy it, so skip them
+      if (this.destoyingFakeRenderer === false && err) {
+        console.error('Cannot render new torrent in fake video element.', err)
+      }
 
       // Load the future file at the correct time (in delay MS - 2 seconds)
       fakeVideoElem.currentTime = this.player.currentTime() + (delay - 2000)
@@ -612,6 +650,8 @@ class PeerTubePlugin extends Plugin {
 
   private destroyFakeRenderer () {
     if (this.fakeRenderer) {
+      this.destoyingFakeRenderer = true
+
       if (this.fakeRenderer.destroy) {
         try {
           this.fakeRenderer.destroy()

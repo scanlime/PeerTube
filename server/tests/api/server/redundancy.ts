@@ -12,10 +12,12 @@ import {
   killallServers, makeGetRequest,
   root,
   ServerInfo,
-  setAccessTokensToServers,
+  setAccessTokensToServers, unfollow,
   uploadVideo,
   viewVideo,
-  wait
+  wait,
+  waitUntilLog,
+  checkVideoFilesWereRemoved, removeVideo
 } from '../../utils'
 import { waitJobs } from '../../utils/server/jobs'
 import * as magnetUtil from 'magnet-uri'
@@ -39,6 +41,8 @@ function checkMagnetWebseeds (file: { magnetUri: string, resolution: { id: numbe
     const found = parsed.urlList.find(url => url === `${ws}-${file.resolution.id}.mp4`)
     expect(found, `Webseed ${ws} not found in ${file.magnetUri} on server ${server.url}`).to.not.be.undefined
   }
+
+  expect(parsed.urlList).to.have.lengthOf(baseWebseeds.length)
 }
 
 async function runServers (strategy: VideoRedundancyStrategy, additionalParams: any = {}) {
@@ -136,23 +140,21 @@ async function check2Webseeds (strategy: VideoRedundancyStrategy, videoUUID?: st
   ]
 
   for (const server of servers) {
-    {
-      const res = await getVideo(server.url, videoUUID)
+    const res = await getVideo(server.url, videoUUID)
 
-      const video: VideoDetails = res.body
+    const video: VideoDetails = res.body
 
-      for (const file of video.files) {
-        checkMagnetWebseeds(file, webseeds, server)
+    for (const file of video.files) {
+      checkMagnetWebseeds(file, webseeds, server)
 
-        // Only servers 1 and 2 have the video
-        if (server.serverNumber !== 3) {
-          await makeGetRequest({
-            url: server.url,
-            statusCodeExpected: 200,
-            path: '/static/webseed/' + `${videoUUID}-${file.resolution.id}.mp4`,
-            contentType: null
-          })
-        }
+      // Only servers 1 and 2 have the video
+      if (server.serverNumber !== 3) {
+        await makeGetRequest({
+          url: server.url,
+          statusCodeExpected: 200,
+          path: '/static/webseed/' + `${videoUUID}-${file.resolution.id}.mp4`,
+          contentType: null
+        })
       }
     }
   }
@@ -180,6 +182,21 @@ async function enableRedundancyOnServer1 () {
 
   expect(server2).to.not.be.undefined
   expect(server2.following.hostRedundancyAllowed).to.be.true
+}
+
+async function disableRedundancyOnServer1 () {
+  await updateRedundancy(servers[ 0 ].url, servers[ 0 ].accessToken, servers[ 1 ].host, false)
+
+  const res = await getFollowingListPaginationAndSort(servers[ 0 ].url, 0, 5, '-createdAt')
+  const follows: ActorFollow[] = res.body.data
+  const server2 = follows.find(f => f.following.host === 'localhost:9002')
+  const server3 = follows.find(f => f.following.host === 'localhost:9003')
+
+  expect(server3).to.not.be.undefined
+  expect(server3.following.hostRedundancyAllowed).to.be.false
+
+  expect(server2).to.not.be.undefined
+  expect(server2.following.hostRedundancyAllowed).to.be.false
 }
 
 async function cleanServers () {
@@ -210,11 +227,24 @@ describe('Test videos redundancy', function () {
       this.timeout(40000)
 
       await waitJobs(servers)
-      await wait(15000)
+      await waitUntilLog(servers[0], 'Duplicated ', 4)
       await waitJobs(servers)
 
       await check2Webseeds(strategy)
       await checkStatsWith2Webseed(strategy)
+    })
+
+    it('Should undo redundancy on server 1 and remove duplicated videos', async function () {
+      this.timeout(40000)
+
+      await disableRedundancyOnServer1()
+
+      await waitJobs(servers)
+      await wait(5000)
+
+      await check1WebSeed(strategy)
+
+      await checkVideoFilesWereRemoved(video1Server2UUID, servers[0].serverNumber, [ 'videos' ])
     })
 
     after(function () {
@@ -244,11 +274,24 @@ describe('Test videos redundancy', function () {
       this.timeout(40000)
 
       await waitJobs(servers)
-      await wait(15000)
+      await waitUntilLog(servers[0], 'Duplicated ', 4)
       await waitJobs(servers)
 
       await check2Webseeds(strategy)
       await checkStatsWith2Webseed(strategy)
+    })
+
+    it('Should unfollow on server 1 and remove duplicated videos', async function () {
+      this.timeout(40000)
+
+      await unfollow(servers[0].url, servers[0].accessToken, servers[1])
+
+      await waitJobs(servers)
+      await wait(5000)
+
+      await check1WebSeed(strategy)
+
+      await checkVideoFilesWereRemoved(video1Server2UUID, servers[0].serverNumber, [ 'videos' ])
     })
 
     after(function () {
@@ -299,11 +342,23 @@ describe('Test videos redundancy', function () {
       this.timeout(40000)
 
       await waitJobs(servers)
-      await wait(15000)
+      await waitUntilLog(servers[0], 'Duplicated ', 4)
       await waitJobs(servers)
 
       await check2Webseeds(strategy)
       await checkStatsWith2Webseed(strategy)
+    })
+
+    it('Should remove the video and the redundancy files', async function () {
+      this.timeout(20000)
+
+      await removeVideo(servers[1].url, servers[1].accessToken, video1Server2UUID)
+
+      await waitJobs(servers)
+
+      for (const server of servers) {
+        await checkVideoFilesWereRemoved(video1Server2UUID, server.serverNumber)
+      }
     })
 
     after(function () {
@@ -386,7 +441,7 @@ describe('Test videos redundancy', function () {
       await enableRedundancyOnServer1()
 
       await waitJobs(servers)
-      await wait(5000)
+      await waitUntilLog(servers[0], 'Duplicated ', 4)
       await waitJobs(servers)
 
       await check2Webseeds(strategy)
@@ -397,15 +452,28 @@ describe('Test videos redundancy', function () {
     })
 
     it('Should cache video 2 webseed on the first video', async function () {
-      this.timeout(40000)
-      this.retries(3)
+      this.timeout(50000)
 
       await waitJobs(servers)
 
       await wait(7000)
 
-      await check1WebSeed(strategy, video1Server2UUID)
-      await check2Webseeds(strategy, video2Server2UUID)
+      try {
+        await check1WebSeed(strategy, video1Server2UUID)
+        await check2Webseeds(strategy, video2Server2UUID)
+      } catch {
+        await wait(3000)
+
+        try {
+          await check1WebSeed(strategy, video1Server2UUID)
+          await check2Webseeds(strategy, video2Server2UUID)
+        } catch {
+          await wait(5000)
+
+          await check1WebSeed(strategy, video1Server2UUID)
+          await check2Webseeds(strategy, video2Server2UUID)
+        }
+      }
     })
 
     after(function () {

@@ -10,7 +10,7 @@ import './webtorrent-info-button'
 import './peertube-videojs-plugin'
 import './peertube-load-progress-bar'
 import './theater-button'
-import { VideoJSCaption, videojsUntyped } from './peertube-videojs-typings'
+import { UserWatching, VideoJSCaption, videojsUntyped } from './peertube-videojs-typings'
 import { buildVideoEmbed, buildVideoLink, copyToClipboard } from './utils'
 import { getCompleteLocale, getShortLocale, is18nLocale, isDefaultLocale } from '../../../../shared/models/i18n/i18n'
 
@@ -34,10 +34,13 @@ function getVideojsOptions (options: {
   startTime: number | string
   theaterMode: boolean,
   videoCaptions: VideoJSCaption[],
+
   language?: string,
   controls?: boolean,
   muted?: boolean,
   loop?: boolean
+
+  userWatching?: UserWatching
 }) {
   const videojsOptions = {
     // We don't use text track settings for now
@@ -57,7 +60,8 @@ function getVideojsOptions (options: {
         playerElement: options.playerElement,
         videoViewUrl: options.videoViewUrl,
         videoDuration: options.videoDuration,
-        startTime: options.startTime
+        startTime: options.startTime,
+        userWatching: options.userWatching
       }
     },
     controlBar: {
@@ -70,6 +74,25 @@ function getVideojsOptions (options: {
       hotkeys: {
         enableVolumeScroll: false,
         enableModifiersForNumbers: false,
+
+        fullscreenKey: function (event) {
+          // fullscreen with the f key or Ctrl+Enter
+          return event.key === 'f' || (event.ctrlKey && event.key === 'Enter')
+        },
+
+        seekStep: function (event) {
+          // mimic VLC seek behavior, and default to 5 (original value is 5).
+          if (event.ctrlKey && event.altKey) {
+            return 5 * 60
+          } else if (event.ctrlKey) {
+            return 60
+          } else if (event.altKey) {
+            return 10
+          } else {
+            return 5
+          }
+        },
+
         customKeys: {
           increasePlaybackRateKey: {
             key: function (event) {
@@ -85,6 +108,17 @@ function getVideojsOptions (options: {
             },
             handler: function (player) {
               player.playbackRate((player.playbackRate() - 0.1).toFixed(2))
+            }
+          },
+          frameByFrame: {
+            key: function (event) {
+              return event.key === '.'
+            },
+            handler: function (player, options, event) {
+              player.pause()
+              // Calculate movement distance (assuming 30 fps)
+              const dist = 1 / 30
+              player.currentTime(player.currentTime() + dist)
             }
           }
         }
