@@ -1,6 +1,6 @@
 import * as express from 'express'
 import 'express-validator'
-import { body, param, ValidationChain } from 'express-validator/check'
+import { body, param, query, ValidationChain } from 'express-validator/check'
 import { UserRight, VideoChangeOwnershipStatus, VideoPrivacy } from '../../../../shared'
 import {
   isBooleanValid,
@@ -8,6 +8,7 @@ import {
   isIdOrUUIDValid,
   isIdValid,
   isUUIDValid,
+  toArray,
   toIntOrNull,
   toValueOrNull
 } from '../../../helpers/custom-validators/misc'
@@ -19,6 +20,7 @@ import {
   isVideoDescriptionValid,
   isVideoExist,
   isVideoFile,
+  isVideoFilterValid,
   isVideoImage,
   isVideoLanguageValid,
   isVideoLicenceValid,
@@ -42,6 +44,7 @@ import { VideoChangeOwnershipAccept } from '../../../../shared/models/videos/vid
 import { VideoChangeOwnershipModel } from '../../../models/video/video-change-ownership'
 import { AccountModel } from '../../../models/account/account'
 import { VideoFetchType } from '../../../helpers/video'
+import { isNSFWQueryValid, isNumberArray, isStringArray } from '../../../helpers/custom-validators/search'
 
 const videosAddValidator = getCommonVideoAttributes().concat([
   body('videofile')
@@ -69,7 +72,6 @@ const videosAddValidator = getCommonVideoAttributes().concat([
     if (isAble === false) {
       res.status(403)
          .json({ error: 'The user video quota is exceeded with this video.' })
-         .end()
 
       return cleanUpReqFiles(req)
     }
@@ -82,7 +84,6 @@ const videosAddValidator = getCommonVideoAttributes().concat([
       logger.error('Invalid input file in videosAddValidator.', { err })
       res.status(400)
          .json({ error: 'Invalid input file.' })
-         .end()
 
       return cleanUpReqFiles(req)
     }
@@ -120,7 +121,6 @@ const videosUpdateValidator = getCommonVideoAttributes().concat([
       cleanUpReqFiles(req)
       return res.status(409)
         .json({ error: 'Cannot set "private" a video that was not private.' })
-        .end()
     }
 
     if (req.body.channelId && !await isVideoChannelOfAccountExist(req.body.channelId, user, res)) return cleanUpReqFiles(req)
@@ -150,7 +150,6 @@ const videosCustomGetValidator = (fetchType: VideoFetchType) => {
           if (video.VideoChannel.Account.userId !== user.id && !user.hasRight(UserRight.MANAGE_VIDEO_BLACKLIST)) {
             return res.status(403)
                       .json({ error: 'Cannot get this private or blacklisted video.' })
-                      .end()
           }
 
           return next()
@@ -239,8 +238,8 @@ const videosChangeOwnershipValidator = [
     const nextOwner = await AccountModel.loadLocalByName(req.body.username)
     if (!nextOwner) {
       res.status(400)
-        .type('json')
-        .end()
+        .json({ error: 'Changing video ownership to a remote account is not supported yet' })
+
       return
     }
     res.locals.nextOwner = nextOwner
@@ -271,7 +270,7 @@ const videosTerminateChangeOwnershipValidator = [
     } else {
       res.status(403)
         .json({ error: 'Ownership already accepted or refused' })
-        .end()
+
       return
     }
   }
@@ -288,7 +287,7 @@ const videosAcceptChangeOwnershipValidator = [
     if (isAble === false) {
       res.status(403)
         .json({ error: 'The user video quota is exceeded with this video.' })
-        .end()
+
       return
     }
 
@@ -363,6 +362,51 @@ function getCommonVideoAttributes () {
   ] as (ValidationChain | express.Handler)[]
 }
 
+const commonVideosFiltersValidator = [
+  query('categoryOneOf')
+    .optional()
+    .customSanitizer(toArray)
+    .custom(isNumberArray).withMessage('Should have a valid one of category array'),
+  query('licenceOneOf')
+    .optional()
+    .customSanitizer(toArray)
+    .custom(isNumberArray).withMessage('Should have a valid one of licence array'),
+  query('languageOneOf')
+    .optional()
+    .customSanitizer(toArray)
+    .custom(isStringArray).withMessage('Should have a valid one of language array'),
+  query('tagsOneOf')
+    .optional()
+    .customSanitizer(toArray)
+    .custom(isStringArray).withMessage('Should have a valid one of tags array'),
+  query('tagsAllOf')
+    .optional()
+    .customSanitizer(toArray)
+    .custom(isStringArray).withMessage('Should have a valid all of tags array'),
+  query('nsfw')
+    .optional()
+    .custom(isNSFWQueryValid).withMessage('Should have a valid NSFW attribute'),
+  query('filter')
+    .optional()
+    .custom(isVideoFilterValid).withMessage('Should have a valid filter attribute'),
+
+  (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    logger.debug('Checking commons video filters query', { parameters: req.query })
+
+    if (areValidationErrors(req, res)) return
+
+    const user: UserModel = res.locals.oauth ? res.locals.oauth.token.User : undefined
+    if (req.query.filter === 'all-local' && (!user || user.hasRight(UserRight.SEE_ALL_VIDEOS) === false)) {
+      res.status(401)
+         .json({ error: 'You are not allowed to see all local videos.' })
+
+      return
+    }
+
+    return next()
+  }
+]
+
 // ---------------------------------------------------------------------------
 
 export {
@@ -379,7 +423,9 @@ export {
   videosTerminateChangeOwnershipValidator,
   videosAcceptChangeOwnershipValidator,
 
-  getCommonVideoAttributes
+  getCommonVideoAttributes,
+
+  commonVideosFiltersValidator
 }
 
 // ---------------------------------------------------------------------------
@@ -389,7 +435,6 @@ function areErrorsInScheduleUpdate (req: express.Request, res: express.Response)
     if (!req.body.scheduleUpdate.updateAt) {
       res.status(400)
          .json({ error: 'Schedule update at is mandatory.' })
-         .end()
 
       return true
     }
