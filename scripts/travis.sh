@@ -11,8 +11,11 @@ killall -q peertube || true
 
 if [ "$1" = "misc" ]; then
     npm run build -- --light-fr
-    mocha --timeout 5000 --exit --require ts-node/register/type-check --bail server/tests/client.ts server/tests/activitypub.ts \
-        server/tests/feeds/index.ts server/tests/misc-endpoints.ts
+    mocha --timeout 5000 --exit --require ts-node/register/type-check --bail server/tests/client.ts \
+        server/tests/activitypub.ts \
+        server/tests/feeds/index.ts \
+        server/tests/misc-endpoints.ts \
+        server/tests/helpers/index.ts
 elif [ "$1" = "api" ]; then
     npm run build:server
     mocha --timeout 5000 --exit --require ts-node/register/type-check --bail server/tests/api/index.ts
@@ -28,6 +31,9 @@ elif [ "$1" = "api-2" ]; then
 elif [ "$1" = "api-3" ]; then
     npm run build:server
     mocha --timeout 5000 --exit --require ts-node/register/type-check --bail server/tests/api/index-3.ts
+elif [ "$1" = "api-3" ]; then
+    npm run build:server
+    mocha --timeout 5000 --exit --require ts-node/register/type-check --bail server/tests/api/index-4.ts
 elif [ "$1" = "lint" ]; then
     npm run tslint -- --project ./tsconfig.json -c ./tslint.json server.ts "server/**/*.ts" "shared/**/*.ts"
 
