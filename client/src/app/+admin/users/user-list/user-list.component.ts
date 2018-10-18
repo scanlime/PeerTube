@@ -23,7 +23,7 @@ export class UserListComponent extends RestTable implements OnInit {
   pagination: RestPagination = { count: this.rowsPerPage, start: 0 }
 
   selectedUsers: User[] = []
-  bulkUserActions: DropdownAction<User>[] = []
+  bulkUserActions: DropdownAction<User[]>[] = []
 
   constructor (
     private notificationsService: NotificationsService,
