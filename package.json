@@ -1,7 +1,7 @@
 {
   "name": "peertube",
   "description": "Federated (ActivityPub) video streaming platform using P2P (BitTorrent) directly in the web browser with WebTorrent and Angular.",
-  "version": "1.1.0-alpha.1",
+  "version": "1.1.0-alpha.2",
   "private": true,
   "licence": "AGPLv3",
   "engines": {
@@ -49,6 +49,7 @@
     "test": "scripty",
     "help": "scripty",
     "generate-api-doc": "scripty",
+    "generate-cli-doc": "scripty",
     "parse-log": "node ./dist/scripts/parse-log.js",
     "prune-storage": "node ./dist/scripts/prune-storage.js",
     "optimize-old-videos": "node ./dist/scripts/optimize-old-videos.js",
@@ -109,6 +110,7 @@
     "fluent-ffmpeg": "^2.1.0",
     "fs-extra": "^7.0.0",
     "helmet": "^3.12.1",
+    "http-signature": "^1.2.0",
     "ip-anonymize": "^0.0.6",
     "ipaddr.js": "1.8.1",
     "is-cidr": "^2.0.5",
@@ -118,6 +120,7 @@
     "jsonld-signatures": "https://github.com/Chocobozzz/jsonld-signatures#rsa2017",
     "lodash": "^4.17.10",
     "magnet-uri": "^5.1.4",
+    "marked-man": "^0.2.1",
     "memoizee": "^0.4.14",
     "morgan": "^1.5.3",
     "multer": "^1.1.0",
