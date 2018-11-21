@@ -1,5 +1,5 @@
 import * as request from 'supertest'
-import { makePostBodyRequest, makePutBodyRequest, updateAvatarRequest } from '../'
+import { makePostBodyRequest, makePutBodyRequest, updateAvatarRequest } from '../requests/requests'
 
 import { UserRole } from '../../../../shared/index'
 import { NSFWPolicyType } from '../../../../shared/models/videos/nsfw-policy.type'
@@ -206,6 +206,7 @@ function updateUser (options: {
   userId: number,
   accessToken: string,
   email?: string,
+  emailVerified?: boolean,
   videoQuota?: number,
   videoQuotaDaily?: number,
   role?: UserRole
@@ -214,6 +215,7 @@ function updateUser (options: {
 
   const toSend = {}
   if (options.email !== undefined && options.email !== null) toSend['email'] = options.email
+  if (options.emailVerified !== undefined && options.emailVerified !== null) toSend['emailVerified'] = options.emailVerified
   if (options.videoQuota !== undefined && options.videoQuota !== null) toSend['videoQuota'] = options.videoQuota
   if (options.videoQuotaDaily !== undefined && options.videoQuotaDaily !== null) toSend['videoQuotaDaily'] = options.videoQuotaDaily
   if (options.role !== undefined && options.role !== null) toSend['role'] = options.role

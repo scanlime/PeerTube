@@ -31,6 +31,7 @@ import {
   asyncMiddleware,
   asyncRetryTransactionMiddleware,
   authenticate,
+  checkVideoFollowConstraints,
   commonVideosFiltersValidator,
   optionalAuthenticate,
   paginationValidator,
@@ -123,6 +124,7 @@ videosRouter.get('/:id/description',
 videosRouter.get('/:id',
   optionalAuthenticate,
   asyncMiddleware(videosGetValidator),
+  asyncMiddleware(checkVideoFollowConstraints),
   getVideo
 )
 videosRouter.post('/:id/views',
@@ -385,6 +387,11 @@ async function updateVideo (req: express.Request, res: express.Response) {
 function getVideo (req: express.Request, res: express.Response) {
   const videoInstance = res.locals.video
 
+  if (videoInstance.isOutdated()) {
+    JobQueue.Instance.createJob({ type: 'activitypub-refresher', payload: { type: 'video', videoUrl: videoInstance.url } })
+      .catch(err => logger.error('Cannot create AP refresher job for video %s.', videoInstance.url, { err }))
+  }
+
   return res.json(videoInstance.toFormattedDetailsJSON())
 }
 
@@ -405,7 +412,11 @@ async function viewVideo (req: express.Request, res: express.Response) {
 
   const serverActor = await getServerActor()
 
-  await sendCreateView(serverActor, videoInstance, undefined)
+  // Send the event to the origin server
+  // If we own the video, we'll send an update event when we'll process the views (in our job queue)
+  if (videoInstance.isOwned() === false) {
+    await sendCreateView(serverActor, videoInstance, undefined)
+  }
 
   return res.status(204).end()
 }
@@ -423,7 +434,7 @@ async function getVideoDescription (req: express.Request, res: express.Response)
   return res.json({ description })
 }
 
-async function listVideos (req: express.Request, res: express.Response, next: express.NextFunction) {
+async function listVideos (req: express.Request, res: express.Response) {
   const resultList = await VideoModel.listForApi({
     start: req.query.start,
     count: req.query.count,
