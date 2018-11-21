@@ -1,14 +1,16 @@
 # Welcome to the contributing guide for PeerTube
 
-Interesting in contributing? Awesome!
+Interested in contributing? Awesome!
 
-**Quick Links:**
+**This guide will present you the following contribution topics:**
 
   * [Translate](#translate)
   * [Give your feedback](#give-your-feedback)
   * [Write documentation](#write-documentation)
   * [Develop](#develop)
-
+  * [Improve the website](#improve-the-website)
+  * [Troubleshooting](#troubleshooting)
+  * [Tutorials](#tutorials)
 
 ## Translate
 
@@ -35,6 +37,15 @@ Some hints:
  * Routes are defined in [/server/controllers/](/server/controllers/) directory
  * Parameters validators are defined in [/server/middlewares/validators](/server/middlewares/validators) directory
  * Models sent/received by the controllers are defined in [/shared/models](/shared/models) directory
+
+
+## Improve the website
+
+PeerTube's website is [joinpeertube.org](https://joinpeertube.org), where people can learn about the project and how it works – note that it is not a PeerTube instance, but rather the project's homepage.
+
+You can help us improve it too!
+
+It is not hosted on GitHub but on [Framasoft](https://framasoft.org/)'s own [GitLab](https://about.gitlab.com/) instance, [FramaGit](https://framagit.org): https://framagit.org/framasoft/peertube/joinpeertube
 
 
 ## Develop
@@ -122,19 +133,7 @@ and the web server is automatically restarted.
 $ npm run dev
 ```
 
-Depending on your OS, you may face the following error :
-```
-$ [nodemon] Internal watch failed: ENOSPC: no space left on device, watch '/PeerTube/dist'
-```
-
-This is due to your system's limit on the number of files you can monitor for live-checking changes. For example, Ubuntu uses inotify and this limit is set to 8192. Then you need to change this limit :
-```
-echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
-```
-
-See more information here : https://github.com/guard/listen/wiki/Increasing-the-amount-of-inotify-watchers
-
-### Federation
+### Testing the federation of PeerTube servers
 
 Create a PostgreSQL user **with the same name as your username** in order to avoid using the *postgres* user.
 Then, we can create the databases (if they don't already exist):
@@ -188,3 +187,11 @@ $ npm run mocha -- --exit --require ts-node/register/type-check --bail server/te
 
 Instance configurations are in `config/test-{1,2,3,4,5,6}.yaml`.
 Note that only instance 2 has transcoding enabled.
+
+### Troubleshooting
+
+Please check out the issues and [list of common errors](https://docs.joinpeertube.org/lang/en/devdocs/troubleshooting.html).
+
+### Tutorials
+
+Please check out the related section in the [development documentation](https://docs.joinpeertube.org/lang/en/devdocs/index.html#tutorials). Contribute tutorials at [framagit.org/framasoft/peertube/documentation](https://framagit.org/framasoft/peertube/documentation).

@@ -1253,6 +1253,23 @@ export class VideoModel extends Model<VideoModel> {
     })
   }
 
+  static checkVideoHasInstanceFollow (videoId: number, followerActorId: number) {
+    // Instances only share videos
+    const query = 'SELECT 1 FROM "videoShare" ' +
+    'INNER JOIN "actorFollow" ON "actorFollow"."targetActorId" = "videoShare"."actorId" ' +
+    'WHERE "actorFollow"."actorId" = $followerActorId AND "videoShare"."videoId" = $videoId ' +
+    'LIMIT 1'
+
+    const options = {
+      type: Sequelize.QueryTypes.SELECT,
+      bind: { followerActorId, videoId },
+      raw: true
+    }
+
+    return VideoModel.sequelize.query(query, options)
+                     .then(results => results.length === 1)
+  }
+
   // threshold corresponds to how many video the field should have to be returned
   static async getRandomFieldSamples (field: 'category' | 'channelId', threshold: number, count: number) {
     const serverActor = await getServerActor()
@@ -1542,6 +1559,12 @@ export class VideoModel extends Model<VideoModel> {
 
     return (now - createdAtTime) > ACTIVITY_PUB.VIDEO_REFRESH_INTERVAL &&
       (now - updatedAtTime) > ACTIVITY_PUB.VIDEO_REFRESH_INTERVAL
+  }
+
+  setAsRefreshed () {
+    this.changed('updatedAt', true)
+
+    return this.save()
   }
 
   getBaseUrls () {
