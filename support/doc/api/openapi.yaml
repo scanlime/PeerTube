@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: PeerTube
-  version: 1.1.0-alpha.2
+  version: 1.2.0-rc.1
   contact:
     name: PeerTube Community
     url: 'https://joinpeertube.org'
@@ -23,7 +23,7 @@ info:
 
     # Authentication
     When you sign up for an account, you are given the possibility to generate
-    sessions, and authenticate using this session token. One session token can 
+    sessions, and authenticate using this session token. One session token can
     currently be used at a time.
 
     # Errors
@@ -61,7 +61,7 @@ tags:
     description: >
       Managing servers which the instance interacts with is crucial to the
       concept of federation in PeerTube and external video indexation. The PeerTube
-      server then deals with inter-server ActivityPub operations and propagates 
+      server then deals with inter-server ActivityPub operations and propagates
       information across its social graph by posting activities to actors' inbox
       endpoints.
   - name: Video Abuse
@@ -433,7 +433,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/start'
         - $ref: '#/components/parameters/count'
-        - $ref: '#/components/parameters/sort'
+        - $ref: '#/components/parameters/usersSort'
       responses:
         '200':
           description: successful operation
@@ -492,7 +492,8 @@ paths:
     get:
       summary: Get current user information
       security:
-        - OAuth2: []
+        - OAuth2:
+          - user
       tags:
         - User
       responses:
@@ -507,7 +508,8 @@ paths:
     put:
       summary: Update current user information
       security:
-        - OAuth2: []
+        - OAuth2:
+          - user
       tags:
         - User
       responses:
@@ -523,7 +525,8 @@ paths:
     get:
       summary: Get current user used quota
       security:
-        - OAuth2: []
+        - OAuth2:
+          - user
       tags:
         - User
       responses:
@@ -558,7 +561,8 @@ paths:
     get:
       summary: Get videos of the current user
       security:
-        - OAuth2: []
+        - OAuth2:
+          - user
       tags:
         - User
       parameters:
@@ -574,6 +578,94 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Video'
+  /users/me/subscriptions:
+    get:
+      summary: Get subscriptions of the current user
+      security:
+        - OAuth2:
+            - user
+      tags:
+        - User
+      parameters:
+        - $ref: '#/components/parameters/start'
+        - $ref: '#/components/parameters/count'
+        - $ref: '#/components/parameters/sort'
+      responses:
+        '200':
+          description: successful operation
+    post:
+      summary: Add subscription to the current user
+      security:
+        - OAuth2:
+            - user
+      tags:
+        - User
+      responses:
+        '200':
+          description: successful operation
+  /users/me/subscriptions/exist:
+    get:
+      summary: Get if subscriptions exist for the current user
+      security:
+        - OAuth2:
+            - user
+      tags:
+        - User
+      parameters:
+        - $ref: '#/components/parameters/subscriptionsUris'
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+  /users/me/subscriptions/videos:
+    get:
+      summary: Get videos of subscriptions of the current user
+      security:
+        - OAuth2:
+          - user
+      tags:
+        - User
+      parameters:
+        - $ref: '#/components/parameters/start'
+        - $ref: '#/components/parameters/count'
+        - $ref: '#/components/parameters/sort'
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Video'
+  '/users/me/subscriptions/{uri}':
+    get:
+      summary: Get subscription of the current user for a given uri
+      security:
+        - OAuth2:
+            - user
+      tags:
+        - User
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoChannel'
+    delete:
+      summary: Delete subscription of the current user for a given uri
+      security:
+        - OAuth2:
+            - user
+      tags:
+        - User
+      responses:
+        '200':
+          description: successful operation
   /users/register:
     post:
       summary: Register a user
@@ -622,15 +714,16 @@ paths:
       tags:
         - Video
       parameters:
-        - name: category
-          in: query
-          required: false
-          description: category id of the video
-          schema:
-            type: number
+        - $ref: '#/components/parameters/categoryOneOf'
+        - $ref: '#/components/parameters/tagsOneOf'
+        - $ref: '#/components/parameters/tagsAllOf'
+        - $ref: '#/components/parameters/licenceOneOf'
+        - $ref: '#/components/parameters/languageOneOf'
+        - $ref: '#/components/parameters/nsfw'
+        - $ref: '#/components/parameters/filter'
         - $ref: '#/components/parameters/start'
         - $ref: '#/components/parameters/count'
-        - $ref: '#/components/parameters/sort'
+        - $ref: '#/components/parameters/videosSort'
       responses:
         '200':
           description: successful operation
@@ -750,7 +843,9 @@ paths:
                   type: string
                 tags:
                   description: Video tags
-                  type: string
+                  type: array
+                  items:
+                    type: string
                 commentsEnabled:
                   description: Enable or disable comments for this video
                   type: string
@@ -819,7 +914,7 @@ paths:
           $ref: '#/paths/~1users~1me/put/responses/204'
   '/videos/{id}/watching':
     put:
-      summary: Indicate progress of in watching the video by its id for a user
+      summary: Set watching progress of a video by its id for a user
       tags:
         - Video
       security:
@@ -957,7 +1052,9 @@ paths:
                   type: string
                 tags:
                   description: Video tags
-                  type: string
+                  type: array
+                  items:
+                    type: string
                 commentsEnabled:
                   description: Enable or disable comments for this video
                   type: string
@@ -1002,7 +1099,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/start'
         - $ref: '#/components/parameters/count'
-        - $ref: '#/components/parameters/sort'
+        - $ref: '#/components/parameters/abusesSort'
       responses:
         '200':
           description: successful operation
@@ -1063,7 +1160,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/start'
         - $ref: '#/components/parameters/count'
-        - $ref: '#/components/parameters/sort'
+        - $ref: '#/components/parameters/blacklistsSort'
       responses:
         '200':
           description: successful operation
@@ -1271,7 +1368,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/start'
         - $ref: '#/components/parameters/count'
-        - $ref: '#/components/parameters/sort'
+        - $ref: '#/components/parameters/videosSearchSort'
         - name: search
           in: query
           required: true
@@ -1317,6 +1414,74 @@ components:
       description: Sort column (-createdAt for example)
       schema:
         type: string
+    videosSort:
+      name: sort
+      in: query
+      required: false
+      description: Sort videos by criteria
+      schema:
+        type: string
+        enum:
+        - -name
+        - -duration
+        - -createdAt
+        - -publishedAt
+        - -views
+        - -likes
+        - -trending
+    videosSearchSort:
+      name: sort
+      in: query
+      required: false
+      description: Sort videos by criteria
+      schema:
+        type: string
+        enum:
+        - -name
+        - -duration
+        - -createdAt
+        - -publishedAt
+        - -views
+        - -likes
+        - -match
+    blacklistsSort:
+      name: sort
+      in: query
+      required: false
+      description: Sort blacklists by criteria
+      schema:
+        type: string
+        enum:
+        - -id
+        - -name
+        - -duration
+        - -views
+        - -likes
+        - -dislikes
+        - -uuid
+        - -createdAt
+    usersSort:
+      name: sort
+      in: query
+      required: false
+      description: Sort users by criteria
+      schema:
+        type: string
+        enum:
+        - -id
+        - -username
+        - -createdAt
+    abusesSort:
+      name: sort
+      in: query
+      required: false
+      description: Sort abuses by criteria
+      schema:
+        type: string
+        enum:
+        - -id
+        - -createdAt
+        - -state
     name:
       name: name
       in: path
@@ -1354,6 +1519,103 @@ components:
       description: The comment id
       schema:
         type: number
+    categoryOneOf:
+      name: categoryOneOf
+      in: query
+      required: false
+      description: category id of the video
+      schema:
+        oneOf:
+        - type: number
+        - type: array
+          items:
+            type: number
+      style: form
+      explode: false
+    tagsOneOf:
+      name: tagsOneOf
+      in: query
+      required: false
+      description: tag(s) of the video
+      schema:
+        oneOf:
+        - type: string
+        - type: array
+          items:
+            type: string
+      style: form
+      explode: false
+    tagsAllOf:
+      name: tagsAllOf
+      in: query
+      required: false
+      description: tag(s) of the video, where all should be present in the video
+      schema:
+        oneOf:
+        - type: string
+        - type: array
+          items:
+            type: string
+      style: form
+      explode: false
+    languageOneOf:
+      name: languageOneOf
+      in: query
+      required: false
+      description: language id of the video
+      schema:
+        oneOf:
+        - type: string
+        - type: array
+          items:
+            type: string
+      style: form
+      explode: false
+    licenceOneOf:
+      name: licenceOneOf
+      in: query
+      required: false
+      description: licence id of the video
+      schema:
+        oneOf:
+        - type: number
+        - type: array
+          items:
+            type: number
+      style: form
+      explode: false
+    nsfw:
+      name: nsfw
+      in: query
+      required: false
+      description: whether to include nsfw videos, if any
+      schema:
+        type: string
+        enum:
+        - 'true'
+        - 'false'
+    filter:
+      name: filter
+      in: query
+      required: false
+      description: >
+        Special filters (local for instance) which might require special rights:
+         * `local` - only videos local to the instance
+         * `all-local` - only videos local to the instance, but showing private and unlisted videos (requires Admin privileges)
+      schema:
+        type: string
+        enum:
+        - local
+        - all-local
+    subscriptionsUris:
+      name: uris
+      in: query
+      required: true
+      description: list of uris to check if each is part of the user subscriptions
+      schema:
+        type: array
+        items:
+          type: string
   requestBodies:
     VideoChannelInput:
       content:
@@ -1741,7 +2003,12 @@ components:
           type: string
           description: 'The user videoQuota '
         role:
-          type: string
+          type: integer
+          format: int32
+          enum:
+            - 0
+            - 1
+            - 2
           description: 'The user role '
       required:
         - username

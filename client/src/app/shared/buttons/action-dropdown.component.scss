@@ -1,6 +1,10 @@
 @import '_variables';
 @import '_mixins';
 
+.dropdown-divider:last-child {
+  display: none;
+}
+
 .action-button {
   @include peertube-button;
 
@@ -20,14 +24,11 @@
   }
 
   &:hover, &:active, &:focus {
-    background-color: $grey-color;
+    background-color: $grey-background-color;
   }
 
-  .icon-action {
-    @include icon(21px);
-
-    background-image: url('../../../assets/images/video/more.svg');
-    top: -1px;
+  .more-icon {
+    width: 21px;
   }
 
   &.small {

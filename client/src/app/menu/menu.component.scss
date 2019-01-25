@@ -39,13 +39,6 @@ menu {
     justify-content: center;
     margin-bottom: 35px;
 
-    img {
-      @include avatar(34px);
-
-      margin-left: 20px;
-      margin-right: 10px;
-    }
-
     .logged-in-info {
       flex-grow: 1;
 
@@ -250,7 +243,7 @@ menu {
   }
 }
 
-@media screen and (max-width: 400px) {
+@media screen and (max-width: $mobile-view) {
   .menu-wrapper {
     width: 100% !important;
   }
