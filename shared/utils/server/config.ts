@@ -52,6 +52,7 @@ function updateCustomSubConfig (url: string, token: string, newConfig: any) {
       description: 'my super description',
       terms: 'my super terms',
       defaultClientRoute: '/videos/recently-added',
+      isNSFW: true,
       defaultNSFWPolicy: 'blur',
       customizations: {
         javascript: 'alert("coucou")',
@@ -97,6 +98,9 @@ function updateCustomSubConfig (url: string, token: string, newConfig: any) {
         '480p': true,
         '720p': false,
         '1080p': false
+      },
+      hls: {
+        enabled: false
       }
     },
     import: {
@@ -105,6 +109,13 @@ function updateCustomSubConfig (url: string, token: string, newConfig: any) {
           enabled: false
         },
         torrent: {
+          enabled: false
+        }
+      }
+    },
+    autoBlacklist: {
+      videos: {
+        ofUsers: {
           enabled: false
         }
       }

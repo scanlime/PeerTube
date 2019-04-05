@@ -19,6 +19,7 @@ describe('Test config API validators', function () {
       shortDescription: 'my short description',
       description: 'my super description',
       terms: 'my super terms',
+      isNSFW: true,
       defaultClientRoute: '/videos/recently-added',
       defaultNSFWPolicy: 'blur',
       customizations: {
@@ -65,6 +66,9 @@ describe('Test config API validators', function () {
         '480p': true,
         '720p': false,
         '1080p': false
+      },
+      hls: {
+        enabled: false
       }
     },
     import: {
@@ -73,6 +77,13 @@ describe('Test config API validators', function () {
           enabled: false
         },
         torrent: {
+          enabled: false
+        }
+      }
+    },
+    autoBlacklist: {
+      videos: {
+        ofUsers: {
           enabled: false
         }
       }
@@ -152,6 +163,25 @@ describe('Test config API validators', function () {
       const newUpdateParams = immutableAssign(updateParams, {
         instance: {
           defaultNSFWPolicy: 'hello'
+        }
+      })
+
+      await makePutBodyRequest({
+        url: server.url,
+        path,
+        fields: newUpdateParams,
+        token: server.accessToken,
+        statusCodeExpected: 400
+      })
+    })
+
+    it('Should fail if email disabled and signup requires email verification', async function () {
+      // opposite scenario - succcess when enable enabled - covered via tests/api/users/user-verification.ts
+      const newUpdateParams = immutableAssign(updateParams, {
+        signup: {
+          enabled: true,
+          limit: 5,
+          requiresEmailVerification: true
         }
       })
 

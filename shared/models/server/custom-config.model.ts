@@ -6,6 +6,7 @@ export interface CustomConfig {
     shortDescription: string
     description: string
     terms: string
+    isNSFW: boolean
     defaultClientRoute: string
     defaultNSFWPolicy: NSFWPolicyType
     customizations: {
@@ -61,6 +62,9 @@ export interface CustomConfig {
       '720p': boolean
       '1080p': boolean
     }
+    hls: {
+      enabled: boolean
+    }
   }
 
   import: {
@@ -73,4 +77,13 @@ export interface CustomConfig {
       }
     }
   }
+
+  autoBlacklist: {
+    videos: {
+      ofUsers: {
+        enabled: boolean
+      }
+    }
+  }
+
 }

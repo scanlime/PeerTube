@@ -10,13 +10,15 @@ import { NSFWPolicyType } from '../../shared/models/videos/nsfw-policy.type'
 import { invert } from 'lodash'
 import { CronRepeatOptions, EveryRepeatOptions } from 'bull'
 import * as bytes from 'bytes'
+import { VideoPlaylistPrivacy } from '../../shared/models/videos/playlist/video-playlist-privacy.model'
+import { VideoPlaylistType } from '../../shared/models/videos/playlist/video-playlist-type.model'
 
 // Use a variable to reload the configuration if we need
 let config: IConfig = require('config')
 
 // ---------------------------------------------------------------------------
 
-const LAST_MIGRATION_VERSION = 325
+const LAST_MIGRATION_VERSION = 350
 
 // ---------------------------------------------------------------------------
 
@@ -52,7 +54,9 @@ const SORTABLE_COLUMNS = {
   ACCOUNTS_BLOCKLIST: [ 'createdAt' ],
   SERVERS_BLOCKLIST: [ 'createdAt' ],
 
-  USER_NOTIFICATIONS: [ 'createdAt' ]
+  USER_NOTIFICATIONS: [ 'createdAt' ],
+
+  VIDEO_PLAYLISTS: [ 'displayName', 'createdAt', 'updatedAt' ]
 }
 
 const OAUTH_LIFETIME = {
@@ -96,36 +100,40 @@ const REMOTE_SCHEME = {
   WS: 'wss'
 }
 
-const JOB_ATTEMPTS: { [ id in JobType ]: number } = {
+// TODO: remove 'video-file'
+const JOB_ATTEMPTS: { [ id in (JobType | 'video-file') ]: number } = {
   'activitypub-http-broadcast': 5,
   'activitypub-http-unicast': 5,
   'activitypub-http-fetcher': 5,
   'activitypub-follow': 5,
   'video-file-import': 1,
+  'video-transcoding': 1,
   'video-file': 1,
   'video-import': 1,
   'email': 5,
   'videos-views': 1,
   'activitypub-refresher': 1
 }
-const JOB_CONCURRENCY: { [ id in JobType ]: number } = {
+const JOB_CONCURRENCY: { [ id in (JobType | 'video-file') ]: number } = {
   'activitypub-http-broadcast': 1,
   'activitypub-http-unicast': 5,
   'activitypub-http-fetcher': 1,
   'activitypub-follow': 3,
   'video-file-import': 1,
-  'video-file': 3,
+  'video-transcoding': 3,
+  'video-file': 1,
   'video-import': 1,
   'email': 5,
   'videos-views': 1,
   'activitypub-refresher': 1
 }
-const JOB_TTL: { [ id in JobType ]: number } = {
+const JOB_TTL: { [ id in (JobType | 'video-file') ]: number } = {
   'activitypub-http-broadcast': 60000 * 10, // 10 minutes
   'activitypub-http-unicast': 60000 * 10, // 10 minutes
   'activitypub-http-fetcher': 60000 * 10, // 10 minutes
   'activitypub-follow': 60000 * 10, // 10 minutes
   'video-file-import': 1000 * 3600, // 1 hour
+  'video-transcoding': 1000 * 3600 * 48, // 2 days, transcoding could be long
   'video-file': 1000 * 3600 * 48, // 2 days, transcoding could be long
   'video-import': 1000 * 3600 * 2, //  hours
   'email': 60000 * 10, // 10 minutes
@@ -192,6 +200,7 @@ const CONFIG = {
     AVATARS_DIR: buildPath(config.get<string>('storage.avatars')),
     LOG_DIR: buildPath(config.get<string>('storage.logs')),
     VIDEOS_DIR: buildPath(config.get<string>('storage.videos')),
+    STREAMING_PLAYLISTS_DIR: buildPath(config.get<string>('storage.streaming_playlists')),
     REDUNDANCY_DIR: buildPath(config.get<string>('storage.redundancy')),
     THUMBNAILS_DIR: buildPath(config.get<string>('storage.thumbnails')),
     PREVIEWS_DIR: buildPath(config.get<string>('storage.previews')),
@@ -228,6 +237,11 @@ const CONFIG = {
       STRATEGIES: buildVideosRedundancy(config.get<any[]>('redundancy.videos.strategies'))
     }
   },
+  CSP: {
+    ENABLED: config.get<boolean>('csp.enabled'),
+    REPORT_ONLY: config.get<boolean>('csp.report_only'),
+    REPORT_URI: config.get<boolean>('csp.report_uri')
+  },
   ADMIN: {
     get EMAIL () { return config.get<string>('admin.email') }
   },
@@ -259,6 +273,9 @@ const CONFIG = {
       get '480p' () { return config.get<boolean>('transcoding.resolutions.480p') },
       get '720p' () { return config.get<boolean>('transcoding.resolutions.720p') },
       get '1080p' () { return config.get<boolean>('transcoding.resolutions.1080p') }
+    },
+    HLS: {
+      get ENABLED () { return config.get<boolean>('transcoding.hls.enabled') }
     }
   },
   IMPORT: {
@@ -268,6 +285,13 @@ const CONFIG = {
       },
       TORRENT: {
         get ENABLED () { return config.get<boolean>('import.videos.torrent.enabled') }
+      }
+    }
+  },
+  AUTO_BLACKLIST: {
+    VIDEOS: {
+      OF_USERS: {
+        get ENABLED () { return config.get<boolean>('auto_blacklist.videos.of_users.enabled') }
       }
     }
   },
@@ -284,6 +308,7 @@ const CONFIG = {
     get SHORT_DESCRIPTION () { return config.get<string>('instance.short_description') },
     get DESCRIPTION () { return config.get<string>('instance.description') },
     get TERMS () { return config.get<string>('instance.terms') },
+    get IS_NSFW () { return config.get<boolean>('instance.is_nsfw') },
     get DEFAULT_CLIENT_ROUTE () { return config.get<string>('instance.default_client_route') },
     get DEFAULT_NSFW_POLICY () { return config.get<NSFWPolicyType>('instance.default_nsfw_policy') },
     CUSTOMIZATIONS: {
@@ -295,7 +320,6 @@ const CONFIG = {
     get SECURITYTXT_CONTACT () { return config.get<string>('admin.email') }
   },
   SERVICES: {
-    get 'CSP-LOGGER' () { return config.get<string>('services.csp-logger') },
     TWITTER: {
       get USERNAME () { return config.get<string>('services.twitter.username') },
       get WHITELISTED () { return config.get<boolean>('services.twitter.whitelisted') }
@@ -376,6 +400,17 @@ let CONSTRAINTS_FIELDS = {
     DISLIKES: { min: 0 },
     FILE_SIZE: { min: 10 },
     URL: { min: 3, max: 2000 } // Length
+  },
+  VIDEO_PLAYLISTS: {
+    NAME: { min: 1, max: 120 }, // Length
+    DESCRIPTION: { min: 3, max: 1000 }, // Length
+    URL: { min: 3, max: 2000 }, // Length
+    IMAGE: {
+      EXTNAME: [ '.jpg', '.jpeg' ],
+      FILE_SIZE: {
+        max: 2 * 1024 * 1024 // 2MB
+      }
+    }
   },
   ACTORS: {
     PUBLIC_KEY: { min: 10, max: 5000 }, // Length
@@ -493,6 +528,17 @@ const VIDEO_ABUSE_STATES = {
   [VideoAbuseState.ACCEPTED]: 'Accepted'
 }
 
+const VIDEO_PLAYLIST_PRIVACIES = {
+  [VideoPlaylistPrivacy.PUBLIC]: 'Public',
+  [VideoPlaylistPrivacy.UNLISTED]: 'Unlisted',
+  [VideoPlaylistPrivacy.PRIVATE]: 'Private'
+}
+
+const VIDEO_PLAYLIST_TYPES = {
+  [VideoPlaylistType.REGULAR]: 'Regular',
+  [VideoPlaylistType.WATCH_LATER]: 'Watch later'
+}
+
 const MIMETYPES = {
   VIDEO: {
     MIMETYPE_EXT: buildVideoMimetypeExt(),
@@ -548,8 +594,9 @@ const ACTIVITY_PUB = {
     MAGNET: [ 'application/x-bittorrent;x-scheme-handler/magnet' ]
   },
   MAX_RECURSION_COMMENTS: 100,
-  ACTOR_REFRESH_INTERVAL: 3600 * 24 * 1000, // 1 day
-  VIDEO_REFRESH_INTERVAL: 3600 * 24 * 1000 // 1 day
+  ACTOR_REFRESH_INTERVAL: 3600 * 24 * 1000 * 2, // 2 days
+  VIDEO_REFRESH_INTERVAL: 3600 * 24 * 1000 * 2, // 2 days
+  VIDEO_PLAYLIST_REFRESH_INTERVAL: 3600 * 24 * 1000 * 2 // 2 days
 }
 
 const ACTIVITY_PUB_ACTOR_TYPES: { [ id: string ]: ActivityPubActorType } = {
@@ -590,6 +637,9 @@ const STATIC_PATHS = {
   TORRENTS: '/static/torrents/',
   WEBSEED: '/static/webseed/',
   REDUNDANCY: '/static/redundancy/',
+  STREAMING_PLAYLISTS: {
+    HLS: '/static/streaming-playlists/hls'
+  },
   AVATARS: '/static/avatars/',
   VIDEO_CAPTIONS: '/static/video-captions/'
 }
@@ -603,8 +653,8 @@ let STATIC_MAX_AGE = '2h'
 
 // Videos thumbnail size
 const THUMBNAILS_SIZE = {
-  width: 200,
-  height: 110
+  width: 223,
+  height: 122
 }
 const PREVIEWS_SIZE = {
   width: 560,
@@ -621,7 +671,7 @@ const EMBED_SIZE = {
 }
 
 // Sub folders of cache directory
-const CACHE = {
+const FILES_CACHE = {
   PREVIEWS: {
     DIRECTORY: join(CONFIG.STORAGE.CACHE_DIR, 'previews'),
     MAX_AGE: 1000 * 3600 * 3 // 3 hours
@@ -631,6 +681,15 @@ const CACHE = {
     MAX_AGE: 1000 * 3600 * 3 // 3 hours
   }
 }
+
+const CACHE = {
+  USER_TOKENS: {
+    MAX_SIZE: 10000
+  }
+}
+
+const HLS_STREAMING_PLAYLIST_DIRECTORY = join(CONFIG.STORAGE.STREAMING_PLAYLISTS_DIR, 'hls')
+const HLS_REDUNDANCY_DIRECTORY = join(CONFIG.STORAGE.REDUNDANCY_DIR, 'hls')
 
 const MEMOIZE_TTL = {
   OVERVIEWS_SAMPLE: 1000 * 3600 * 4 // 4 hours
@@ -650,7 +709,7 @@ const CUSTOM_HTML_TAG_COMMENTS = {
   TITLE: '<!-- title tag -->',
   DESCRIPTION: '<!-- description tag -->',
   CUSTOM_CSS: '<!-- custom css tag -->',
-  OPENGRAPH_AND_OEMBED: '<!-- open graph and oembed tags -->'
+  META_TAGS: '<!-- meta tags -->'
 }
 
 // ---------------------------------------------------------------------------
@@ -683,6 +742,7 @@ if (isTestInstance() === true) {
   ACTIVITY_PUB.COLLECTION_ITEMS_PER_PAGE = 2
   ACTIVITY_PUB.ACTOR_REFRESH_INTERVAL = 10 * 1000 // 10 seconds
   ACTIVITY_PUB.VIDEO_REFRESH_INTERVAL = 10 * 1000 // 10 seconds
+  ACTIVITY_PUB.VIDEO_PLAYLIST_REFRESH_INTERVAL = 10 * 1000 // 10 seconds
 
   CONSTRAINTS_FIELDS.ACTORS.AVATAR.FILE_SIZE.max = 100 * 1024 // 100KB
 
@@ -698,9 +758,11 @@ if (isTestInstance() === true) {
 
   JOB_ATTEMPTS['email'] = 1
 
-  CACHE.VIDEO_CAPTIONS.MAX_AGE = 3000
+  FILES_CACHE.VIDEO_CAPTIONS.MAX_AGE = 3000
   MEMOIZE_TTL.OVERVIEWS_SAMPLE = 1
   ROUTE_CACHE_LIFETIME.OVERVIEWS.VIDEOS = '0ms'
+
+  RATES_LIMIT.LOGIN.MAX = 20
 }
 
 updateWebserverUrls()
@@ -709,11 +771,12 @@ updateWebserverUrls()
 
 export {
   API_VERSION,
+  HLS_REDUNDANCY_DIRECTORY,
   AVATARS_SIZE,
   ACCEPT_HEADERS,
   BCRYPT_SALT_SIZE,
   TRACKER_RATE_LIMITS,
-  CACHE,
+  FILES_CACHE,
   CONFIG,
   CONSTRAINTS_FIELDS,
   EMBED_SIZE,
@@ -733,12 +796,14 @@ export {
   PRIVATE_RSA_KEY_SIZE,
   ROUTE_CACHE_LIFETIME,
   SORTABLE_COLUMNS,
+  HLS_STREAMING_PLAYLIST_DIRECTORY,
   FEEDS,
   JOB_TTL,
   NSFW_POLICY_TYPES,
   STATIC_MAX_AGE,
   STATIC_PATHS,
   VIDEO_IMPORT_TIMEOUT,
+  VIDEO_PLAYLIST_TYPES,
   ACTIVITY_PUB,
   ACTIVITY_PUB_ACTOR_TYPES,
   THUMBNAILS_SIZE,
@@ -751,6 +816,7 @@ export {
   VIDEO_TRANSCODING_FPS,
   FFMPEG_NICE,
   VIDEO_ABUSE_STATES,
+  CACHE,
   JOB_REQUEST_TIMEOUT,
   USER_PASSWORD_RESET_LIFETIME,
   MEMOIZE_TTL,
@@ -767,6 +833,7 @@ export {
   VIDEO_IMPORT_STATES,
   VIDEO_VIEW_LIFETIME,
   CONTACT_FORM_LIFETIME,
+  VIDEO_PLAYLIST_PRIVACIES,
   buildLanguages
 }
 
@@ -824,6 +891,8 @@ function buildVideosExtname () {
 
 function buildVideosRedundancy (objs: any[]): VideosRedundancy[] {
   if (!objs) return []
+
+  if (!Array.isArray(objs)) return objs
 
   return objs.map(obj => {
     return Object.assign({}, obj, {

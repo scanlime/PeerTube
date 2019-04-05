@@ -3,6 +3,7 @@ import { makePostBodyRequest, makePutBodyRequest, updateAvatarRequest } from '..
 
 import { UserRole } from '../../index'
 import { NSFWPolicyType } from '../../models/videos/nsfw-policy.type'
+import { ServerInfo, userLogin } from '..'
 
 function createUser (
   url: string,
@@ -30,6 +31,13 @@ function createUser (
           .set('Authorization', 'Bearer ' + accessToken)
           .send(body)
           .expect(specialStatus)
+}
+
+async function generateUserAccessToken (server: ServerInfo, username: string) {
+  const password = 'my super password'
+  await createUser(server.url, server.accessToken, username, password)
+
+  return userLogin(server, { username, password })
 }
 
 function registerUser (url: string, username: string, password: string, specialStatus = 204) {
@@ -213,11 +221,13 @@ function updateUser (options: {
   emailVerified?: boolean,
   videoQuota?: number,
   videoQuotaDaily?: number,
+  password?: string,
   role?: UserRole
 }) {
   const path = '/api/v1/users/' + options.userId
 
   const toSend = {}
+  if (options.password !== undefined && options.password !== null) toSend['password'] = options.password
   if (options.email !== undefined && options.email !== null) toSend['email'] = options.email
   if (options.emailVerified !== undefined && options.emailVerified !== null) toSend['emailVerified'] = options.emailVerified
   if (options.videoQuota !== undefined && options.videoQuota !== null) toSend['videoQuota'] = options.videoQuota
@@ -298,5 +308,6 @@ export {
   resetPassword,
   updateMyAvatar,
   askSendVerifyEmail,
+  generateUserAccessToken,
   verifyEmail
 }

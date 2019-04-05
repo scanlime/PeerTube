@@ -14,10 +14,7 @@ import { AUTH_INTERCEPTOR_PROVIDER } from './auth'
 import { ButtonComponent } from './buttons/button.component'
 import { DeleteButtonComponent } from './buttons/delete-button.component'
 import { EditButtonComponent } from './buttons/edit-button.component'
-import { FromNowPipe } from './misc/from-now.pipe'
 import { LoaderComponent } from './misc/loader.component'
-import { NumberFormatterPipe } from './misc/number-formatter.pipe'
-import { ObjectLengthPipe } from './misc/object-length.pipe'
 import { RestExtractor, RestService } from './rest'
 import { UserService } from './users'
 import { VideoAbuseService } from './video-abuse'
@@ -45,9 +42,11 @@ import {
   VideoChangeOwnershipValidatorsService,
   VideoChannelValidatorsService,
   VideoCommentValidatorsService,
+  VideoPlaylistValidatorsService,
   VideoValidatorsService
 } from '@app/shared/forms'
 import { I18nPrimengCalendarService } from '@app/shared/i18n/i18n-primeng-calendar'
+import { InputMaskModule } from 'primeng/inputmask'
 import { ScreenService } from '@app/shared/misc/screen.service'
 import { VideoCaptionsValidatorsService } from '@app/shared/forms/form-validators/video-captions-validators.service'
 import { VideoCaptionService } from '@app/shared/video-caption'
@@ -68,7 +67,24 @@ import { UserNotificationsComponent } from '@app/shared/users/user-notifications
 import { InstanceService } from '@app/shared/instance/instance.service'
 import { HtmlRendererService, LinkifierService, MarkdownService } from '@app/shared/renderer'
 import { ConfirmComponent } from '@app/shared/confirm/confirm.component'
-import { GlobalIconComponent } from '@app/shared/icons/global-icon.component'
+import { SmallLoaderComponent } from '@app/shared/misc/small-loader.component'
+import { VideoPlaylistService } from '@app/shared/video-playlist/video-playlist.service'
+import { ImageUploadComponent } from '@app/shared/images/image-upload.component'
+import { GlobalIconComponent } from '@app/shared/images/global-icon.component'
+import { VideoPlaylistMiniatureComponent } from '@app/shared/video-playlist/video-playlist-miniature.component'
+import { VideoAddToPlaylistComponent } from '@app/shared/video-playlist/video-add-to-playlist.component'
+import { TimestampInputComponent } from '@app/shared/forms/timestamp-input.component'
+import { VideoPlaylistElementMiniatureComponent } from '@app/shared/video-playlist/video-playlist-element-miniature.component'
+import { VideosSelectionComponent } from '@app/shared/video/videos-selection.component'
+import { NumberFormatterPipe } from '@app/shared/angular/number-formatter.pipe'
+import { ObjectLengthPipe } from '@app/shared/angular/object-length.pipe'
+import { FromNowPipe } from '@app/shared/angular/from-now.pipe'
+import { PeerTubeTemplateDirective } from '@app/shared/angular/peertube-template.directive'
+import { VideoActionsDropdownComponent } from '@app/shared/video/video-actions-dropdown.component'
+import { VideoBlacklistComponent } from '@app/shared/video/modals/video-blacklist.component'
+import { VideoDownloadComponent } from '@app/shared/video/modals/video-download.component'
+import { VideoReportComponent } from '@app/shared/video/modals/video-report.component'
+import { ClipboardModule } from 'ngx-clipboard'
 
 @NgModule({
   imports: [
@@ -84,28 +100,50 @@ import { GlobalIconComponent } from '@app/shared/icons/global-icon.component'
     NgbTabsetModule,
     NgbTooltipModule,
 
+    ClipboardModule,
+
     PrimeSharedModule,
+    InputMaskModule,
     NgPipesModule
   ],
 
   declarations: [
     LoaderComponent,
+    SmallLoaderComponent,
+
     VideoThumbnailComponent,
     VideoMiniatureComponent,
+    VideoPlaylistMiniatureComponent,
+    VideoAddToPlaylistComponent,
+    VideoPlaylistElementMiniatureComponent,
+    VideosSelectionComponent,
+    VideoActionsDropdownComponent,
+
+    VideoDownloadComponent,
+    VideoReportComponent,
+    VideoBlacklistComponent,
+
     FeedComponent,
+
     ButtonComponent,
     DeleteButtonComponent,
     EditButtonComponent,
-    ActionDropdownComponent,
+
     NumberFormatterPipe,
     ObjectLengthPipe,
     FromNowPipe,
+    PeerTubeTemplateDirective,
+
+    ActionDropdownComponent,
     MarkdownTextareaComponent,
     InfiniteScrollerDirective,
     TextareaAutoResizeDirective,
     HelpComponent,
+
     ReactiveFileComponent,
     PeertubeCheckboxComponent,
+    TimestampInputComponent,
+
     SubscribeButtonComponent,
     RemoteSubscribeComponent,
     InstanceFeaturesTableComponent,
@@ -114,7 +152,9 @@ import { GlobalIconComponent } from '@app/shared/icons/global-icon.component'
     TopMenuDropdownComponent,
     UserNotificationsComponent,
     ConfirmComponent,
-    GlobalIconComponent
+
+    GlobalIconComponent,
+    ImageUploadComponent
   ],
 
   exports: [
@@ -130,24 +170,44 @@ import { GlobalIconComponent } from '@app/shared/icons/global-icon.component'
     NgbTabsetModule,
     NgbTooltipModule,
 
+    ClipboardModule,
+
     PrimeSharedModule,
+    InputMaskModule,
     BytesPipe,
     KeysPipe,
 
     LoaderComponent,
+    SmallLoaderComponent,
+
     VideoThumbnailComponent,
     VideoMiniatureComponent,
+    VideoPlaylistMiniatureComponent,
+    VideoAddToPlaylistComponent,
+    VideoPlaylistElementMiniatureComponent,
+    VideosSelectionComponent,
+    VideoActionsDropdownComponent,
+
+    VideoDownloadComponent,
+    VideoReportComponent,
+    VideoBlacklistComponent,
+
     FeedComponent,
+
     ButtonComponent,
     DeleteButtonComponent,
     EditButtonComponent,
+
     ActionDropdownComponent,
     MarkdownTextareaComponent,
     InfiniteScrollerDirective,
     TextareaAutoResizeDirective,
     HelpComponent,
+
     ReactiveFileComponent,
     PeertubeCheckboxComponent,
+    TimestampInputComponent,
+
     SubscribeButtonComponent,
     RemoteSubscribeComponent,
     InstanceFeaturesTableComponent,
@@ -156,11 +216,14 @@ import { GlobalIconComponent } from '@app/shared/icons/global-icon.component'
     TopMenuDropdownComponent,
     UserNotificationsComponent,
     ConfirmComponent,
+
     GlobalIconComponent,
+    ImageUploadComponent,
 
     NumberFormatterPipe,
     ObjectLengthPipe,
-    FromNowPipe
+    FromNowPipe,
+    PeerTubeTemplateDirective
   ],
 
   providers: [
@@ -174,6 +237,7 @@ import { GlobalIconComponent } from '@app/shared/icons/global-icon.component'
     VideoService,
     AccountService,
     VideoChannelService,
+    VideoPlaylistService,
     VideoCaptionService,
     VideoImportService,
     UserSubscriptionService,
@@ -183,6 +247,7 @@ import { GlobalIconComponent } from '@app/shared/icons/global-icon.component'
     LoginValidatorsService,
     ResetPasswordValidatorsService,
     UserValidatorsService,
+    VideoPlaylistValidatorsService,
     VideoAbuseValidatorsService,
     VideoChannelValidatorsService,
     VideoCommentValidatorsService,

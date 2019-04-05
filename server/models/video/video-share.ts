@@ -125,7 +125,7 @@ export class VideoShareModel extends Model<VideoShareModel> {
       .then(res => res.map(r => r.Actor))
   }
 
-  static loadActorsByVideoOwner (actorOwnerId: number, t: Sequelize.Transaction): Bluebird<ActorModel[]> {
+  static loadActorsWhoSharedVideosOf (actorOwnerId: number, t: Sequelize.Transaction): Bluebird<ActorModel[]> {
     const query = {
       attributes: [],
       include: [
@@ -199,5 +199,18 @@ export class VideoShareModel extends Model<VideoShareModel> {
     }
 
     return VideoShareModel.findAndCountAll(query)
+  }
+
+  static cleanOldSharesOf (videoId: number, beforeUpdatedAt: Date) {
+    const query = {
+      where: {
+        updatedAt: {
+          [Sequelize.Op.lt]: beforeUpdatedAt
+        },
+        videoId
+      }
+    }
+
+    return VideoShareModel.destroy(query)
   }
 }

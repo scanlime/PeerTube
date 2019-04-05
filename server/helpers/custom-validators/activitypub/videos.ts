@@ -1,7 +1,7 @@
 import * as validator from 'validator'
 import { ACTIVITY_PUB, CONSTRAINTS_FIELDS } from '../../../initializers'
 import { peertubeTruncate } from '../../core-utils'
-import { exists, isBooleanValid, isDateValid, isUUIDValid } from '../misc'
+import { exists, isArray, isBooleanValid, isDateValid, isUUIDValid } from '../misc'
 import {
   isVideoDurationValid,
   isVideoNameValid,
@@ -12,7 +12,6 @@ import {
 } from '../videos'
 import { isActivityPubUrlValid, isBaseActivityValid, setValidAttributedTo } from './misc'
 import { VideoState } from '../../../../shared/models/videos'
-import { isVideoAbuseReasonValid } from '../video-abuses'
 
 function sanitizeAndCheckVideoTorrentUpdateActivity (activity: any) {
   return isBaseActivityValid(activity, 'Update') &&
@@ -40,6 +39,7 @@ function sanitizeAndCheckVideoTorrentObject (video: any) {
   // Default attributes
   if (!isVideoStateValid(video.state)) video.state = VideoState.PUBLISHED
   if (!isBooleanValid(video.waitTranscoding)) video.waitTranscoding = false
+  if (!isBooleanValid(video.downloadEnabled)) video.downloadEnabled = true
 
   return isActivityPubUrlValid(video.id) &&
     isVideoNameValid(video.name) &&
@@ -51,8 +51,10 @@ function sanitizeAndCheckVideoTorrentObject (video: any) {
     isVideoViewsValid(video.views) &&
     isBooleanValid(video.sensitive) &&
     isBooleanValid(video.commentsEnabled) &&
+    isBooleanValid(video.downloadEnabled) &&
     isDateValid(video.published) &&
     isDateValid(video.updated) &&
+    (!video.originallyPublishedAt || isDateValid(video.originallyPublishedAt)) &&
     (!video.content || isRemoteVideoContentValid(video.mediaType, video.content)) &&
     isRemoteVideoIconValid(video.icon) &&
     video.url.length !== 0 &&
@@ -81,6 +83,11 @@ function isRemoteVideoUrlValid (url: any) {
       ACTIVITY_PUB.URL_MIME_TYPES.MAGNET.indexOf(url.mediaType || url.mimeType) !== -1 &&
       validator.isLength(url.href, { min: 5 }) &&
       validator.isInt(url.height + '', { min: 0 })
+    ) ||
+    (
+      (url.mediaType || url.mimeType) === 'application/x-mpegURL' &&
+      isActivityPubUrlValid(url.href) &&
+      isArray(url.tag)
     )
 }
 

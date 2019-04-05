@@ -1,33 +1,18 @@
 import './embed.scss'
 
-import 'core-js/es6/symbol'
-import 'core-js/es6/object'
-import 'core-js/es6/function'
-import 'core-js/es6/parse-int'
-import 'core-js/es6/parse-float'
-import 'core-js/es6/number'
-import 'core-js/es6/math'
-import 'core-js/es6/string'
-import 'core-js/es6/date'
-import 'core-js/es6/array'
-import 'core-js/es6/regexp'
-import 'core-js/es6/map'
-import 'core-js/es6/weak-map'
-import 'core-js/es6/set'
-// For google bot that uses Chrome 41 and does not understand fetch
-import 'whatwg-fetch'
-
-// FIXME: something weird with our path definition in tsconfig and typings
-// @ts-ignore
-import * as vjs from 'video.js'
-
 import * as Channel from 'jschannel'
 
 import { peertubeTranslate, ResultList, VideoDetails } from '../../../../shared'
-import { addContextMenu, getServerTranslations, getVideojsOptions, loadLocaleInVideoJS } from '../../assets/player/peertube-player'
 import { PeerTubeResolution } from '../player/definitions'
 import { VideoJSCaption } from '../../assets/player/peertube-videojs-typings'
 import { VideoCaption } from '../../../../shared/models/videos/caption/video-caption.model'
+import {
+  P2PMediaLoaderOptions,
+  PeertubePlayerManager,
+  PeertubePlayerManagerOptions,
+  PlayerMode
+} from '../../assets/player/peertube-player-manager'
+import { VideoStreamingPlaylistType } from '../../../../shared/models/videos/video-streaming-playlist.type'
 
 /**
  * Embed API exposes control of the embed player to the outside world via
@@ -55,7 +40,7 @@ class PeerTubeEmbedApi {
   }
 
   private constructChannel () {
-    let channel = Channel.build({ window: window.parent, origin: '*', scope: this.embed.scope })
+    const channel = Channel.build({ window: window.parent, origin: '*', scope: this.embed.scope })
 
     channel.bind('play', (txn, params) => this.embed.player.play())
     channel.bind('pause', (txn, params) => this.embed.player.pause())
@@ -73,16 +58,16 @@ class PeerTubeEmbedApi {
   }
 
   private setResolution (resolutionId: number) {
-    if (resolutionId === -1 && this.embed.player.peertube().isAutoResolutionForbidden()) return
+    if (resolutionId === -1 && this.embed.player.webtorrent().isAutoResolutionForbidden()) return
 
     // Auto resolution
     if (resolutionId === -1) {
-      this.embed.player.peertube().enableAutoResolution()
+      this.embed.player.webtorrent().enableAutoResolution()
       return
     }
 
-    this.embed.player.peertube().disableAutoResolution()
-    this.embed.player.peertube().updateResolution(resolutionId)
+    this.embed.player.webtorrent().disableAutoResolution()
+    this.embed.player.webtorrent().updateResolution(resolutionId)
   }
 
   /**
@@ -97,8 +82,8 @@ class PeerTubeEmbedApi {
     let currentState: 'playing' | 'paused' | 'unstarted' = 'unstarted'
 
     setInterval(() => {
-      let position = this.element.currentTime
-      let volume = this.element.volume
+      const position = this.element.currentTime
+      const volume = this.element.volume
 
       this.channel.notify({
         method: 'playbackStatusUpdate',
@@ -122,15 +107,17 @@ class PeerTubeEmbedApi {
 
     // PeerTube specific capabilities
 
-    this.embed.player.peertube().on('autoResolutionUpdate', () => this.loadResolutions())
-    this.embed.player.peertube().on('videoFileUpdate', () => this.loadResolutions())
+    if (this.embed.player.webtorrent) {
+      this.embed.player.webtorrent().on('autoResolutionUpdate', () => this.loadWebTorrentResolutions())
+      this.embed.player.webtorrent().on('videoFileUpdate', () => this.loadWebTorrentResolutions())
+    }
   }
 
-  private loadResolutions () {
-    let resolutions = []
-    let currentResolutionId = this.embed.player.peertube().getCurrentResolutionId()
+  private loadWebTorrentResolutions () {
+    const resolutions = []
+    const currentResolutionId = this.embed.player.webtorrent().getCurrentResolutionId()
 
-    for (const videoFile of this.embed.player.peertube().videoFiles) {
+    for (const videoFile of this.embed.player.webtorrent().videoFiles) {
       let label = videoFile.resolution.label
       if (videoFile.fps && videoFile.fps >= 50) {
         label += videoFile.fps
@@ -164,6 +151,8 @@ class PeerTubeEmbed {
   subtitle: string
   enableApi = false
   startTime: number | string = 0
+  stopTime: number | string
+  mode: PlayerMode
   scope = 'peertube'
 
   static async main () {
@@ -246,7 +235,7 @@ class PeerTubeEmbed {
 
   private loadParams () {
     try {
-      let params = new URL(window.location.toString()).searchParams
+      const params = new URL(window.location.toString()).searchParams
 
       this.autoplay = this.getParamToggle(params, 'autoplay')
       this.controls = this.getParamToggle(params, 'controls')
@@ -257,6 +246,9 @@ class PeerTubeEmbed {
       this.scope = this.getParamString(params, 'scope', this.scope)
       this.subtitle = this.getParamString(params, 'subtitle')
       this.startTime = this.getParamString(params, 'start')
+      this.stopTime = this.getParamString(params, 'stop')
+
+      this.mode = this.getParamString(params, 'mode') === 'p2p-media-loader' ? 'p2p-media-loader' : 'webtorrent'
     } catch (err) {
       console.error('Cannot get params from URL.', err)
     }
@@ -266,9 +258,8 @@ class PeerTubeEmbed {
     const urlParts = window.location.pathname.split('/')
     const videoId = urlParts[ urlParts.length - 1 ]
 
-    const [ , serverTranslations, videoResponse, captionsResponse ] = await Promise.all([
-      loadLocaleInVideoJS(window.location.origin, vjs, navigator.language),
-      getServerTranslations(window.location.origin, navigator.language),
+    const [ serverTranslations, videoResponse, captionsResponse ] = await Promise.all([
+      PeertubePlayerManager.getServerTranslations(window.location.origin, navigator.language),
       this.loadVideoInfo(videoId),
       this.loadVideoCaptions(videoId)
     ])
@@ -292,43 +283,68 @@ class PeerTubeEmbed {
 
     this.loadParams()
 
-    const videojsOptions = getVideojsOptions({
-      autoplay: this.autoplay,
-      controls: this.controls,
-      muted: this.muted,
-      loop: this.loop,
-      startTime: this.startTime,
-      subtitle: this.subtitle,
+    const options: PeertubePlayerManagerOptions = {
+      common: {
+        autoplay: this.autoplay,
+        controls: this.controls,
+        muted: this.muted,
+        loop: this.loop,
+        captions: videoCaptions.length !== 0,
+        startTime: this.startTime,
+        stopTime: this.stopTime,
+        subtitle: this.subtitle,
 
-      videoCaptions,
-      inactivityTimeout: 1500,
-      videoViewUrl: this.getVideoUrl(videoId) + '/views',
-      playerElement: this.videoElement,
-      videoFiles: videoInfo.files,
-      videoDuration: videoInfo.duration,
-      enableHotkeys: true,
-      peertubeLink: true,
-      poster: window.location.origin + videoInfo.previewPath,
-      theaterMode: false
-    })
+        videoCaptions,
+        inactivityTimeout: 1500,
+        videoViewUrl: this.getVideoUrl(videoId) + '/views',
 
-    this.playerOptions = videojsOptions
-    this.player = vjs(this.videoContainerId, videojsOptions, () => {
-      this.player.on('customError', (event: any, data: any) => this.handleError(data.err, serverTranslations))
+        playerElement: this.videoElement,
+        onPlayerElementChange: (element: HTMLVideoElement) => this.videoElement = element,
 
-      window[ 'videojsPlayer' ] = this.player
+        videoDuration: videoInfo.duration,
+        enableHotkeys: true,
+        peertubeLink: true,
+        poster: window.location.origin + videoInfo.previewPath,
+        theaterMode: false,
 
-      if (this.controls) {
-        this.player.dock({
-          title: videoInfo.name,
-          description: this.player.localize('Uses P2P, others may know your IP is downloading this video.')
-        })
+        serverUrl: window.location.origin,
+        language: navigator.language,
+        embedUrl: window.location.origin + videoInfo.embedPath
+      },
+
+      webtorrent: {
+        videoFiles: videoInfo.files
       }
+    }
 
-      addContextMenu(this.player, window.location.origin + videoInfo.embedPath)
+    if (this.mode === 'p2p-media-loader') {
+      const hlsPlaylist = videoInfo.streamingPlaylists.find(p => p.type === VideoStreamingPlaylistType.HLS)
 
-      this.initializeApi()
-    })
+      Object.assign(options, {
+        p2pMediaLoader: {
+          playlistUrl: hlsPlaylist.playlistUrl,
+          segmentsSha256Url: hlsPlaylist.segmentsSha256Url,
+          redundancyBaseUrls: hlsPlaylist.redundancies.map(r => r.baseUrl),
+          trackerAnnounce: videoInfo.trackerUrls,
+          videoFiles: videoInfo.files
+        } as P2PMediaLoaderOptions
+      })
+    }
+
+    this.player = await PeertubePlayerManager.initialize(this.mode, options)
+
+    this.player.on('customError', (event: any, data: any) => this.handleError(data.err, serverTranslations))
+
+    window[ 'videojsPlayer' ] = this.player
+
+    if (this.controls) {
+      this.player.dock({
+        title: videoInfo.name,
+        description: this.player.localize('Uses P2P, others may know your IP is downloading this video.')
+      })
+    }
+
+    this.initializeApi()
   }
 
   private handleError (err: Error, translations?: { [ id: string ]: string }) {

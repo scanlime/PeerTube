@@ -1,6 +1,5 @@
 import { Component, OnDestroy, OnInit } from '@angular/core'
 import { ActivatedRoute, Router } from '@angular/router'
-import { Location } from '@angular/common'
 import { immutableAssign } from '@app/shared/misc/utils'
 import { AuthService } from '../../core/auth'
 import { AbstractVideoList } from '../../shared/video/abstract-video-list'
@@ -17,18 +16,16 @@ import { Notifier, ServerService } from '@app/core'
 })
 export class VideoTrendingComponent extends AbstractVideoList implements OnInit, OnDestroy {
   titlePage: string
-  currentRoute = '/videos/trending'
   defaultSort: VideoSortField = '-trending'
 
   constructor (
     protected router: Router,
+    protected serverService: ServerService,
     protected route: ActivatedRoute,
     protected notifier: Notifier,
     protected authService: AuthService,
-    protected location: Location,
     protected screenService: ScreenService,
-    private serverService: ServerService,
-    protected i18n: I18n,
+    private i18n: I18n,
     private videoService: VideoService
   ) {
     super()
@@ -45,11 +42,11 @@ export class VideoTrendingComponent extends AbstractVideoList implements OnInit,
 
         if (trendingDays === 1) {
           this.titlePage = this.i18n('Trending for the last 24 hours')
-          this.titleTooltip = this.i18n('Trending videos are those totalizing the greatest number of views during the last 24 hours.')
+          this.titleTooltip = this.i18n('Trending videos are those totalizing the greatest number of views during the last 24 hours')
         } else {
           this.titlePage = this.i18n('Trending for the last {{days}} days', { days: trendingDays })
           this.titleTooltip = this.i18n(
-            'Trending videos are those totalizing the greatest number of views during the last {{days}} days.',
+            'Trending videos are those totalizing the greatest number of views during the last {{days}} days',
             { days: trendingDays }
           )
         }

@@ -15,7 +15,7 @@ function activityPubContextify <T> (data: T) {
       'https://w3id.org/security/v1',
       {
         RsaSignature2017: 'https://w3id.org/security#RsaSignature2017',
-        pt: 'https://joinpeertube.org/ns',
+        pt: 'https://joinpeertube.org/ns#',
         sc: 'http://schema.org#',
         Hashtag: 'as:Hashtag',
         uuid: 'sc:identifier',
@@ -28,11 +28,17 @@ function activityPubContextify <T> (data: T) {
         state: 'sc:Number',
         size: 'sc:Number',
         fps: 'sc:Number',
+        startTimestamp: 'sc:Number',
+        stopTimestamp: 'sc:Number',
+        position: 'sc:Number',
         commentsEnabled: 'sc:Boolean',
+        downloadEnabled: 'sc:Boolean',
         waitTranscoding: 'sc:Boolean',
         expires: 'sc:expires',
         support: 'sc:Text',
-        CacheFile: 'pt:CacheFile'
+        CacheFile: 'pt:CacheFile',
+        Infohash: 'pt:Infohash',
+        originallyPublishedAt: 'sc:DateTime'
       },
       {
         likes: {
@@ -41,6 +47,10 @@ function activityPubContextify <T> (data: T) {
         },
         dislikes: {
           '@id': 'as:dislikes',
+          '@type': '@id'
+        },
+        playlists: {
+          '@id': 'pt:playlists',
           '@type': '@id'
         },
         shares: {
@@ -64,7 +74,7 @@ async function activityPubCollectionPagination (baseUrl: string, handler: Activi
 
     return {
       id: baseUrl,
-      type: 'OrderedCollection',
+      type: 'OrderedCollectionPage',
       totalItems: result.total,
       first: baseUrl + '?page=1'
     }

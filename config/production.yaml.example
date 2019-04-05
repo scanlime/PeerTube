@@ -49,6 +49,7 @@ storage:
   tmp: '/var/www/peertube/storage/tmp/' # Used to download data (imports etc), store uploaded files before processing...
   avatars: '/var/www/peertube/storage/avatars/'
   videos: '/var/www/peertube/storage/videos/'
+  streaming_playlists: '/var/www/peertube/storage/streaming-playlists/'
   redundancy: '/var/www/peertube/storage/videos/'
   logs: '/var/www/peertube/storage/logs/'
   previews: '/var/www/peertube/storage/previews/'
@@ -95,6 +96,12 @@ redundancy:
 #        min_lifetime: '48 hours'
 #        strategy: 'recently-added' # Cache recently added videos
 #        min_views: 10 # Having at least x views
+
+csp:
+  enabled: false
+  report_only: true # CSP directives are still being tested, so disable the report only mode at your own risk!
+  report_uri:
+
 
 ###############################################################################
 #
@@ -151,6 +158,15 @@ transcoding:
     480p: false
     720p: false
     1080p: false
+  # /!\ EXPERIMENTAL /!\
+  # /!\ Requires ffmpeg >= 4
+  # Generate HLS playlists and fragmented MP4 files. Better playback than with WebTorrent:
+  #     * Resolution change is smoother
+  #     * Faster playback in particular with long videos
+  #     * More stable playback (less bugs/infinite loading)
+  # /!\ Multiply videos storage by 2 /!\
+  hls:
+    enabled: false
 
 import:
   # Add ability for your users to import remote videos (from YouTube, torrent...)
@@ -160,6 +176,12 @@ import:
     torrent: # Magnet URI or torrent file (use classic TCP/UDP/WebSeed to download the file)
       enabled: false
 
+auto_blacklist:
+  # New videos automatically blacklisted so moderators can review before publishing
+  videos:
+    of_users:
+      enabled: false 
+ 
 # Instance settings
 instance:
   name: 'PeerTube'
@@ -167,6 +189,10 @@ instance:
   description: '' # Support markdown
   terms: '' # Support markdown
   default_client_route: '/videos/trending'
+  # Whether or not the instance is dedicated to NSFW content
+  # Enabling it will allow other administrators to know that you are mainly federating sensitive content
+  # Moreover, the NSFW checkbox on video upload will be automatically checked by default
+  is_nsfw: false
   # By default, "do_not_list" or "blur" or "display" NSFW videos
   # Could be overridden per user with a setting
   default_nsfw_policy: 'do_not_list'

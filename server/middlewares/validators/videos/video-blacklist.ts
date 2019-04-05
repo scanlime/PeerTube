@@ -1,11 +1,14 @@
 import * as express from 'express'
-import { body, param } from 'express-validator/check'
+import { body, param, query } from 'express-validator/check'
 import { isBooleanValid, isIdOrUUIDValid } from '../../../helpers/custom-validators/misc'
-import { isVideoExist } from '../../../helpers/custom-validators/videos'
+import { doesVideoExist } from '../../../helpers/custom-validators/videos'
 import { logger } from '../../../helpers/logger'
 import { areValidationErrors } from '../utils'
-import { isVideoBlacklistExist, isVideoBlacklistReasonValid } from '../../../helpers/custom-validators/video-blacklist'
-import { VideoModel } from '../../../models/video/video'
+import {
+  doesVideoBlacklistExist,
+  isVideoBlacklistReasonValid,
+  isVideoBlacklistTypeValid
+} from '../../../helpers/custom-validators/video-blacklist'
 
 const videosBlacklistRemoveValidator = [
   param('videoId').custom(isIdOrUUIDValid).not().isEmpty().withMessage('Should have a valid videoId'),
@@ -14,8 +17,8 @@ const videosBlacklistRemoveValidator = [
     logger.debug('Checking blacklistRemove parameters.', { parameters: req.params })
 
     if (areValidationErrors(req, res)) return
-    if (!await isVideoExist(req.params.videoId, res)) return
-    if (!await isVideoBlacklistExist(res.locals.video.id, res)) return
+    if (!await doesVideoExist(req.params.videoId, res)) return
+    if (!await doesVideoBlacklistExist(res.locals.video.id, res)) return
 
     return next()
   }
@@ -35,9 +38,9 @@ const videosBlacklistAddValidator = [
     logger.debug('Checking videosBlacklistAdd parameters', { parameters: req.params })
 
     if (areValidationErrors(req, res)) return
-    if (!await isVideoExist(req.params.videoId, res)) return
+    if (!await doesVideoExist(req.params.videoId, res)) return
 
-    const video: VideoModel = res.locals.video
+    const video = res.locals.video
     if (req.body.unfederate === true && video.remote === true) {
       return res
         .status(409)
@@ -59,8 +62,22 @@ const videosBlacklistUpdateValidator = [
     logger.debug('Checking videosBlacklistUpdate parameters', { parameters: req.params })
 
     if (areValidationErrors(req, res)) return
-    if (!await isVideoExist(req.params.videoId, res)) return
-    if (!await isVideoBlacklistExist(res.locals.video.id, res)) return
+    if (!await doesVideoExist(req.params.videoId, res)) return
+    if (!await doesVideoBlacklistExist(res.locals.video.id, res)) return
+
+    return next()
+  }
+]
+
+const videosBlacklistFiltersValidator = [
+  query('type')
+    .optional()
+    .custom(isVideoBlacklistTypeValid).withMessage('Should have a valid video blacklist type attribute'),
+
+  (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    logger.debug('Checking videos blacklist filters query', { parameters: req.query })
+
+    if (areValidationErrors(req, res)) return
 
     return next()
   }
@@ -71,5 +88,6 @@ const videosBlacklistUpdateValidator = [
 export {
   videosBlacklistAddValidator,
   videosBlacklistRemoveValidator,
-  videosBlacklistUpdateValidator
+  videosBlacklistUpdateValidator,
+  videosBlacklistFiltersValidator
 }

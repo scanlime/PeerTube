@@ -7,7 +7,8 @@ import { join } from 'path'
 import { VideoPrivacy } from '../../../../shared/models/videos/video-privacy.enum'
 import {
   createUser, flushTests, getMyUserInformation, getVideo, getVideosList, immutableAssign, killallServers, makeDeleteRequest,
-  makeGetRequest, makeUploadRequest, makePutBodyRequest, removeVideo, runServer, ServerInfo, setAccessTokensToServers, userLogin
+  makeGetRequest, makeUploadRequest, makePutBodyRequest, removeVideo, uploadVideo,
+  runServer, ServerInfo, setAccessTokensToServers, userLogin, updateCustomSubConfig
 } from '../../../../shared/utils'
 import {
   checkBadCountPagination,
@@ -179,12 +180,14 @@ describe('Test videos API validator', function () {
         language: 'pt',
         nsfw: false,
         commentsEnabled: true,
+        downloadEnabled: true,
         waitTranscoding: true,
         description: 'my super description',
         support: 'my super support text',
         tags: [ 'tag1', 'tag2' ],
         privacy: VideoPrivacy.PUBLIC,
-        channelId: channelId
+        channelId: channelId,
+        originallyPublishedAt: new Date().toISOString()
       }
     })
 
@@ -312,6 +315,13 @@ describe('Test videos API validator', function () {
       await makeUploadRequest({ url: server.url, path: path + '/upload', token: server.accessToken, fields, attaches })
     })
 
+    it('Should fail with a bad originally published at attribute', async function () {
+      const fields = immutableAssign(baseCorrectParams, { 'originallyPublishedAt': 'toto' })
+      const attaches = baseCorrectAttaches
+
+      await makeUploadRequest({ url: server.url, path: path + '/upload', token: server.accessToken, fields, attaches })
+    })
+
     it('Should fail without an input file', async function () {
       const fields = baseCorrectParams
       const attaches = {}
@@ -428,6 +438,7 @@ describe('Test videos API validator', function () {
       language: 'pt',
       nsfw: false,
       commentsEnabled: false,
+      downloadEnabled: false,
       description: 'my super description',
       privacy: VideoPrivacy.PUBLIC,
       tags: [ 'tag1', 'tag2' ]
@@ -528,6 +539,12 @@ describe('Test videos API validator', function () {
 
     it('Should fail with a bad schedule update (wrong updateAt)', async function () {
       const fields = immutableAssign(baseCorrectParams, { scheduleUpdate: { updateAt: 'toto', privacy: VideoPrivacy.PUBLIC } })
+
+      await makePutBodyRequest({ url: server.url, path: path + videoId, token: server.accessToken, fields })
+    })
+
+    it('Should fail with a bad originally published at param', async function () {
+      const fields = immutableAssign(baseCorrectParams, { originallyPublishedAt: 'toto' })
 
       await makePutBodyRequest({ url: server.url, path: path + videoId, token: server.accessToken, fields })
     })

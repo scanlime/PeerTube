@@ -196,8 +196,13 @@ async function processFile (downloader: () => Promise<string>, videoImport: Vide
       return videoImportUpdated
     })
 
-    Notifier.Instance.notifyOnNewVideo(videoImportUpdated.Video)
     Notifier.Instance.notifyOnFinishedVideoImport(videoImportUpdated, true)
+
+    if (videoImportUpdated.Video.VideoBlacklist) {
+      Notifier.Instance.notifyOnVideoAutoBlacklist(videoImportUpdated.Video)
+    } else {
+      Notifier.Instance.notifyOnNewVideo(videoImportUpdated.Video)
+    }
 
     // Create transcoding jobs?
     if (videoImportUpdated.Video.state === VideoState.TO_TRANSCODE) {
@@ -207,7 +212,7 @@ async function processFile (downloader: () => Promise<string>, videoImport: Vide
         isNewVideo: true
       }
 
-      await JobQueue.Instance.createJob({ type: 'video-file', payload: dataInput })
+      await JobQueue.Instance.createJob({ type: 'video-transcoding', payload: dataInput })
     }
 
   } catch (err) {

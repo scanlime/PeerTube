@@ -11,7 +11,7 @@ import { truncate } from 'lodash'
 import * as prompt from 'prompt'
 import { remove } from 'fs-extra'
 import { sha256 } from '../helpers/core-utils'
-import { safeGetYoutubeDL } from '../helpers/youtube-dl'
+import { safeGetYoutubeDL, buildOriginallyPublishedAt } from '../helpers/youtube-dl'
 import { getSettings, netrc } from './cli'
 
 let accessToken: string
@@ -212,6 +212,8 @@ async function uploadVideoOnPeerTube (videoInfo: any, videoPath: string, cwd: st
     }, thumbnailfile)
   }
 
+  const originallyPublishedAt = buildOriginallyPublishedAt(videoInfo)
+
   const videoAttributes = {
     name: truncate(videoInfo.title, {
       'length': CONSTRAINTS_FIELDS.VIDEOS.NAME.max,
@@ -224,13 +226,15 @@ async function uploadVideoOnPeerTube (videoInfo: any, videoPath: string, cwd: st
     nsfw: isNSFW(videoInfo),
     waitTranscoding: true,
     commentsEnabled: true,
+    downloadEnabled: true,
     description: videoInfo.description || undefined,
     support: undefined,
     tags,
     privacy: VideoPrivacy.PUBLIC,
     fixture: videoPath,
     thumbnailfile,
-    previewfile: thumbnailfile
+    previewfile: thumbnailfile,
+    originallyPublishedAt: originallyPublishedAt ? originallyPublishedAt.toISOString() : null
   }
 
   console.log('\nUploading on PeerTube video "%s".', videoAttributes.name)

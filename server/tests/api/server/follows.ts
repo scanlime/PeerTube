@@ -241,7 +241,7 @@ describe('Test follows', function () {
     expect(res.body.data[0].name).to.equal('server3')
   })
 
-  describe('Should propagate data on a new following', async function () {
+  describe('Should propagate data on a new following', function () {
     let video4: Video
 
     before(async function () {
@@ -348,6 +348,7 @@ describe('Test follows', function () {
         },
         isLocal,
         commentsEnabled: true,
+        downloadEnabled: true,
         duration: 5,
         tags: [ 'tag1', 'tag2', 'tag3' ],
         privacy: VideoPrivacy.PUBLIC,

@@ -13,6 +13,10 @@ function isNotEmptyIntArray (value: any) {
   return Array.isArray(value) && value.every(v => validator.isInt('' + v)) && value.length !== 0
 }
 
+function isArrayOf (value: any, validator: (value: any) => boolean) {
+  return isArray(value) && value.every(v => validator(v))
+}
+
 function isDateValid (value: string) {
   return exists(value) && validator.isISO8601(value)
 }
@@ -45,10 +49,17 @@ function toValueOrNull (value: string) {
   return value
 }
 
-function toArray (value: string) {
+function toArray (value: any) {
   if (value && isArray(value) === false) return [ value ]
 
   return value
+}
+
+function toIntArray (value: any) {
+  if (!value) return []
+  if (isArray(value) === false) return [ validator.toInt(value) ]
+
+  return value.map(v => validator.toInt(v))
 }
 
 function isFileValid (
@@ -82,6 +93,7 @@ function isFileValid (
 
 export {
   exists,
+  isArrayOf,
   isNotEmptyIntArray,
   isArray,
   isIdValid,
@@ -92,5 +104,6 @@ export {
   isBooleanValid,
   toIntOrNull,
   toArray,
+  toIntArray,
   isFileValid
 }

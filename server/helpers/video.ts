@@ -1,9 +1,14 @@
+import { CONFIG } from '../initializers'
 import { VideoModel } from '../models/video/video'
+import { UserRight } from '../../shared'
+import { UserModel } from '../models/account/user'
 
-type VideoFetchType = 'all' | 'only-video' | 'id' | 'none'
+type VideoFetchType = 'all' | 'only-video' | 'only-video-with-rights' | 'id' | 'none'
 
 function fetchVideo (id: number | string, fetchType: VideoFetchType, userId?: number) {
   if (fetchType === 'all') return VideoModel.loadAndPopulateAccountAndServerAndTags(id, undefined, userId)
+
+  if (fetchType === 'only-video-with-rights') return VideoModel.loadWithRights(id)
 
   if (fetchType === 'only-video') return VideoModel.load(id)
 

@@ -1,7 +1,7 @@
 /* tslint:disable:no-unused-expression */
 
 import { expect } from 'chai'
-import { existsSync, readdir, readFile } from 'fs-extra'
+import { pathExists, readdir, readFile } from 'fs-extra'
 import * as parseTorrent from 'parse-torrent'
 import { extname, join } from 'path'
 import * as request from 'supertest'
@@ -16,7 +16,7 @@ import {
   ServerInfo,
   testImage
 } from '../'
-
+import * as validator from 'validator'
 import { VideoDetails, VideoPrivacy } from '../../models/videos'
 import { VIDEO_CATEGORIES, VIDEO_LANGUAGES, VIDEO_LICENCES, VIDEO_PRIVACIES } from '../../../server/initializers/constants'
 import { dateIsValid, webtorrentAdd } from '../miscs/miscs'
@@ -28,8 +28,10 @@ type VideoAttributes = {
   language?: string
   nsfw?: boolean
   commentsEnabled?: boolean
+  downloadEnabled?: boolean
   waitTranscoding?: boolean
   description?: string
+  originallyPublishedAt?: string
   tags?: string[]
   channelId?: number
   privacy?: VideoPrivacy
@@ -221,6 +223,28 @@ function getVideoChannelVideos (
   })
 }
 
+function getPlaylistVideos (
+  url: string,
+  accessToken: string,
+  playlistId: number | string,
+  start: number,
+  count: number,
+  query: { nsfw?: boolean } = {}
+) {
+  const path = '/api/v1/video-playlists/' + playlistId + '/videos'
+
+  return makeGetRequest({
+    url,
+    path,
+    query: immutableAssign(query, {
+      start,
+      count
+    }),
+    token: accessToken,
+    statusCodeExpected: 200
+  })
+}
+
 function getVideosListPagination (url: string, start: number, count: number, sort?: string) {
   const path = '/api/v1/videos'
 
@@ -271,15 +295,24 @@ function removeVideo (url: string, token: string, id: number | string, expectedS
 async function checkVideoFilesWereRemoved (
   videoUUID: string,
   serverNumber: number,
-  directories = [ 'redundancy', 'videos', 'thumbnails', 'torrents', 'previews', 'captions' ]
+  directories = [
+    'redundancy',
+    'videos',
+    'thumbnails',
+    'torrents',
+    'previews',
+    'captions',
+    join('playlists', 'hls'),
+    join('redundancy', 'hls')
+  ]
 ) {
   const testDirectory = 'test' + serverNumber
 
   for (const directory of directories) {
     const directoryPath = join(root(), testDirectory, directory)
 
-    const directoryExists = existsSync(directoryPath)
-    expect(directoryExists).to.be.true
+    const directoryExists = await pathExists(directoryPath)
+    if (directoryExists === false) continue
 
     const files = await readdir(directoryPath)
     for (const file of files) {
@@ -311,6 +344,7 @@ async function uploadVideo (url: string, accessToken: string, videoAttributesArg
     tags: [ 'tag' ],
     privacy: VideoPrivacy.PUBLIC,
     commentsEnabled: true,
+    downloadEnabled: true,
     fixture: 'video_short.webm'
   }, videoAttributesArg)
 
@@ -321,6 +355,7 @@ async function uploadVideo (url: string, accessToken: string, videoAttributesArg
               .field('name', attributes.name)
               .field('nsfw', JSON.stringify(attributes.nsfw))
               .field('commentsEnabled', JSON.stringify(attributes.commentsEnabled))
+              .field('downloadEnabled', JSON.stringify(attributes.downloadEnabled))
               .field('waitTranscoding', JSON.stringify(attributes.waitTranscoding))
               .field('privacy', attributes.privacy.toString())
               .field('channelId', attributes.channelId)
@@ -357,6 +392,10 @@ async function uploadVideo (url: string, accessToken: string, videoAttributesArg
     }
   }
 
+  if (attributes.originallyPublishedAt !== undefined) {
+    req.field('originallyPublishedAt', attributes.originallyPublishedAt)
+  }
+
   return req.attach('videofile', buildAbsoluteFixturePath(attributes.fixture))
             .expect(specialStatus)
 }
@@ -371,6 +410,8 @@ function updateVideo (url: string, accessToken: string, id: number | string, att
   if (attributes.language) body['language'] = attributes.language
   if (attributes.nsfw !== undefined) body['nsfw'] = JSON.stringify(attributes.nsfw)
   if (attributes.commentsEnabled !== undefined) body['commentsEnabled'] = JSON.stringify(attributes.commentsEnabled)
+  if (attributes.downloadEnabled !== undefined) body['downloadEnabled'] = JSON.stringify(attributes.downloadEnabled)
+  if (attributes.originallyPublishedAt !== undefined) body['originallyPublishedAt'] = attributes.originallyPublishedAt
   if (attributes.description) body['description'] = attributes.description
   if (attributes.tags) body['tags'] = attributes.tags
   if (attributes.privacy) body['privacy'] = attributes.privacy
@@ -436,9 +477,11 @@ async function completeVideoCheck (
     language: string
     nsfw: boolean
     commentsEnabled: boolean
+    downloadEnabled: boolean
     description: string
     publishedAt?: string
     support: string
+    originallyPublishedAt?: string,
     account: {
       name: string
       host: string
@@ -496,6 +539,12 @@ async function completeVideoCheck (
     expect(video.publishedAt).to.equal(attributes.publishedAt)
   }
 
+  if (attributes.originallyPublishedAt) {
+    expect(video.originallyPublishedAt).to.equal(attributes.originallyPublishedAt)
+  } else {
+    expect(video.originallyPublishedAt).to.be.null
+  }
+
   const res = await getVideo(url, video.uuid)
   const videoDetails: VideoDetails = res.body
 
@@ -510,6 +559,7 @@ async function completeVideoCheck (
   expect(dateIsValid(videoDetails.channel.createdAt.toString())).to.be.true
   expect(dateIsValid(videoDetails.channel.updatedAt.toString())).to.be.true
   expect(videoDetails.commentsEnabled).to.equal(attributes.commentsEnabled)
+  expect(videoDetails.downloadEnabled).to.equal(attributes.downloadEnabled)
 
   for (const attributeFile of attributes.files) {
     const file = videoDetails.files.find(f => f.resolution.id === attributeFile.resolution)
@@ -547,12 +597,29 @@ async function completeVideoCheck (
   }
 }
 
+async function videoUUIDToId (url: string, id: number | string) {
+  if (validator.isUUID('' + id) === false) return id
+
+  const res = await getVideo(url, id)
+  return res.body.id
+}
+
+async function uploadVideoAndGetId (options: { server: ServerInfo, videoName: string, nsfw?: boolean, token?: string }) {
+  const videoAttrs: any = { name: options.videoName }
+  if (options.nsfw) videoAttrs.nsfw = options.nsfw
+
+  const res = await uploadVideo(options.server.url, options.token || options.server.accessToken, videoAttrs)
+
+  return { id: res.body.video.id, uuid: res.body.video.uuid }
+}
+
 // ---------------------------------------------------------------------------
 
 export {
   getVideoDescription,
   getVideoCategories,
   getVideoLicences,
+  videoUUIDToId,
   getVideoPrivacies,
   getVideoLanguages,
   getMyVideos,
@@ -573,5 +640,7 @@ export {
   parseTorrentVideo,
   getLocalVideos,
   completeVideoCheck,
-  checkVideoFilesWereRemoved
+  checkVideoFilesWereRemoved,
+  getPlaylistVideos,
+  uploadVideoAndGetId
 }

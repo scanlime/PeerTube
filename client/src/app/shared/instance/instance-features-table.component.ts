@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core'
 import { ServerService } from '@app/core'
 import { I18n } from '@ngx-translate/i18n-polyfill'
+import { ServerConfig } from '../../../../../shared'
 
 @Component({
   selector: 'my-instance-features-table',
@@ -33,10 +34,26 @@ export class InstanceFeaturesTableComponent implements OnInit {
         })
   }
 
+  buildNSFWLabel () {
+    const policy = this.serverService.getConfig().instance.defaultNSFWPolicy
+
+    if (policy === 'do_not_list') return this.i18n('Hidden')
+    if (policy === 'blur') return this.i18n('Blurred with confirmation request')
+    if (policy === 'display') return this.i18n('Displayed')
+  }
+
   private buildFeatures () {
     const config = this.serverService.getConfig()
 
     this.features = [
+      {
+        label: this.i18n('User registration allowed'),
+        value: config.signup.allowed
+      },
+      {
+        label: this.i18n('Video uploads require manual validation by moderators'),
+        value: config.autoBlacklist.videos.ofUsers.enabled
+      },
       {
         label: this.i18n('Transcode your videos in multiple resolutions'),
         value: config.transcoding.enabledResolutions.length !== 0
@@ -50,7 +67,6 @@ export class InstanceFeaturesTableComponent implements OnInit {
         value: config.import.videos.torrent.enabled
       }
     ]
-
   }
 
   private getApproximateTime (seconds: number) {
@@ -84,5 +100,4 @@ export class InstanceFeaturesTableComponent implements OnInit {
 
     this.quotaHelpIndication = lines.join('<br />')
   }
-
 }
