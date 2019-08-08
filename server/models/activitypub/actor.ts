@@ -30,7 +30,7 @@ import {
   isActorPublicKeyValid
 } from '../../helpers/custom-validators/activitypub/actor'
 import { isActivityPubUrlValid } from '../../helpers/custom-validators/activitypub/misc'
-import { ACTIVITY_PUB, ACTIVITY_PUB_ACTOR_TYPES, CONFIG, CONSTRAINTS_FIELDS } from '../../initializers'
+import { ACTIVITY_PUB, ACTIVITY_PUB_ACTOR_TYPES, CONSTRAINTS_FIELDS, WEBSERVER } from '../../initializers/constants'
 import { AccountModel } from '../account/account'
 import { AvatarModel } from '../avatar/avatar'
 import { ServerModel } from '../server/server'
@@ -56,46 +56,46 @@ export const unusedActorAttributesForAPI = [
   'updatedAt'
 ]
 
-@DefaultScope({
+@DefaultScope(() => ({
   include: [
     {
-      model: () => ServerModel,
+      model: ServerModel,
       required: false
     },
     {
-      model: () => AvatarModel,
+      model: AvatarModel,
       required: false
     }
   ]
-})
-@Scopes({
+}))
+@Scopes(() => ({
   [ScopeNames.FULL]: {
     include: [
       {
-        model: () => AccountModel.unscoped(),
+        model: AccountModel.unscoped(),
         required: false
       },
       {
-        model: () => VideoChannelModel.unscoped(),
+        model: VideoChannelModel.unscoped(),
         required: false,
         include: [
           {
-            model: () => AccountModel,
+            model: AccountModel,
             required: true
           }
         ]
       },
       {
-        model: () => ServerModel,
+        model: ServerModel,
         required: false
       },
       {
-        model: () => AvatarModel,
+        model: AvatarModel,
         required: false
       }
     ]
   }
-})
+}))
 @Table({
   tableName: 'actor',
   indexes: [
@@ -131,7 +131,7 @@ export const unusedActorAttributesForAPI = [
 export class ActorModel extends Model<ActorModel> {
 
   @AllowNull(false)
-  @Column(DataType.ENUM(values(ACTIVITY_PUB_ACTOR_TYPES)))
+  @Column(DataType.ENUM(...values(ACTIVITY_PUB_ACTOR_TYPES)))
   type: ActivityPubActorType
 
   @AllowNull(false)
@@ -151,12 +151,12 @@ export class ActorModel extends Model<ActorModel> {
   url: string
 
   @AllowNull(true)
-  @Is('ActorPublicKey', value => throwIfNotValid(value, isActorPublicKeyValid, 'public key'))
+  @Is('ActorPublicKey', value => throwIfNotValid(value, isActorPublicKeyValid, 'public key', true))
   @Column(DataType.STRING(CONSTRAINTS_FIELDS.ACTORS.PUBLIC_KEY.max))
   publicKey: string
 
   @AllowNull(true)
-  @Is('ActorPublicKey', value => throwIfNotValid(value, isActorPrivateKeyValid, 'private key'))
+  @Is('ActorPublicKey', value => throwIfNotValid(value, isActorPrivateKeyValid, 'private key', true))
   @Column(DataType.STRING(CONSTRAINTS_FIELDS.ACTORS.PRIVATE_KEY.max))
   privateKey: string
 
@@ -280,14 +280,16 @@ export class ActorModel extends Model<ActorModel> {
               attributes: [ 'id' ],
               model: VideoChannelModel.unscoped(),
               required: true,
-              include: {
-                attributes: [ 'id' ],
-                model: VideoModel.unscoped(),
-                required: true,
-                where: {
-                  id: videoId
+              include: [
+                {
+                  attributes: [ 'id' ],
+                  model: VideoModel.unscoped(),
+                  required: true,
+                  where: {
+                    id: videoId
+                  }
                 }
-              }
+              ]
             }
           ]
         }
@@ -295,7 +297,7 @@ export class ActorModel extends Model<ActorModel> {
       transaction
     }
 
-    return ActorModel.unscoped().findOne(query as any) // FIXME: typings
+    return ActorModel.unscoped().findOne(query)
   }
 
   static isActorUrlExist (url: string) {
@@ -389,8 +391,7 @@ export class ActorModel extends Model<ActorModel> {
   }
 
   static incrementFollows (id: number, column: 'followersCount' | 'followingCount', by: number) {
-    // FIXME: typings
-    return (ActorModel as any).increment(column, {
+    return ActorModel.increment(column, {
       by,
       where: {
         id
@@ -516,7 +517,7 @@ export class ActorModel extends Model<ActorModel> {
   }
 
   getHost () {
-    return this.Server ? this.Server.host : CONFIG.WEBSERVER.HOST
+    return this.Server ? this.Server.host : WEBSERVER.HOST
   }
 
   getRedundancyAllowed () {
@@ -526,7 +527,7 @@ export class ActorModel extends Model<ActorModel> {
   getAvatarUrl () {
     if (!this.avatarId) return undefined
 
-    return CONFIG.WEBSERVER.URL + this.Avatar.getWebserverPath()
+    return WEBSERVER.URL + this.Avatar.getWebserverPath()
   }
 
   isOutdated () {

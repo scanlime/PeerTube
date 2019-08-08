@@ -5,7 +5,7 @@ import 'mocha'
 import { VideoDetails } from '../../../../shared/models/videos'
 import {
   checkSegmentHash,
-  checkVideoFilesWereRemoved,
+  checkVideoFilesWereRemoved, cleanupTests,
   doubleFollow,
   flushAndRunMultipleServers,
   getFollowingListPaginationAndSort,
@@ -24,16 +24,16 @@ import {
   viewVideo,
   wait,
   waitUntilLog
-} from '../../../../shared/utils'
-import { waitJobs } from '../../../../shared/utils/server/jobs'
+} from '../../../../shared/extra-utils'
+import { waitJobs } from '../../../../shared/extra-utils/server/jobs'
 
 import * as magnetUtil from 'magnet-uri'
-import { updateRedundancy } from '../../../../shared/utils/server/redundancy'
+import { updateRedundancy } from '../../../../shared/extra-utils/server/redundancy'
 import { ActorFollow } from '../../../../shared/models/actors'
 import { readdir } from 'fs-extra'
 import { join } from 'path'
 import { VideoRedundancyStrategy } from '../../../../shared/models/redundancy'
-import { getStats } from '../../../../shared/utils/server/stats'
+import { getStats } from '../../../../shared/extra-utils/server/stats'
 import { ServerStats } from '../../../../shared/models/server/server-stats.model'
 
 const expect = chai.expect
@@ -52,7 +52,7 @@ function checkMagnetWebseeds (file: { magnetUri: string, resolution: { id: numbe
   expect(parsed.urlList).to.have.lengthOf(baseWebseeds.length)
 }
 
-async function runServers (strategy: VideoRedundancyStrategy, additionalParams: any = {}) {
+async function flushAndRunServers (strategy: VideoRedundancyStrategy, additionalParams: any = {}) {
   const config = {
     transcoding: {
       hls: {
@@ -264,10 +264,6 @@ async function disableRedundancyOnServer1 () {
   expect(server2.following.hostRedundancyAllowed).to.be.false
 }
 
-async function cleanServers () {
-  killallServers(servers)
-}
-
 describe('Test videos redundancy', function () {
 
   describe('With most-views strategy', function () {
@@ -276,7 +272,7 @@ describe('Test videos redundancy', function () {
     before(function () {
       this.timeout(120000)
 
-      return runServers(strategy)
+      return flushAndRunServers(strategy)
     })
 
     it('Should have 1 webseed on the first video', async function () {
@@ -315,8 +311,8 @@ describe('Test videos redundancy', function () {
       await checkVideoFilesWereRemoved(video1Server2UUID, servers[0].serverNumber, [ 'videos', join('playlists', 'hls') ])
     })
 
-    after(function () {
-      return cleanServers()
+    after(async function () {
+      return cleanupTests(servers)
     })
   })
 
@@ -326,7 +322,7 @@ describe('Test videos redundancy', function () {
     before(function () {
       this.timeout(120000)
 
-      return runServers(strategy)
+      return flushAndRunServers(strategy)
     })
 
     it('Should have 1 webseed on the first video', async function () {
@@ -365,8 +361,8 @@ describe('Test videos redundancy', function () {
       await checkVideoFilesWereRemoved(video1Server2UUID, servers[0].serverNumber, [ 'videos' ])
     })
 
-    after(function () {
-      return cleanServers()
+    after(async function () {
+      await cleanupTests(servers)
     })
   })
 
@@ -376,7 +372,7 @@ describe('Test videos redundancy', function () {
     before(function () {
       this.timeout(120000)
 
-      return runServers(strategy, { min_views: 3 })
+      return flushAndRunServers(strategy, { min_views: 3 })
     })
 
     it('Should have 1 webseed on the first video', async function () {
@@ -435,8 +431,8 @@ describe('Test videos redundancy', function () {
       }
     })
 
-    after(function () {
-      return cleanServers()
+    after(async function () {
+      await cleanupTests(servers)
     })
   })
 
@@ -468,7 +464,7 @@ describe('Test videos redundancy', function () {
     before(async function () {
       this.timeout(120000)
 
-      await runServers(strategy, { min_lifetime: '7 seconds', min_views: 0 })
+      await flushAndRunServers(strategy, { min_lifetime: '7 seconds', min_views: 0 })
 
       await enableRedundancyOnServer1()
     })
@@ -498,8 +494,8 @@ describe('Test videos redundancy', function () {
       await checkNotContains([ servers[1], servers[2] ], 'http%3A%2F%2Flocalhost%3A9001')
     })
 
-    after(function () {
-      return killallServers([ servers[1], servers[2] ])
+    after(async function () {
+      await cleanupTests(servers)
     })
   })
 
@@ -510,7 +506,7 @@ describe('Test videos redundancy', function () {
     before(async function () {
       this.timeout(120000)
 
-      await runServers(strategy, { min_lifetime: '7 seconds', min_views: 0 })
+      await flushAndRunServers(strategy, { min_lifetime: '7 seconds', min_views: 0 })
 
       await enableRedundancyOnServer1()
 
@@ -569,8 +565,8 @@ describe('Test videos redundancy', function () {
       await checkVideoFilesWereRemoved(video1Server2UUID, servers[0].serverNumber, [ join('redundancy', 'hls') ])
     })
 
-    after(function () {
-      return cleanServers()
+    after(async function () {
+      await cleanupTests(servers)
     })
   })
 })

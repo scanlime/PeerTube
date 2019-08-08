@@ -6,8 +6,9 @@ import 'mocha'
 import { VideoPrivacy } from '../../../../shared/models/videos'
 import {
   checkVideoFilesWereRemoved,
+  cleanupTests,
   completeVideoCheck,
-  flushTests,
+  flushAndRunServer,
   getVideo,
   getVideoCategories,
   getVideoLanguages,
@@ -17,10 +18,8 @@ import {
   getVideosListPagination,
   getVideosListSort,
   getVideosWithFilters,
-  killallServers,
   rateVideo,
   removeVideo,
-  runServer,
   ServerInfo,
   setAccessTokensToServers,
   testImage,
@@ -28,7 +27,7 @@ import {
   uploadVideo,
   viewVideo,
   wait
-} from '../../../../shared/utils'
+} from '../../../../shared/extra-utils'
 
 const expect = chai.expect
 
@@ -107,9 +106,7 @@ describe('Test a single server', function () {
   before(async function () {
     this.timeout(30000)
 
-    await flushTests()
-
-    server = await runServer(1)
+    server = await flushAndRunServer(1)
 
     await setAccessTokensToServers([ server ])
   })
@@ -427,11 +424,6 @@ describe('Test a single server', function () {
   })
 
   after(async function () {
-    killallServers([ server ])
-
-    // Keep the logs if the test failed
-    if (this['ok']) {
-      await flushTests()
-    }
+    await cleanupTests([ server ])
   })
 })

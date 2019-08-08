@@ -6,22 +6,23 @@ import {
   addVideoChannel,
   addVideoInPlaylist,
   checkPlaylistFilesWereRemoved,
+  cleanupTests,
   createUser,
   createVideoPlaylist,
   deleteVideoChannel,
   deleteVideoPlaylist,
-  doubleFollow, doVideosExistInMyPlaylist,
+  doubleFollow,
+  doVideosExistInMyPlaylist,
   flushAndRunMultipleServers,
-  flushTests,
   getAccountPlaylistsList,
-  getAccountPlaylistsListWithToken, getMyUserInformation,
+  getAccountPlaylistsListWithToken,
+  getMyUserInformation,
   getPlaylistVideos,
   getVideoChannelPlaylistsList,
   getVideoPlaylist,
   getVideoPlaylistPrivacies,
   getVideoPlaylistsList,
   getVideoPlaylistWithToken,
-  killallServers,
   removeUser,
   removeVideoFromPlaylist,
   reorderVideosPlaylist,
@@ -35,8 +36,9 @@ import {
   uploadVideo,
   uploadVideoAndGetId,
   userLogin,
-  waitJobs
-} from '../../../../shared/utils'
+  waitJobs,
+  generateUserAccessToken
+} from '../../../../shared/extra-utils'
 import { VideoPlaylistPrivacy } from '../../../../shared/models/videos/playlist/video-playlist-privacy.model'
 import { VideoPlaylist } from '../../../../shared/models/videos/playlist/video-playlist.model'
 import { Video } from '../../../../shared/models/videos'
@@ -135,6 +137,18 @@ describe('Test video playlists', function () {
       expect(res.body.total).to.equal(0)
       expect(res.body.data).to.have.lengthOf(0)
     }
+  })
+
+  it('Should get private playlist for a classic user', async function () {
+    const token = await generateUserAccessToken(servers[0], 'toto')
+
+    const res = await getAccountPlaylistsListWithToken(servers[0].url, token, 'toto', 0, 5)
+
+    expect(res.body.total).to.equal(1)
+    expect(res.body.data).to.have.lengthOf(1)
+
+    const playlistId = res.body.data[0].id
+    await getPlaylistVideos(servers[0].url, token, playlistId, 0, 5)
   })
 
   it('Should create a playlist on server 1 and have the playlist on server 2 and 3', async function () {
@@ -815,7 +829,12 @@ describe('Test video playlists', function () {
     this.timeout(30000)
 
     const user = { username: 'user_1', password: 'password' }
-    const res = await createUser(servers[0].url, servers[0].accessToken, user.username, user.password)
+    const res = await createUser({
+      url: servers[ 0 ].url,
+      accessToken: servers[ 0 ].accessToken,
+      username: user.username,
+      password: user.password
+    })
 
     const userId = res.body.user.id
     const userAccessToken = await userLogin(servers[0], user)
@@ -856,11 +875,6 @@ describe('Test video playlists', function () {
   })
 
   after(async function () {
-    killallServers(servers)
-
-    // Keep the logs if the test failed
-    if (this['ok']) {
-      await flushTests()
-    }
+    await cleanupTests(servers)
   })
 })

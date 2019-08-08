@@ -7,7 +7,7 @@ import * as Bluebird from 'bluebird'
 import { getOrCreateActorAndServerAndModel } from './actor'
 import { AccountVideoRateModel } from '../../models/account/account-video-rate'
 import { logger } from '../../helpers/logger'
-import { CRAWL_REQUEST_CONCURRENCY } from '../../initializers'
+import { CRAWL_REQUEST_CONCURRENCY } from '../../initializers/constants'
 import { doRequest } from '../../helpers/requests'
 import { checkUrlsSameHost, getAPId } from '../../helpers/activitypub'
 import { ActorModel } from '../../models/activitypub/actor'
@@ -56,7 +56,10 @@ async function createRates (ratesUrl: string[], video: VideoModel, rate: VideoRa
   logger.info('Adding %d %s to video %s.', rateCounts, rate, video.uuid)
 
   // This is "likes" and "dislikes"
-  if (rateCounts !== 0) await video.increment(rate + 's', { by: rateCounts })
+  if (rateCounts !== 0) {
+    const field = rate === 'like' ? 'likes' : 'dislikes'
+    await video.increment(field, { by: rateCounts })
+  }
 
   return
 }

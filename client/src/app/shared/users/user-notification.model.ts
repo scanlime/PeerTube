@@ -1,4 +1,4 @@
-import { UserNotification as UserNotificationServer, UserNotificationType, VideoInfo, ActorInfo } from '../../../../../shared'
+import { ActorInfo, FollowState, UserNotification as UserNotificationServer, UserNotificationType, VideoInfo } from '../../../../../shared'
 import { Actor } from '@app/shared/actor/actor.model'
 
 export class UserNotification implements UserNotificationServer {
@@ -39,6 +39,7 @@ export class UserNotification implements UserNotificationServer {
 
   actorFollow?: {
     id: number
+    state: FollowState
     follower: ActorInfo & { avatarUrl?: string }
     following: {
       type: 'account' | 'channel'
@@ -58,6 +59,7 @@ export class UserNotification implements UserNotificationServer {
   accountUrl?: string
   videoImportIdentifier?: string
   videoImportUrl?: string
+  instanceFollowUrl?: string
 
   constructor (hash: UserNotificationServer) {
     this.id = hash.id
@@ -139,6 +141,10 @@ export class UserNotification implements UserNotificationServer {
 
         case UserNotificationType.NEW_FOLLOW:
           this.accountUrl = this.buildAccountUrl(this.actorFollow.follower)
+          break
+
+        case UserNotificationType.NEW_INSTANCE_FOLLOWER:
+          this.instanceFollowUrl = '/admin/follows/followers-list'
           break
       }
     } catch (err) {

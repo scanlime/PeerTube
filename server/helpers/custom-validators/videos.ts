@@ -5,13 +5,14 @@ import 'multer'
 import * as validator from 'validator'
 import { UserRight, VideoFilter, VideoPrivacy, VideoRateType } from '../../../shared'
 import {
-  CONSTRAINTS_FIELDS, MIMETYPES,
+  CONSTRAINTS_FIELDS,
+  MIMETYPES,
   VIDEO_CATEGORIES,
   VIDEO_LICENCES,
   VIDEO_PRIVACIES,
   VIDEO_RATE_TYPES,
   VIDEO_STATES
-} from '../../initializers'
+} from '../../initializers/constants'
 import { VideoModel } from '../../models/video/video'
 import { exists, isArray, isDateValid, isFileValid } from './misc'
 import { VideoChannelModel } from '../../models/video/video-channel'

@@ -1,6 +1,5 @@
 import {
   AllowNull,
-  BeforeDestroy,
   BelongsTo,
   Column,
   CreatedAt,
@@ -8,6 +7,7 @@ import {
   Default,
   ForeignKey,
   HasMany,
+  HasOne,
   Is,
   IsUUID,
   Model,
@@ -15,7 +15,6 @@ import {
   Table,
   UpdatedAt
 } from 'sequelize-typescript'
-import * as Sequelize from 'sequelize'
 import { VideoPlaylistPrivacy } from '../../../shared/models/videos/playlist/video-playlist-privacy.model'
 import { buildServerIdsFollowedBy, buildWhereIdOrUUID, getSort, isOutdated, throwIfNotValid } from '../utils'
 import {
@@ -26,13 +25,13 @@ import {
 import { isActivityPubUrlValid } from '../../helpers/custom-validators/activitypub/misc'
 import {
   ACTIVITY_PUB,
-  CONFIG,
   CONSTRAINTS_FIELDS,
   STATIC_PATHS,
   THUMBNAILS_SIZE,
   VIDEO_PLAYLIST_PRIVACIES,
-  VIDEO_PLAYLIST_TYPES
-} from '../../initializers'
+  VIDEO_PLAYLIST_TYPES,
+  WEBSERVER
+} from '../../initializers/constants'
 import { VideoPlaylist } from '../../../shared/models/videos/playlist/video-playlist.model'
 import { AccountModel, ScopeNames as AccountScopeNames } from '../account/account'
 import { ScopeNames as VideoChannelScopeNames, VideoChannelModel } from './video-channel'
@@ -40,15 +39,17 @@ import { join } from 'path'
 import { VideoPlaylistElementModel } from './video-playlist-element'
 import { PlaylistObject } from '../../../shared/models/activitypub/objects/playlist-object'
 import { activityPubCollectionPagination } from '../../helpers/activitypub'
-import { remove } from 'fs-extra'
-import { logger } from '../../helpers/logger'
 import { VideoPlaylistType } from '../../../shared/models/videos/playlist/video-playlist-type.model'
+import { ThumbnailModel } from './thumbnail'
+import { ActivityIconObject } from '../../../shared/models/activitypub/objects'
+import { FindOptions, literal, Op, ScopeOptions, Transaction, WhereOptions } from 'sequelize'
 
 enum ScopeNames {
   AVAILABLE_FOR_LIST = 'AVAILABLE_FOR_LIST',
   WITH_VIDEOS_LENGTH = 'WITH_VIDEOS_LENGTH',
   WITH_ACCOUNT_AND_CHANNEL_SUMMARY = 'WITH_ACCOUNT_AND_CHANNEL_SUMMARY',
   WITH_ACCOUNT = 'WITH_ACCOUNT',
+  WITH_THUMBNAIL = 'WITH_THUMBNAIL',
   WITH_ACCOUNT_AND_CHANNEL = 'WITH_ACCOUNT_AND_CHANNEL'
 }
 
@@ -60,21 +61,29 @@ type AvailableForListOptions = {
   privateAndUnlisted?: boolean
 }
 
-@Scopes({
+@Scopes(() => ({
+  [ ScopeNames.WITH_THUMBNAIL ]: {
+    include: [
+      {
+        model: ThumbnailModel,
+        required: false
+      }
+    ]
+  },
   [ ScopeNames.WITH_VIDEOS_LENGTH ]: {
     attributes: {
       include: [
         [
-          Sequelize.literal('(SELECT COUNT("id") FROM "videoPlaylistElement" WHERE "videoPlaylistId" = "VideoPlaylistModel"."id")'),
+          literal('(SELECT COUNT("id") FROM "videoPlaylistElement" WHERE "videoPlaylistId" = "VideoPlaylistModel"."id")'),
           'videosLength'
         ]
       ]
     }
-  },
+  } as FindOptions,
   [ ScopeNames.WITH_ACCOUNT ]: {
     include: [
       {
-        model: () => AccountModel,
+        model: AccountModel,
         required: true
       }
     ]
@@ -82,11 +91,11 @@ type AvailableForListOptions = {
   [ ScopeNames.WITH_ACCOUNT_AND_CHANNEL_SUMMARY ]: {
     include: [
       {
-        model: () => AccountModel.scope(AccountScopeNames.SUMMARY),
+        model: AccountModel.scope(AccountScopeNames.SUMMARY),
         required: true
       },
       {
-        model: () => VideoChannelModel.scope(VideoChannelScopeNames.SUMMARY),
+        model: VideoChannelModel.scope(VideoChannelScopeNames.SUMMARY),
         required: false
       }
     ]
@@ -94,11 +103,11 @@ type AvailableForListOptions = {
   [ ScopeNames.WITH_ACCOUNT_AND_CHANNEL ]: {
     include: [
       {
-        model: () => AccountModel,
+        model: AccountModel,
         required: true
       },
       {
-        model: () => VideoChannelModel,
+        model: VideoChannelModel,
         required: false
       }
     ]
@@ -107,19 +116,19 @@ type AvailableForListOptions = {
     // Only list local playlists OR playlists that are on an instance followed by actorId
     const inQueryInstanceFollow = buildServerIdsFollowedBy(options.followerActorId)
     const actorWhere = {
-      [ Sequelize.Op.or ]: [
+      [ Op.or ]: [
         {
           serverId: null
         },
         {
           serverId: {
-            [ Sequelize.Op.in ]: Sequelize.literal(inQueryInstanceFollow)
+            [ Op.in ]: literal(inQueryInstanceFollow)
           }
         }
       ]
     }
 
-    const whereAnd: any[] = []
+    const whereAnd: WhereOptions[] = []
 
     if (options.privateAndUnlisted !== true) {
       whereAnd.push({
@@ -146,7 +155,7 @@ type AvailableForListOptions = {
     }
 
     const where = {
-      [Sequelize.Op.and]: whereAnd
+      [Op.and]: whereAnd
     }
 
     const accountScope = {
@@ -165,9 +174,9 @@ type AvailableForListOptions = {
           required: false
         }
       ]
-    }
+    } as FindOptions
   }
-})
+}))
 
 @Table({
   tableName: 'videoPlaylist',
@@ -197,7 +206,7 @@ export class VideoPlaylistModel extends Model<VideoPlaylistModel> {
   name: string
 
   @AllowNull(true)
-  @Is('VideoPlaylistDescription', value => throwIfNotValid(value, isVideoPlaylistDescriptionValid, 'description'))
+  @Is('VideoPlaylistDescription', value => throwIfNotValid(value, isVideoPlaylistDescriptionValid, 'description', true))
   @Column
   description: string
 
@@ -255,12 +264,16 @@ export class VideoPlaylistModel extends Model<VideoPlaylistModel> {
   })
   VideoPlaylistElements: VideoPlaylistElementModel[]
 
-  @BeforeDestroy
-  static async removeFiles (instance: VideoPlaylistModel) {
-    logger.info('Removing files of video playlist %s.', instance.url)
+  @HasOne(() => ThumbnailModel, {
 
-    return instance.removeThumbnail()
-  }
+    foreignKey: {
+      name: 'videoPlaylistId',
+      allowNull: true
+    },
+    onDelete: 'CASCADE',
+    hooks: true
+  })
+  Thumbnail: ThumbnailModel
 
   static listForApi (options: {
     followerActorId: number
@@ -278,7 +291,7 @@ export class VideoPlaylistModel extends Model<VideoPlaylistModel> {
       order: getSort(options.sort)
     }
 
-    const scopes = [
+    const scopes: (string | ScopeOptions)[] = [
       {
         method: [
           ScopeNames.AVAILABLE_FOR_LIST,
@@ -290,8 +303,9 @@ export class VideoPlaylistModel extends Model<VideoPlaylistModel> {
             privateAndUnlisted: options.privateAndUnlisted
           } as AvailableForListOptions
         ]
-      } as any, // FIXME: typings
-      ScopeNames.WITH_VIDEOS_LENGTH
+      },
+      ScopeNames.WITH_VIDEOS_LENGTH,
+      ScopeNames.WITH_THUMBNAIL
     ]
 
     return VideoPlaylistModel
@@ -331,7 +345,7 @@ export class VideoPlaylistModel extends Model<VideoPlaylistModel> {
           model: VideoPlaylistElementModel.unscoped(),
           where: {
             videoId: {
-              [Sequelize.Op.any]: videoIds
+              [Op.in]: videoIds // FIXME: sequelize ANY seems broken
             }
           },
           required: true
@@ -355,7 +369,7 @@ export class VideoPlaylistModel extends Model<VideoPlaylistModel> {
       .then(e => !!e)
   }
 
-  static loadWithAccountAndChannelSummary (id: number | string, transaction: Sequelize.Transaction) {
+  static loadWithAccountAndChannelSummary (id: number | string, transaction: Transaction) {
     const where = buildWhereIdOrUUID(id)
 
     const query = {
@@ -364,11 +378,11 @@ export class VideoPlaylistModel extends Model<VideoPlaylistModel> {
     }
 
     return VideoPlaylistModel
-      .scope([ ScopeNames.WITH_ACCOUNT_AND_CHANNEL_SUMMARY, ScopeNames.WITH_VIDEOS_LENGTH ])
+      .scope([ ScopeNames.WITH_ACCOUNT_AND_CHANNEL_SUMMARY, ScopeNames.WITH_VIDEOS_LENGTH, ScopeNames.WITH_THUMBNAIL ])
       .findOne(query)
   }
 
-  static loadWithAccountAndChannel (id: number | string, transaction: Sequelize.Transaction) {
+  static loadWithAccountAndChannel (id: number | string, transaction: Transaction) {
     const where = buildWhereIdOrUUID(id)
 
     const query = {
@@ -377,7 +391,7 @@ export class VideoPlaylistModel extends Model<VideoPlaylistModel> {
     }
 
     return VideoPlaylistModel
-      .scope([ ScopeNames.WITH_ACCOUNT_AND_CHANNEL, ScopeNames.WITH_VIDEOS_LENGTH ])
+      .scope([ ScopeNames.WITH_ACCOUNT_AND_CHANNEL, ScopeNames.WITH_VIDEOS_LENGTH, ScopeNames.WITH_THUMBNAIL ])
       .findOne(query)
   }
 
@@ -388,7 +402,7 @@ export class VideoPlaylistModel extends Model<VideoPlaylistModel> {
       }
     }
 
-    return VideoPlaylistModel.scope(ScopeNames.WITH_ACCOUNT).findOne(query)
+    return VideoPlaylistModel.scope([ ScopeNames.WITH_ACCOUNT, ScopeNames.WITH_THUMBNAIL ]).findOne(query)
   }
 
   static getPrivacyLabel (privacy: VideoPlaylistPrivacy) {
@@ -399,7 +413,7 @@ export class VideoPlaylistModel extends Model<VideoPlaylistModel> {
     return VIDEO_PLAYLIST_TYPES[type] || 'Unknown'
   }
 
-  static resetPlaylistsOfChannel (videoChannelId: number, transaction: Sequelize.Transaction) {
+  static resetPlaylistsOfChannel (videoChannelId: number, transaction: Transaction) {
     const query = {
       where: {
         videoChannelId
@@ -410,24 +424,32 @@ export class VideoPlaylistModel extends Model<VideoPlaylistModel> {
     return VideoPlaylistModel.update({ privacy: VideoPlaylistPrivacy.PRIVATE, videoChannelId: null }, query)
   }
 
-  getThumbnailName () {
+  async setAndSaveThumbnail (thumbnail: ThumbnailModel, t: Transaction) {
+    thumbnail.videoPlaylistId = this.id
+
+    this.Thumbnail = await thumbnail.save({ transaction: t })
+  }
+
+  hasThumbnail () {
+    return !!this.Thumbnail
+  }
+
+  generateThumbnailName () {
     const extension = '.jpg'
 
     return 'playlist-' + this.uuid + extension
   }
 
   getThumbnailUrl () {
-    return CONFIG.WEBSERVER.URL + STATIC_PATHS.THUMBNAILS + this.getThumbnailName()
+    if (!this.hasThumbnail()) return null
+
+    return WEBSERVER.URL + STATIC_PATHS.THUMBNAILS + this.Thumbnail.filename
   }
 
   getThumbnailStaticPath () {
-    return join(STATIC_PATHS.THUMBNAILS, this.getThumbnailName())
-  }
+    if (!this.hasThumbnail()) return null
 
-  removeThumbnail () {
-    const thumbnailPath = join(CONFIG.STORAGE.THUMBNAILS_DIR, this.getThumbnailName())
-    return remove(thumbnailPath)
-      .catch(err => logger.warn('Cannot delete thumbnail %s.', thumbnailPath, { err }))
+    return join(STATIC_PATHS.THUMBNAILS, this.Thumbnail.filename)
   }
 
   setAsRefreshed () {
@@ -466,7 +488,7 @@ export class VideoPlaylistModel extends Model<VideoPlaylistModel> {
         label: VideoPlaylistModel.getTypeLabel(this.type)
       },
 
-      videosLength: this.get('videosLength'),
+      videosLength: this.get('videosLength') as number,
 
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
@@ -476,9 +498,20 @@ export class VideoPlaylistModel extends Model<VideoPlaylistModel> {
     }
   }
 
-  toActivityPubObject (page: number, t: Sequelize.Transaction): Promise<PlaylistObject> {
+  toActivityPubObject (page: number, t: Transaction): Promise<PlaylistObject> {
     const handler = (start: number, count: number) => {
       return VideoPlaylistElementModel.listUrlsOfForAP(this.id, start, count, t)
+    }
+
+    let icon: ActivityIconObject
+    if (this.hasThumbnail()) {
+      icon = {
+        type: 'Image' as 'Image',
+        url: this.getThumbnailUrl(),
+        mediaType: 'image/jpeg' as 'image/jpeg',
+        width: THUMBNAILS_SIZE.width,
+        height: THUMBNAILS_SIZE.height
+      }
     }
 
     return activityPubCollectionPagination(this.url, handler, page)
@@ -491,13 +524,7 @@ export class VideoPlaylistModel extends Model<VideoPlaylistModel> {
           published: this.createdAt.toISOString(),
           updated: this.updatedAt.toISOString(),
           attributedTo: this.VideoChannel ? [ this.VideoChannel.Actor.url ] : [],
-          icon: {
-            type: 'Image' as 'Image',
-            url: this.getThumbnailUrl(),
-            mediaType: 'image/jpeg' as 'image/jpeg',
-            width: THUMBNAILS_SIZE.width,
-            height: THUMBNAILS_SIZE.height
-          }
+          icon
         })
       })
   }

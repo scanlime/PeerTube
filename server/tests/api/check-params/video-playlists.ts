@@ -3,29 +3,29 @@
 import 'mocha'
 import {
   addVideoInPlaylist,
+  cleanupTests,
   createVideoPlaylist,
   deleteVideoPlaylist,
-  flushTests,
+  flushAndRunServer,
   generateUserAccessToken,
   getAccountPlaylistsListWithToken,
   getVideoPlaylist,
   immutableAssign,
-  killallServers,
   makeGetRequest,
   removeVideoFromPlaylist,
   reorderVideosPlaylist,
-  runServer,
   ServerInfo,
-  setAccessTokensToServers, setDefaultVideoChannel,
+  setAccessTokensToServers,
+  setDefaultVideoChannel,
   updateVideoPlaylist,
   updateVideoPlaylistElement,
   uploadVideoAndGetId
-} from '../../../../shared/utils'
+} from '../../../../shared/extra-utils'
 import {
   checkBadCountPagination,
   checkBadSortPagination,
   checkBadStartPagination
-} from '../../../../shared/utils/requests/check-api-params'
+} from '../../../../shared/extra-utils/requests/check-api-params'
 import { VideoPlaylistPrivacy } from '../../../../shared/models/videos/playlist/video-playlist-privacy.model'
 import { VideoPlaylistType } from '../../../../shared/models/videos/playlist/video-playlist-type.model'
 
@@ -43,9 +43,7 @@ describe('Test video playlists API validator', function () {
   before(async function () {
     this.timeout(30000)
 
-    await flushTests()
-
-    server = await runServer(1)
+    server = await flushAndRunServer(1)
 
     await setAccessTokensToServers([ server ])
     await setDefaultVideoChannel([ server ])
@@ -671,11 +669,6 @@ describe('Test video playlists API validator', function () {
   })
 
   after(async function () {
-    killallServers([ server ])
-
-    // Keep the logs if the test failed
-    if (this['ok']) {
-      await flushTests()
-    }
+    await cleanupTests([ server ])
   })
 })

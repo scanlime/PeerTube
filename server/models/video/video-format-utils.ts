@@ -7,7 +7,7 @@ import {
   ActivityUrlObject,
   VideoTorrentObject
 } from '../../../shared/models/activitypub/objects'
-import { CONFIG, MIMETYPES, THUMBNAILS_SIZE } from '../../initializers'
+import { MIMETYPES, WEBSERVER } from '../../initializers/constants'
 import { VideoCaptionModel } from './video-caption'
 import {
   getVideoCommentsActivityPubUrl,
@@ -59,7 +59,7 @@ function videoModelToFormattedJSON (video: VideoModel, options?: VideoFormatting
     views: video.views,
     likes: video.likes,
     dislikes: video.dislikes,
-    thumbnailPath: video.getThumbnailStaticPath(),
+    thumbnailPath: video.getMiniatureStaticPath(),
     previewPath: video.getPreviewStaticPath(),
     embedPath: video.getEmbedStaticPath(),
     createdAt: video.createdAt,
@@ -290,7 +290,7 @@ function videoModelToActivityPubObject (video: VideoModel): VideoTorrentObject {
     type: 'Link',
     mimeType: 'text/html',
     mediaType: 'text/html',
-    href: CONFIG.WEBSERVER.URL + '/videos/watch/' + video.uuid
+    href: WEBSERVER.URL + '/videos/watch/' + video.uuid
   })
 
   const subtitleLanguage = []
@@ -300,6 +300,8 @@ function videoModelToActivityPubObject (video: VideoModel): VideoTorrentObject {
       name: VideoCaptionModel.getLanguageLabel(caption.language)
     })
   }
+
+  const miniature = video.getMiniature()
 
   return {
     type: 'Video' as 'Video',
@@ -326,10 +328,10 @@ function videoModelToActivityPubObject (video: VideoModel): VideoTorrentObject {
     subtitleLanguage,
     icon: {
       type: 'Image',
-      url: video.getThumbnailUrl(baseUrlHttp),
+      url: miniature.getFileUrl(),
       mediaType: 'image/jpeg',
-      width: THUMBNAILS_SIZE.width,
-      height: THUMBNAILS_SIZE.height
+      width: miniature.width,
+      height: miniature.height
     },
     url,
     likes: getVideoLikesActivityPubUrl(video),

@@ -3,7 +3,7 @@ import * as RateLimit from 'express-rate-limit'
 import { UserCreate, UserRight, UserRole, UserUpdate } from '../../../../shared'
 import { logger } from '../../../helpers/logger'
 import { getFormattedObjects } from '../../../helpers/utils'
-import { CONFIG, RATES_LIMIT, sequelizeTypescript } from '../../../initializers'
+import { RATES_LIMIT, WEBSERVER } from '../../../initializers/constants'
 import { Emailer } from '../../../lib/emailer'
 import { Redis } from '../../../lib/redis'
 import { createUserAccountAndChannelAndPlaylist } from '../../../lib/user'
@@ -43,6 +43,9 @@ import { myVideosHistoryRouter } from './my-history'
 import { myNotificationsRouter } from './my-notifications'
 import { Notifier } from '../../../lib/notifier'
 import { mySubscriptionsRouter } from './my-subscriptions'
+import { CONFIG } from '../../../initializers/config'
+import { sequelizeTypescript } from '../../../initializers/database'
+import { UserAdminFlag } from '../../../../shared/models/users/user-flag.model'
 
 const auditLogger = auditLoggerFactory('users')
 
@@ -173,7 +176,8 @@ async function createUser (req: express.Request, res: express.Response) {
     autoPlayVideo: true,
     role: body.role,
     videoQuota: body.videoQuota,
-    videoQuotaDaily: body.videoQuotaDaily
+    videoQuotaDaily: body.videoQuotaDaily,
+    adminFlags: body.adminFlags || UserAdminFlag.NONE
   })
 
   const { user, account } = await createUserAccountAndChannelAndPlaylist(userToCreate)
@@ -239,7 +243,7 @@ async function blockUser (req: express.Request, res: express.Response) {
 }
 
 function getUser (req: express.Request, res: express.Response) {
-  return res.json(res.locals.user.toFormattedJSON())
+  return res.json(res.locals.user.toFormattedJSON({ withAdminFlags: true }))
 }
 
 async function autocompleteUsers (req: express.Request, res: express.Response) {
@@ -251,7 +255,7 @@ async function autocompleteUsers (req: express.Request, res: express.Response) {
 async function listUsers (req: express.Request, res: express.Response) {
   const resultList = await UserModel.listForApi(req.query.start, req.query.count, req.query.sort, req.query.search)
 
-  return res.json(getFormattedObjects(resultList.data, resultList.total))
+  return res.json(getFormattedObjects(resultList.data, resultList.total, { withAdminFlags: true }))
 }
 
 async function removeUser (req: express.Request, res: express.Response) {
@@ -276,6 +280,7 @@ async function updateUser (req: express.Request, res: express.Response) {
   if (body.videoQuota !== undefined) userToUpdate.videoQuota = body.videoQuota
   if (body.videoQuotaDaily !== undefined) userToUpdate.videoQuotaDaily = body.videoQuotaDaily
   if (body.role !== undefined) userToUpdate.role = body.role
+  if (body.adminFlags !== undefined) userToUpdate.adminFlags = body.adminFlags
 
   const user = await userToUpdate.save()
 
@@ -293,7 +298,7 @@ async function askResetUserPassword (req: express.Request, res: express.Response
   const user = res.locals.user
 
   const verificationString = await Redis.Instance.setResetPasswordVerificationString(user.id)
-  const url = CONFIG.WEBSERVER.URL + '/reset-password?userId=' + user.id + '&verificationString=' + verificationString
+  const url = WEBSERVER.URL + '/reset-password?userId=' + user.id + '&verificationString=' + verificationString
   await Emailer.Instance.addPasswordResetEmailJob(user.email, url)
 
   return res.status(204).end()
@@ -310,7 +315,7 @@ async function resetUserPassword (req: express.Request, res: express.Response) {
 
 async function sendVerifyUserEmail (user: UserModel) {
   const verificationString = await Redis.Instance.setVerifyEmailVerificationString(user.id)
-  const url = CONFIG.WEBSERVER.URL + '/verify-account/email?userId=' + user.id + '&verificationString=' + verificationString
+  const url = WEBSERVER.URL + '/verify-account/email?userId=' + user.id + '&verificationString=' + verificationString
   await Emailer.Instance.addVerifyEmailJob(user.email, url)
   return
 }

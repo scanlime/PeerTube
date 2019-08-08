@@ -12,11 +12,11 @@ import {
   killallServers,
   ServerInfo,
   setAccessTokensToServers,
-  uploadVideo
-} from '../../../../shared/utils'
-import { unfollow } from '../../../../shared/utils/server/follows'
-import { userLogin } from '../../../../shared/utils/users/login'
-import { createUser } from '../../../../shared/utils/users/users'
+  uploadVideo, cleanupTests
+} from '../../../../shared/extra-utils'
+import { unfollow } from '../../../../shared/extra-utils/server/follows'
+import { userLogin } from '../../../../shared/extra-utils/users/login'
+import { createUser } from '../../../../shared/extra-utils/users/users'
 
 const expect = chai.expect
 
@@ -47,7 +47,7 @@ describe('Test follow constraints', function () {
       username: 'user1',
       password: 'super_password'
     }
-    await createUser(servers[0].url, servers[0].accessToken, user.username, user.password)
+    await createUser({ url: servers[ 0 ].url, accessToken: servers[ 0 ].accessToken, username: user.username, password: user.password })
     userAccessToken = await userLogin(servers[0], user)
 
     await doubleFollow(servers[0], servers[1])
@@ -220,6 +220,6 @@ describe('Test follow constraints', function () {
   })
 
   after(async function () {
-    killallServers(servers)
+    await cleanupTests(servers)
   })
 })

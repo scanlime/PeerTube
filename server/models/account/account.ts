@@ -1,10 +1,9 @@
-import * as Sequelize from 'sequelize'
 import {
   AllowNull,
   BeforeDestroy,
   BelongsTo,
   Column,
-  CreatedAt,
+  CreatedAt, DataType,
   Default,
   DefaultScope,
   ForeignKey,
@@ -25,24 +24,25 @@ import { getSort, throwIfNotValid } from '../utils'
 import { VideoChannelModel } from '../video/video-channel'
 import { VideoCommentModel } from '../video/video-comment'
 import { UserModel } from './user'
-import { CONFIG } from '../../initializers'
 import { AvatarModel } from '../avatar/avatar'
 import { VideoPlaylistModel } from '../video/video-playlist'
+import { CONSTRAINTS_FIELDS, WEBSERVER } from '../../initializers/constants'
+import { Op, Transaction, WhereOptions } from 'sequelize'
 
 export enum ScopeNames {
   SUMMARY = 'SUMMARY'
 }
 
-@DefaultScope({
+@DefaultScope(() => ({
   include: [
     {
-      model: () => ActorModel, // Default scope includes avatar and server
+      model: ActorModel, // Default scope includes avatar and server
       required: true
     }
   ]
-})
-@Scopes({
-  [ ScopeNames.SUMMARY ]: (whereActor?: Sequelize.WhereOptions<ActorModel>) => {
+}))
+@Scopes(() => ({
+  [ ScopeNames.SUMMARY ]: (whereActor?: WhereOptions) => {
     return {
       attributes: [ 'id', 'name' ],
       include: [
@@ -66,7 +66,7 @@ export enum ScopeNames {
       ]
     }
   }
-})
+}))
 @Table({
   tableName: 'account',
   indexes: [
@@ -90,8 +90,8 @@ export class AccountModel extends Model<AccountModel> {
 
   @AllowNull(true)
   @Default(null)
-  @Is('AccountDescription', value => throwIfNotValid(value, isAccountDescriptionValid, 'description'))
-  @Column
+  @Is('AccountDescription', value => throwIfNotValid(value, isAccountDescriptionValid, 'description', true))
+  @Column(DataType.STRING(CONSTRAINTS_FIELDS.USERS.DESCRIPTION.max))
   description: string
 
   @CreatedAt
@@ -176,7 +176,7 @@ export class AccountModel extends Model<AccountModel> {
     return undefined
   }
 
-  static load (id: number, transaction?: Sequelize.Transaction) {
+  static load (id: number, transaction?: Transaction) {
     return AccountModel.findByPk(id, { transaction })
   }
 
@@ -199,7 +199,7 @@ export class AccountModel extends Model<AccountModel> {
   static loadByNameWithHost (nameWithHost: string) {
     const [ accountName, host ] = nameWithHost.split('@')
 
-    if (!host || host === CONFIG.WEBSERVER.HOST) return AccountModel.loadLocalByName(accountName)
+    if (!host || host === WEBSERVER.HOST) return AccountModel.loadLocalByName(accountName)
 
     return AccountModel.loadByNameAndHost(accountName, host)
   }
@@ -207,15 +207,15 @@ export class AccountModel extends Model<AccountModel> {
   static loadLocalByName (name: string) {
     const query = {
       where: {
-        [ Sequelize.Op.or ]: [
+        [ Op.or ]: [
           {
             userId: {
-              [ Sequelize.Op.ne ]: null
+              [ Op.ne ]: null
             }
           },
           {
             applicationId: {
-              [ Sequelize.Op.ne ]: null
+              [ Op.ne ]: null
             }
           }
         ]
@@ -259,7 +259,7 @@ export class AccountModel extends Model<AccountModel> {
     return AccountModel.findOne(query)
   }
 
-  static loadByUrl (url: string, transaction?: Sequelize.Transaction) {
+  static loadByUrl (url: string, transaction?: Transaction) {
     const query = {
       include: [
         {

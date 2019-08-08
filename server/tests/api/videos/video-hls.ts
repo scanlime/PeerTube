@@ -5,7 +5,7 @@ import 'mocha'
 import {
   checkDirectoryIsEmpty,
   checkSegmentHash,
-  checkTmpIsEmpty,
+  checkTmpIsEmpty, cleanupTests,
   doubleFollow,
   flushAndRunMultipleServers,
   flushTests,
@@ -18,7 +18,7 @@ import {
   updateVideo,
   uploadVideo,
   waitJobs
-} from '../../../../shared/utils'
+} from '../../../../shared/extra-utils'
 import { VideoDetails } from '../../../../shared/models/videos'
 import { VideoStreamingPlaylistType } from '../../../../shared/models/videos/video-streaming-playlist.type'
 import { join } from 'path'
@@ -129,11 +129,6 @@ describe('Test HLS videos', function () {
   })
 
   after(async function () {
-    killallServers(servers)
-
-    // Keep the logs if the test failed
-    if (this['ok']) {
-      await flushTests()
-    }
+    await cleanupTests(servers)
   })
 })

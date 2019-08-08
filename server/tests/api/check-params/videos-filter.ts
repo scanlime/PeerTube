@@ -2,16 +2,16 @@
 
 import 'mocha'
 import {
+  cleanupTests,
   createUser,
   createVideoPlaylist,
-  flushTests,
-  killallServers,
+  flushAndRunServer,
   makeGetRequest,
-  runServer,
   ServerInfo,
-  setAccessTokensToServers, setDefaultVideoChannel,
+  setAccessTokensToServers,
+  setDefaultVideoChannel,
   userLogin
-} from '../../../../shared/utils'
+} from '../../../../shared/extra-utils'
 import { UserRole } from '../../../../shared/models/users'
 import { VideoPlaylistPrivacy } from '../../../../shared/models/videos/playlist/video-playlist-privacy.model'
 
@@ -48,26 +48,26 @@ describe('Test videos filters', function () {
   before(async function () {
     this.timeout(30000)
 
-    await flushTests()
-
-    server = await runServer(1)
+    server = await flushAndRunServer(1)
 
     await setAccessTokensToServers([ server ])
     await setDefaultVideoChannel([ server ])
 
     const user = { username: 'user1', password: 'my super password' }
-    await createUser(server.url, server.accessToken, user.username, user.password)
+    await createUser({ url: server.url, accessToken: server.accessToken, username: user.username, password: user.password })
     userAccessToken = await userLogin(server, user)
 
     const moderator = { username: 'moderator', password: 'my super password' }
     await createUser(
-      server.url,
-      server.accessToken,
-      moderator.username,
-      moderator.password,
-      undefined,
-      undefined,
-      UserRole.MODERATOR
+      {
+        url: server.url,
+        accessToken: server.accessToken,
+        username: moderator.username,
+        password: moderator.password,
+        videoQuota: undefined,
+        videoQuotaDaily: undefined,
+        role: UserRole.MODERATOR
+      }
     )
     moderatorAccessToken = await userLogin(server, moderator)
 
@@ -130,11 +130,6 @@ describe('Test videos filters', function () {
   })
 
   after(async function () {
-    killallServers([ server ])
-
-    // Keep the logs if the test failed
-    if (this['ok']) {
-      await flushTests()
-    }
+    await cleanupTests([ server ])
   })
 })

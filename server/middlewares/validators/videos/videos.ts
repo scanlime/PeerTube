@@ -14,37 +14,36 @@ import {
 } from '../../../helpers/custom-validators/misc'
 import {
   checkUserCanManageVideo,
-  isVideoOriginallyPublishedAtValid,
+  doesVideoChannelOfAccountExist,
+  doesVideoExist,
   isScheduleVideoUpdatePrivacyValid,
   isVideoCategoryValid,
-  doesVideoChannelOfAccountExist,
   isVideoDescriptionValid,
-  doesVideoExist,
   isVideoFile,
   isVideoFilterValid,
   isVideoImage,
   isVideoLanguageValid,
   isVideoLicenceValid,
   isVideoNameValid,
+  isVideoOriginallyPublishedAtValid,
   isVideoPrivacyValid,
   isVideoSupportValid,
   isVideoTagsValid
 } from '../../../helpers/custom-validators/videos'
 import { getDurationFromVideoFile } from '../../../helpers/ffmpeg-utils'
 import { logger } from '../../../helpers/logger'
-import { CONFIG, CONSTRAINTS_FIELDS } from '../../../initializers'
+import { CONSTRAINTS_FIELDS } from '../../../initializers/constants'
 import { authenticatePromiseIfNeeded } from '../../oauth'
 import { areValidationErrors } from '../utils'
 import { cleanUpReqFiles } from '../../../helpers/express-utils'
 import { VideoModel } from '../../../models/video/video'
-import { UserModel } from '../../../models/account/user'
 import { checkUserCanTerminateOwnershipChange, doesChangeVideoOwnershipExist } from '../../../helpers/custom-validators/video-ownership'
 import { VideoChangeOwnershipAccept } from '../../../../shared/models/videos/video-change-ownership-accept.model'
-import { VideoChangeOwnershipModel } from '../../../models/video/video-change-ownership'
 import { AccountModel } from '../../../models/account/account'
 import { VideoFetchType } from '../../../helpers/video'
 import { isNSFWQueryValid, isNumberArray, isStringArray } from '../../../helpers/custom-validators/search'
 import { getServerActor } from '../../../helpers/utils'
+import { CONFIG } from '../../../initializers/config'
 
 const videosAddValidator = getCommonVideoEditAttributes().concat([
   body('videofile')
@@ -69,6 +68,7 @@ const videosAddValidator = getCommonVideoEditAttributes().concat([
     if (!await doesVideoChannelOfAccountExist(req.body.channelId, user, res)) return cleanUpReqFiles(req)
 
     const isAble = await user.isAbleToUploadVideo(videoFile)
+
     if (isAble === false) {
       res.status(403)
          .json({ error: 'The user video quota is exceeded with this video.' })

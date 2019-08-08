@@ -4,6 +4,7 @@ import * as chai from 'chai'
 import 'mocha'
 import { ServerStats } from '../../../../shared/models/server/server-stats.model'
 import {
+  cleanupTests,
   createUser,
   doubleFollow,
   flushAndRunMultipleServers,
@@ -13,11 +14,11 @@ import {
   uploadVideo,
   viewVideo,
   wait
-} from '../../../../shared/utils'
-import { flushTests, setAccessTokensToServers } from '../../../../shared/utils/index'
-import { getStats } from '../../../../shared/utils/server/stats'
-import { addVideoCommentThread } from '../../../../shared/utils/videos/video-comments'
-import { waitJobs } from '../../../../shared/utils/server/jobs'
+} from '../../../../shared/extra-utils'
+import { flushTests, setAccessTokensToServers } from '../../../../shared/extra-utils/index'
+import { getStats } from '../../../../shared/extra-utils/server/stats'
+import { addVideoCommentThread } from '../../../../shared/extra-utils/videos/video-comments'
+import { waitJobs } from '../../../../shared/extra-utils/server/jobs'
 
 const expect = chai.expect
 
@@ -26,8 +27,6 @@ describe('Test stats (excluding redundancy)', function () {
 
   before(async function () {
     this.timeout(60000)
-
-    await flushTests()
     servers = await flushAndRunMultipleServers(3)
     await setAccessTokensToServers(servers)
 
@@ -37,7 +36,7 @@ describe('Test stats (excluding redundancy)', function () {
       username: 'user1',
       password: 'super_password'
     }
-    await createUser(servers[0].url, servers[0].accessToken, user.username, user.password)
+    await createUser({ url: servers[ 0 ].url, accessToken: servers[ 0 ].accessToken, username: user.username, password: user.password })
 
     const resVideo = await uploadVideo(servers[0].url, servers[0].accessToken, { fixture: 'video_short.webm' })
     const videoUUID = resVideo.body.video.uuid
@@ -98,6 +97,6 @@ describe('Test stats (excluding redundancy)', function () {
   })
 
   after(async function () {
-    killallServers(servers)
+    await cleanupTests(servers)
   })
 })

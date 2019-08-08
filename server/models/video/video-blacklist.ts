@@ -1,22 +1,12 @@
-import {
-  AllowNull,
-  BelongsTo,
-  Column,
-  CreatedAt,
-  DataType,
-  Default,
-  ForeignKey,
-  Is, Model,
-  Table,
-  UpdatedAt,
-  IFindOptions
-} from 'sequelize-typescript'
+import { AllowNull, BelongsTo, Column, CreatedAt, DataType, Default, ForeignKey, Is, Model, Table, UpdatedAt } from 'sequelize-typescript'
 import { getSortOnModel, SortType, throwIfNotValid } from '../utils'
-import { VideoModel } from './video'
-import { VideoChannelModel, ScopeNames as VideoChannelScopeNames } from './video-channel'
+import { ScopeNames as VideoModelScopeNames, VideoModel } from './video'
+import { ScopeNames as VideoChannelScopeNames, VideoChannelModel } from './video-channel'
 import { isVideoBlacklistReasonValid, isVideoBlacklistTypeValid } from '../../helpers/custom-validators/video-blacklist'
 import { VideoBlacklist, VideoBlacklistType } from '../../../shared/models/videos'
-import { CONSTRAINTS_FIELDS } from '../../initializers'
+import { CONSTRAINTS_FIELDS } from '../../initializers/constants'
+import { FindOptions } from 'sequelize'
+import { ThumbnailModel } from './thumbnail'
 
 @Table({
   tableName: 'videoBlacklist',
@@ -30,7 +20,7 @@ import { CONSTRAINTS_FIELDS } from '../../initializers'
 export class VideoBlacklistModel extends Model<VideoBlacklistModel> {
 
   @AllowNull(true)
-  @Is('VideoBlacklistReason', value => throwIfNotValid(value, isVideoBlacklistReasonValid, 'reason'))
+  @Is('VideoBlacklistReason', value => throwIfNotValid(value, isVideoBlacklistReasonValid, 'reason', true))
   @Column(DataType.STRING(CONSTRAINTS_FIELDS.VIDEO_BLACKLIST.REASON.max))
   reason: string
 
@@ -63,35 +53,50 @@ export class VideoBlacklistModel extends Model<VideoBlacklistModel> {
   Video: VideoModel
 
   static listForApi (start: number, count: number, sort: SortType, type?: VideoBlacklistType) {
-    const query: IFindOptions<VideoBlacklistModel> = {
-      offset: start,
-      limit: count,
-      order: getSortOnModel(sort.sortModel, sort.sortValue),
-      include: [
-        {
-          model: VideoModel,
-          required: true,
-          include: [
-            {
-              model: VideoChannelModel.scope({ method: [ VideoChannelScopeNames.SUMMARY, true ] }),
-              required: true
-            }
-          ]
-        }
-      ]
+    function buildBaseQuery (): FindOptions {
+      return {
+        offset: start,
+        limit: count,
+        order: getSortOnModel(sort.sortModel, sort.sortValue)
+      }
     }
+
+    const countQuery = buildBaseQuery()
+
+    const findQuery = buildBaseQuery()
+    findQuery.subQuery = false
+    findQuery.include = [
+      {
+        model: VideoModel,
+        required: true,
+        include: [
+          {
+            model: VideoChannelModel.scope({ method: [ VideoChannelScopeNames.SUMMARY, true ] }),
+            required: true
+          },
+          {
+            model: ThumbnailModel,
+            attributes: [ 'type', 'filename' ],
+            required: false
+          }
+        ]
+      }
+    ]
 
     if (type) {
-      query.where = { type }
+      countQuery.where = { type }
+      findQuery.where = { type }
     }
 
-    return VideoBlacklistModel.findAndCountAll(query)
-      .then(({ rows, count }) => {
-        return {
-          data: rows,
-          total: count
-        }
-      })
+    return Promise.all([
+      VideoBlacklistModel.count(countQuery),
+      VideoBlacklistModel.findAll(findQuery)
+    ]).then(([ count, rows ]) => {
+      return {
+        data: rows,
+        total: count
+      }
+    })
   }
 
   static loadByVideoId (id: number) {

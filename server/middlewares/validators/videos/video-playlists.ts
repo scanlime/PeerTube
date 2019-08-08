@@ -5,7 +5,7 @@ import { logger } from '../../../helpers/logger'
 import { UserModel } from '../../../models/account/user'
 import { areValidationErrors } from '../utils'
 import { doesVideoExist, isVideoImage } from '../../../helpers/custom-validators/videos'
-import { CONSTRAINTS_FIELDS } from '../../../initializers'
+import { CONSTRAINTS_FIELDS } from '../../../initializers/constants'
 import { isArrayOf, isIdOrUUIDValid, isIdValid, isUUIDValid, toIntArray, toValueOrNull } from '../../../helpers/custom-validators/misc'
 import {
   doesVideoPlaylistExist,
@@ -140,9 +140,10 @@ const videoPlaylistsGetValidator = [
       await authenticatePromiseIfNeeded(req, res)
 
       const user = res.locals.oauth ? res.locals.oauth.token.User : null
+
       if (
         !user ||
-        (videoPlaylist.OwnerAccount.userId !== user.id && !user.hasRight(UserRight.UPDATE_ANY_VIDEO_PLAYLIST))
+        (videoPlaylist.OwnerAccount.id !== user.Account.id && !user.hasRight(UserRight.UPDATE_ANY_VIDEO_PLAYLIST))
       ) {
         return res.status(403)
                   .json({ error: 'Cannot get this private video playlist.' })

@@ -4,22 +4,21 @@ import 'mocha'
 import * as io from 'socket.io-client'
 
 import {
-  flushTests,
+  cleanupTests,
+  flushAndRunServer,
   immutableAssign,
-  killallServers,
   makeGetRequest,
   makePostBodyRequest,
   makePutBodyRequest,
-  runServer,
   ServerInfo,
   setAccessTokensToServers,
   wait
-} from '../../../../shared/utils'
+} from '../../../../shared/extra-utils'
 import {
   checkBadCountPagination,
   checkBadSortPagination,
   checkBadStartPagination
-} from '../../../../shared/utils/requests/check-api-params'
+} from '../../../../shared/extra-utils/requests/check-api-params'
 import { UserNotificationSetting, UserNotificationSettingValue } from '../../../../shared/models/users'
 
 describe('Test user notifications API validators', function () {
@@ -30,9 +29,7 @@ describe('Test user notifications API validators', function () {
   before(async function () {
     this.timeout(30000)
 
-    await flushTests()
-
-    server = await runServer(1)
+    server = await flushAndRunServer(1)
 
     await setAccessTokensToServers([ server ])
   })
@@ -174,7 +171,8 @@ describe('Test user notifications API validators', function () {
       myVideoPublished: UserNotificationSettingValue.WEB,
       commentMention: UserNotificationSettingValue.WEB,
       newFollow: UserNotificationSettingValue.WEB,
-      newUserRegistration: UserNotificationSettingValue.WEB
+      newUserRegistration: UserNotificationSettingValue.WEB,
+      newInstanceFollower: UserNotificationSettingValue.WEB
     }
 
     it('Should fail with missing fields', async function () {
@@ -235,7 +233,7 @@ describe('Test user notifications API validators', function () {
 
   describe('When connecting to my notification socket', function () {
     it('Should fail with no token', function (next) {
-      const socket = io('http://localhost:9001/user-notifications', { reconnection: false })
+      const socket = io(`http://localhost:${server.port}/user-notifications`, { reconnection: false })
 
       socket.on('error', () => {
         socket.removeListener('error', this)
@@ -250,7 +248,7 @@ describe('Test user notifications API validators', function () {
     })
 
     it('Should fail with an invalid token', function (next) {
-      const socket = io('http://localhost:9001/user-notifications', {
+      const socket = io(`http://localhost:${server.port}/user-notifications`, {
         query: { accessToken: 'bad_access_token' },
         reconnection: false
       })
@@ -268,7 +266,7 @@ describe('Test user notifications API validators', function () {
     })
 
     it('Should success with the correct token', function (next) {
-      const socket = io('http://localhost:9001/user-notifications', {
+      const socket = io(`http://localhost:${server.port}/user-notifications`, {
         query: { accessToken: server.accessToken },
         reconnection: false
       })
@@ -288,11 +286,6 @@ describe('Test user notifications API validators', function () {
   })
 
   after(async function () {
-    killallServers([ server ])
-
-    // Keep the logs if the test failed
-    if (this['ok']) {
-      await flushTests()
-    }
+    await cleanupTests([ server ])
   })
 })

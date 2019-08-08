@@ -1,13 +1,13 @@
 import * as cors from 'cors'
 import * as express from 'express'
 import {
-  CONFIG,
   HLS_STREAMING_PLAYLIST_DIRECTORY,
   ROUTE_CACHE_LIFETIME,
   STATIC_DOWNLOAD_PATHS,
   STATIC_MAX_AGE,
-  STATIC_PATHS
-} from '../initializers'
+  STATIC_PATHS,
+  WEBSERVER
+} from '../initializers/constants'
 import { VideosCaptionCache, VideosPreviewCache } from '../lib/files-cache'
 import { cacheRoute } from '../middlewares/cache'
 import { asyncMiddleware, videosGetValidator } from '../middlewares'
@@ -17,6 +17,7 @@ import { VideoCommentModel } from '../models/video/video-comment'
 import { HttpNodeinfoDiasporaSoftwareNsSchema20 } from '../../shared/models/nodeinfo'
 import { join } from 'path'
 import { root } from '../helpers/core-utils'
+import { CONFIG } from '../initializers/config'
 
 const packageJSON = require('../../../package.json')
 const staticRouter = express.Router()
@@ -121,7 +122,7 @@ staticRouter.use('/.well-known/nodeinfo',
       links: [
         {
           rel: 'http://nodeinfo.diaspora.software/ns/schema/2.0',
-          href: CONFIG.WEBSERVER.URL + '/nodeinfo/2.0.json'
+          href: WEBSERVER.URL + '/nodeinfo/2.0.json'
         }
       ]
     })
@@ -155,6 +156,19 @@ staticRouter.use('/.well-known/change-password',
   }
 )
 
+staticRouter.use('/.well-known/host-meta',
+  (_, res: express.Response) => {
+    res.type('application/xml')
+
+    const xml = '<?xml version="1.0" encoding="UTF-8"?>\n' +
+      '<XRD xmlns="http://docs.oasis-open.org/ns/xri/xrd-1.0">\n' +
+      `  <Link rel="lrdd" type="application/xrd+xml" template="${WEBSERVER.URL}/.well-known/webfinger?resource={uri}"/>\n` +
+      '</XRD>'
+
+    res.send(xml).end()
+  }
+)
+
 // ---------------------------------------------------------------------------
 
 export {
@@ -163,21 +177,21 @@ export {
 
 // ---------------------------------------------------------------------------
 
-async function getPreview (req: express.Request, res: express.Response, next: express.NextFunction) {
-  const path = await VideosPreviewCache.Instance.getFilePath(req.params.uuid)
-  if (!path) return res.sendStatus(404)
+async function getPreview (req: express.Request, res: express.Response) {
+  const result = await VideosPreviewCache.Instance.getFilePath(req.params.uuid)
+  if (!result) return res.sendStatus(404)
 
-  return res.sendFile(path, { maxAge: STATIC_MAX_AGE })
+  return res.sendFile(result.path, { maxAge: STATIC_MAX_AGE })
 }
 
 async function getVideoCaption (req: express.Request, res: express.Response) {
-  const path = await VideosCaptionCache.Instance.getFilePath({
+  const result = await VideosCaptionCache.Instance.getFilePath({
     videoId: req.params.videoId,
     language: req.params.captionLanguage
   })
-  if (!path) return res.sendStatus(404)
+  if (!result) return res.sendStatus(404)
 
-  return res.sendFile(path, { maxAge: STATIC_MAX_AGE })
+  return res.sendFile(result.path, { maxAge: STATIC_MAX_AGE })
 }
 
 async function generateNodeinfo (req: express.Request, res: express.Response, next: express.NextFunction) {

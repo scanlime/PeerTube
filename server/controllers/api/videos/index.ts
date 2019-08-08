@@ -2,22 +2,11 @@ import * as express from 'express'
 import { extname, join } from 'path'
 import { VideoCreate, VideoPrivacy, VideoState, VideoUpdate } from '../../../../shared'
 import { getVideoFileFPS, getVideoFileResolution } from '../../../helpers/ffmpeg-utils'
-import { processImage } from '../../../helpers/image-utils'
 import { logger } from '../../../helpers/logger'
 import { auditLoggerFactory, getAuditIdFromRes, VideoAuditView } from '../../../helpers/audit-logger'
 import { getFormattedObjects, getServerActor } from '../../../helpers/utils'
 import { autoBlacklistVideoIfNeeded } from '../../../lib/video-blacklist'
-import {
-  CONFIG,
-  MIMETYPES,
-  PREVIEWS_SIZE,
-  sequelizeTypescript,
-  THUMBNAILS_SIZE,
-  VIDEO_CATEGORIES,
-  VIDEO_LANGUAGES,
-  VIDEO_LICENCES,
-  VIDEO_PRIVACIES
-} from '../../../initializers'
+import { MIMETYPES, VIDEO_CATEGORIES, VIDEO_LANGUAGES, VIDEO_LICENCES, VIDEO_PRIVACIES } from '../../../initializers/constants'
 import {
   changeVideoChannelShare,
   federateVideoIfNeeded,
@@ -61,6 +50,10 @@ import { move } from 'fs-extra'
 import { watchingRouter } from './watching'
 import { Notifier } from '../../../lib/notifier'
 import { sendView } from '../../../lib/activitypub/send/send-view'
+import { CONFIG } from '../../../initializers/config'
+import { sequelizeTypescript } from '../../../initializers/database'
+import { createVideoMiniatureFromExisting, generateVideoMiniature } from '../../../lib/thumbnail'
+import { ThumbnailType } from '../../../../shared/models/videos/thumbnail.type'
 
 const auditLogger = auditLoggerFactory('videos')
 const videosRouter = express.Router()
@@ -189,7 +182,7 @@ async function addVideo (req: express.Request, res: express.Response) {
     nsfw: videoInfo.nsfw || false,
     description: videoInfo.description,
     support: videoInfo.support,
-    privacy: videoInfo.privacy,
+    privacy: videoInfo.privacy || VideoPrivacy.PRIVATE,
     duration: videoPhysicalFile['duration'], // duration was added by a previous middleware
     channelId: res.locals.videoChannel.id,
     originallyPublishedAt: videoInfo.originallyPublishedAt
@@ -220,21 +213,15 @@ async function addVideo (req: express.Request, res: express.Response) {
 
   // Process thumbnail or create it from the video
   const thumbnailField = req.files['thumbnailfile']
-  if (thumbnailField) {
-    const thumbnailPhysicalFile = thumbnailField[0]
-    await processImage(thumbnailPhysicalFile, join(CONFIG.STORAGE.THUMBNAILS_DIR, video.getThumbnailName()), THUMBNAILS_SIZE)
-  } else {
-    await video.createThumbnail(videoFile)
-  }
+  const thumbnailModel = thumbnailField
+    ? await createVideoMiniatureFromExisting(thumbnailField[0].path, video, ThumbnailType.MINIATURE)
+    : await generateVideoMiniature(video, videoFile, ThumbnailType.MINIATURE)
 
   // Process preview or create it from the video
   const previewField = req.files['previewfile']
-  if (previewField) {
-    const previewPhysicalFile = previewField[0]
-    await processImage(previewPhysicalFile, join(CONFIG.STORAGE.PREVIEWS_DIR, video.getPreviewName()), PREVIEWS_SIZE)
-  } else {
-    await video.createPreview(videoFile)
-  }
+  const previewModel = previewField
+    ? await createVideoMiniatureFromExisting(previewField[0].path, video, ThumbnailType.PREVIEW)
+    : await generateVideoMiniature(video, videoFile, ThumbnailType.PREVIEW)
 
   // Create the torrent file
   await video.createTorrentAndSetInfoHash(videoFile)
@@ -243,6 +230,10 @@ async function addVideo (req: express.Request, res: express.Response) {
     const sequelizeOptions = { transaction: t }
 
     const videoCreated = await video.save(sequelizeOptions)
+
+    await videoCreated.addAndSaveThumbnail(thumbnailModel, t)
+    await videoCreated.addAndSaveThumbnail(previewModel, t)
+
     // Do not forget to add video channel information to the created video
     videoCreated.VideoChannel = res.locals.videoChannel
 
@@ -313,16 +304,13 @@ async function updateVideo (req: express.Request, res: express.Response) {
   const wasUnlistedVideo = videoInstance.privacy === VideoPrivacy.UNLISTED
 
   // Process thumbnail or create it from the video
-  if (req.files && req.files['thumbnailfile']) {
-    const thumbnailPhysicalFile = req.files['thumbnailfile'][0]
-    await processImage(thumbnailPhysicalFile, join(CONFIG.STORAGE.THUMBNAILS_DIR, videoInstance.getThumbnailName()), THUMBNAILS_SIZE)
-  }
+  const thumbnailModel = req.files && req.files['thumbnailfile']
+    ? await createVideoMiniatureFromExisting(req.files['thumbnailfile'][0].path, videoInstance, ThumbnailType.MINIATURE)
+    : undefined
 
-  // Process preview or create it from the video
-  if (req.files && req.files['previewfile']) {
-    const previewPhysicalFile = req.files['previewfile'][0]
-    await processImage(previewPhysicalFile, join(CONFIG.STORAGE.PREVIEWS_DIR, videoInstance.getPreviewName()), PREVIEWS_SIZE)
-  }
+  const previewModel = req.files && req.files['previewfile']
+    ? await createVideoMiniatureFromExisting(req.files['previewfile'][0].path, videoInstance, ThumbnailType.PREVIEW)
+    : undefined
 
   try {
     const videoInstanceUpdated = await sequelizeTypescript.transaction(async t => {
@@ -341,19 +329,22 @@ async function updateVideo (req: express.Request, res: express.Response) {
       if (videoInfoToUpdate.downloadEnabled !== undefined) videoInstance.set('downloadEnabled', videoInfoToUpdate.downloadEnabled)
 
       if (videoInfoToUpdate.originallyPublishedAt !== undefined && videoInfoToUpdate.originallyPublishedAt !== null) {
-        videoInstance.set('originallyPublishedAt', videoInfoToUpdate.originallyPublishedAt)
+        videoInstance.originallyPublishedAt = new Date(videoInfoToUpdate.originallyPublishedAt)
       }
 
       if (videoInfoToUpdate.privacy !== undefined) {
         const newPrivacy = parseInt(videoInfoToUpdate.privacy.toString(), 10)
-        videoInstance.set('privacy', newPrivacy)
+        videoInstance.privacy = newPrivacy
 
         if (wasPrivateVideo === true && newPrivacy !== VideoPrivacy.PRIVATE) {
-          videoInstance.set('publishedAt', new Date())
+          videoInstance.publishedAt = new Date()
         }
       }
 
       const videoInstanceUpdated = await videoInstance.save(sequelizeOptions)
+
+      if (thumbnailModel) await videoInstanceUpdated.addAndSaveThumbnail(thumbnailModel, t)
+      if (previewModel) await videoInstanceUpdated.addAndSaveThumbnail(previewModel, t)
 
       // Video tags update?
       if (videoInfoToUpdate.tags !== undefined) {

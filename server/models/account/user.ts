@@ -1,4 +1,4 @@
-import * as Sequelize from 'sequelize'
+import { FindOptions, literal, Op, QueryTypes } from 'sequelize'
 import {
   AfterDestroy,
   AfterUpdate,
@@ -22,6 +22,7 @@ import {
 import { hasUserRight, USER_ROLE_LABELS, UserRight } from '../../../shared'
 import { User, UserRole } from '../../../shared/models/users'
 import {
+  isUserAdminFlagsValid,
   isUserAutoPlayVideoValid,
   isUserBlockedReasonValid,
   isUserBlockedValid,
@@ -42,45 +43,46 @@ import { VideoChannelModel } from '../video/video-channel'
 import { AccountModel } from './account'
 import { NSFWPolicyType } from '../../../shared/models/videos/nsfw-policy.type'
 import { values } from 'lodash'
-import { NSFW_POLICY_TYPES } from '../../initializers'
+import { NSFW_POLICY_TYPES } from '../../initializers/constants'
 import { clearCacheByUserId } from '../../lib/oauth-model'
 import { UserNotificationSettingModel } from './user-notification-setting'
 import { VideoModel } from '../video/video'
 import { ActorModel } from '../activitypub/actor'
 import { ActorFollowModel } from '../activitypub/actor-follow'
 import { VideoImportModel } from '../video/video-import'
+import { UserAdminFlag } from '../../../shared/models/users/user-flag.model'
 
 enum ScopeNames {
   WITH_VIDEO_CHANNEL = 'WITH_VIDEO_CHANNEL'
 }
 
-@DefaultScope({
+@DefaultScope(() => ({
   include: [
     {
-      model: () => AccountModel,
+      model: AccountModel,
       required: true
     },
     {
-      model: () => UserNotificationSettingModel,
+      model: UserNotificationSettingModel,
       required: true
     }
   ]
-})
-@Scopes({
+}))
+@Scopes(() => ({
   [ScopeNames.WITH_VIDEO_CHANNEL]: {
     include: [
       {
-        model: () => AccountModel,
+        model: AccountModel,
         required: true,
-        include: [ () => VideoChannelModel ]
+        include: [ VideoChannelModel ]
       },
       {
-        model: () => UserNotificationSettingModel,
+        model: UserNotificationSettingModel,
         required: true
       }
     ]
   }
-})
+}))
 @Table({
   tableName: 'user',
   indexes: [
@@ -113,13 +115,13 @@ export class UserModel extends Model<UserModel> {
 
   @AllowNull(true)
   @Default(null)
-  @Is('UserEmailVerified', value => throwIfNotValid(value, isUserEmailVerifiedValid, 'email verified boolean'))
+  @Is('UserEmailVerified', value => throwIfNotValid(value, isUserEmailVerifiedValid, 'email verified boolean', true))
   @Column
   emailVerified: boolean
 
   @AllowNull(false)
   @Is('UserNSFWPolicy', value => throwIfNotValid(value, isUserNSFWPolicyValid, 'NSFW policy'))
-  @Column(DataType.ENUM(values(NSFW_POLICY_TYPES)))
+  @Column(DataType.ENUM(...values(NSFW_POLICY_TYPES)))
   nsfwPolicy: NSFWPolicyType
 
   @AllowNull(false)
@@ -141,6 +143,12 @@ export class UserModel extends Model<UserModel> {
   autoPlayVideo: boolean
 
   @AllowNull(false)
+  @Default(UserAdminFlag.NONE)
+  @Is('UserAdminFlags', value => throwIfNotValid(value, isUserAdminFlagsValid, 'user admin flags'))
+  @Column
+  adminFlags?: UserAdminFlag
+
+  @AllowNull(false)
   @Default(false)
   @Is('UserBlocked', value => throwIfNotValid(value, isUserBlockedValid, 'blocked boolean'))
   @Column
@@ -148,7 +156,7 @@ export class UserModel extends Model<UserModel> {
 
   @AllowNull(true)
   @Default(null)
-  @Is('UserBlockedReason', value => throwIfNotValid(value, isUserBlockedReasonValid, 'blocked reason'))
+  @Is('UserBlockedReason', value => throwIfNotValid(value, isUserBlockedReasonValid, 'blocked reason', true))
   @Column
   blockedReason: string
 
@@ -225,26 +233,26 @@ export class UserModel extends Model<UserModel> {
     let where = undefined
     if (search) {
       where = {
-        [Sequelize.Op.or]: [
+        [Op.or]: [
           {
             email: {
-              [Sequelize.Op.iLike]: '%' + search + '%'
+              [Op.iLike]: '%' + search + '%'
             }
           },
           {
             username: {
-              [ Sequelize.Op.iLike ]: '%' + search + '%'
+              [ Op.iLike ]: '%' + search + '%'
             }
           }
         ]
       }
     }
 
-    const query = {
+    const query: FindOptions = {
       attributes: {
         include: [
           [
-            Sequelize.literal(
+            literal(
               '(' +
                 'SELECT COALESCE(SUM("size"), 0) ' +
                 'FROM (' +
@@ -257,7 +265,7 @@ export class UserModel extends Model<UserModel> {
               ')'
             ),
             'videoQuotaUsed'
-          ] as any // FIXME: typings
+          ]
         ]
       },
       offset: start,
@@ -283,7 +291,7 @@ export class UserModel extends Model<UserModel> {
     const query = {
       where: {
         role: {
-          [Sequelize.Op.in]: roles
+          [Op.in]: roles
         }
       }
     }
@@ -379,7 +387,7 @@ export class UserModel extends Model<UserModel> {
 
     const query = {
       where: {
-        [ Sequelize.Op.or ]: [ { username }, { email } ]
+        [ Op.or ]: [ { username }, { email } ]
       }
     }
 
@@ -502,7 +510,7 @@ export class UserModel extends Model<UserModel> {
     const query = {
       where: {
         username: {
-          [ Sequelize.Op.like ]: `%${search}%`
+          [ Op.like ]: `%${search}%`
         }
       },
       limit: 10
@@ -516,11 +524,15 @@ export class UserModel extends Model<UserModel> {
     return hasUserRight(this.role, right)
   }
 
+  hasAdminFlag (flag: UserAdminFlag) {
+    return this.adminFlags & flag
+  }
+
   isPasswordMatch (password: string) {
     return comparePassword(password, this.password)
   }
 
-  toFormattedJSON (): User {
+  toFormattedJSON (parameters: { withAdminFlags?: boolean } = {}): User {
     const videoQuotaUsed = this.get('videoQuotaUsed')
     const videoQuotaUsedDaily = this.get('videoQuotaUsedDaily')
 
@@ -544,11 +556,15 @@ export class UserModel extends Model<UserModel> {
       notificationSettings: this.NotificationSetting ? this.NotificationSetting.toFormattedJSON() : undefined,
       videoChannels: [],
       videoQuotaUsed: videoQuotaUsed !== undefined
-            ? parseInt(videoQuotaUsed, 10)
+            ? parseInt(videoQuotaUsed + '', 10)
             : undefined,
       videoQuotaUsedDaily: videoQuotaUsedDaily !== undefined
-            ? parseInt(videoQuotaUsedDaily, 10)
+            ? parseInt(videoQuotaUsedDaily + '', 10)
             : undefined
+    }
+
+    if (parameters.withAdminFlags) {
+      Object.assign(json, { adminFlags: this.adminFlags })
     }
 
     if (Array.isArray(this.Account.VideoChannels) === true) {
@@ -575,15 +591,11 @@ export class UserModel extends Model<UserModel> {
 
     const uploadedTotal = videoFile.size + totalBytes
     const uploadedDaily = videoFile.size + totalBytesDaily
-    if (this.videoQuotaDaily === -1) {
-      return uploadedTotal < this.videoQuota
-    }
-    if (this.videoQuota === -1) {
-      return uploadedDaily < this.videoQuotaDaily
-    }
 
-    return (uploadedTotal < this.videoQuota) &&
-        (uploadedDaily < this.videoQuotaDaily)
+    if (this.videoQuotaDaily === -1) return uploadedTotal < this.videoQuota
+    if (this.videoQuota === -1) return uploadedDaily < this.videoQuotaDaily
+
+    return uploadedTotal < this.videoQuota && uploadedDaily < this.videoQuotaDaily
   }
 
   private static generateUserQuotaBaseSQL (where?: string) {
@@ -603,10 +615,10 @@ export class UserModel extends Model<UserModel> {
   private static getTotalRawQuery (query: string, userId: number) {
     const options = {
       bind: { userId },
-      type: Sequelize.QueryTypes.SELECT
+      type: QueryTypes.SELECT as QueryTypes.SELECT
     }
 
-    return UserModel.sequelize.query(query, options)
+    return UserModel.sequelize.query<{ total: string }>(query, options)
                     .then(([ { total } ]) => {
                       if (total === null) return 0
 

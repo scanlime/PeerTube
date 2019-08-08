@@ -5,7 +5,7 @@ import 'mocha'
 import { Account } from '../../../../shared/models/actors'
 import {
   checkTmpIsEmpty,
-  checkVideoFilesWereRemoved,
+  checkVideoFilesWereRemoved, cleanupTests,
   createUser,
   doubleFollow,
   flushAndRunMultipleServers,
@@ -14,13 +14,20 @@ import {
   removeUser,
   updateMyUser,
   userLogin
-} from '../../../../shared/utils'
-import { getMyUserInformation, killallServers, ServerInfo, testImage, updateMyAvatar, uploadVideo } from '../../../../shared/utils/index'
-import { checkActorFilesWereRemoved, getAccount, getAccountsList } from '../../../../shared/utils/users/accounts'
-import { setAccessTokensToServers } from '../../../../shared/utils/users/login'
+} from '../../../../shared/extra-utils'
+import {
+  getMyUserInformation,
+  killallServers,
+  ServerInfo,
+  testImage,
+  updateMyAvatar,
+  uploadVideo
+} from '../../../../shared/extra-utils/index'
+import { checkActorFilesWereRemoved, getAccount, getAccountsList } from '../../../../shared/extra-utils/users/accounts'
+import { setAccessTokensToServers } from '../../../../shared/extra-utils/users/login'
 import { User } from '../../../../shared/models/users'
 import { VideoChannel } from '../../../../shared/models/videos'
-import { waitJobs } from '../../../../shared/utils/server/jobs'
+import { waitJobs } from '../../../../shared/extra-utils/server/jobs'
 
 const expect = chai.expect
 
@@ -57,7 +64,12 @@ describe('Test users with multiple servers', function () {
         username: 'user1',
         password: 'password'
       }
-      const res = await createUser(servers[ 0 ].url, servers[ 0 ].accessToken, user.username, user.password)
+      const res = await createUser({
+        url: servers[ 0 ].url,
+        accessToken: servers[ 0 ].accessToken,
+        username: user.username,
+        password: user.password
+      })
       userId = res.body.user.id
       userAccessToken = await userLogin(servers[ 0 ], user)
     }
@@ -224,6 +236,6 @@ describe('Test users with multiple servers', function () {
   })
 
   after(async function () {
-    killallServers(servers)
+    await cleanupTests(servers)
   })
 })

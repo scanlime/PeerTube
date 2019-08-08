@@ -8,6 +8,16 @@ webserver:
   hostname: 'example.com'
   port: 443
 
+rates_limit:
+  login:
+    # 15 attempts in 5 min
+    window: 5 minutes
+    max: 15
+  ask_send_email:
+    # 3 attempts in 5 min
+    window: 5 minutes
+    max: 3
+
 # Proxies to trust to get real client IP
 # If you run PeerTube just behind a local proxy (nginx), keep 'loopback'
 # If you run PeerTube behind a remote proxy, add the proxy IP address (or subnet)
@@ -102,6 +112,33 @@ csp:
   report_only: true # CSP directives are still being tested, so disable the report only mode at your own risk!
   report_uri:
 
+tracker:
+  # If you disable the tracker, you disable the P2P aspect of PeerTube
+  enabled: true
+  # Only handle requests on your videos.
+  # If you set this to false it means you have a public tracker.
+  # Then, it is possible that clients overload your instance with external torrents
+  private: true
+  # Reject peers that do a lot of announces (could improve privacy of TCP/UDP peers)
+  reject_too_many_announces: false
+
+history:
+  videos:
+    # If you want to limit users videos history
+    # -1 means there is no limitations
+    # Other values could be '6 months' or '30 days' etc (PeerTube will periodically delete old entries from database)
+    max_age: -1
+
+views:
+  videos:
+    # PeerTube creates a database entry every hour for each video to track views over a period of time
+    # This is used in particular by the Trending page
+    # PeerTube could remove old remote video views if you want to reduce your database size (video view counter will not be altered)
+    # -1 means no cleanup
+    # Other values could be '6 months' or '30 days' etc (PeerTube will periodically delete old entries from database)
+    remote:
+      max_age: -1
+
 
 ###############################################################################
 #
@@ -164,7 +201,7 @@ transcoding:
   #     * Resolution change is smoother
   #     * Faster playback in particular with long videos
   #     * More stable playback (less bugs/infinite loading)
-  # /!\ Multiply videos storage by 2 /!\
+  # /!\ Multiplies videos storage by 2 /!\
   hls:
     enabled: false
 
@@ -180,8 +217,8 @@ auto_blacklist:
   # New videos automatically blacklisted so moderators can review before publishing
   videos:
     of_users:
-      enabled: false 
- 
+      enabled: false
+
 # Instance settings
 instance:
   name: 'PeerTube'
@@ -217,3 +254,10 @@ services:
     # If false, we use an image link card that will redirect on your PeerTube instance
     # Test on https://cards-dev.twitter.com/validator to see if you are whitelisted
     whitelisted: false
+
+followers:
+  instance:
+    # Allow or not other instances to follow yours
+    enabled: true
+    # Whether or not an administrator must manually validate a new follower
+    manual_approval: false

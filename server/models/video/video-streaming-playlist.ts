@@ -1,16 +1,16 @@
-import { AllowNull, BelongsTo, Column, CreatedAt, DataType, ForeignKey, HasMany, Is, Model, Table, UpdatedAt } from 'sequelize-typescript'
+import { AllowNull, BelongsTo, Column, CreatedAt, ForeignKey, HasMany, Is, Model, Table, UpdatedAt, DataType } from 'sequelize-typescript'
 import { isVideoFileInfoHashValid } from '../../helpers/custom-validators/videos'
 import { throwIfNotValid } from '../utils'
 import { VideoModel } from './video'
-import * as Sequelize from 'sequelize'
 import { VideoRedundancyModel } from '../redundancy/video-redundancy'
 import { VideoStreamingPlaylistType } from '../../../shared/models/videos/video-streaming-playlist.type'
 import { isActivityPubUrlValid } from '../../helpers/custom-validators/activitypub/misc'
-import { CONSTRAINTS_FIELDS, STATIC_PATHS } from '../../initializers'
+import { CONSTRAINTS_FIELDS, STATIC_PATHS, P2P_MEDIA_LOADER_PEER_VERSION } from '../../initializers/constants'
 import { VideoFileModel } from './video-file'
 import { join } from 'path'
 import { sha1 } from '../../helpers/core-utils'
 import { isArrayOf } from '../../helpers/custom-validators/misc'
+import { QueryTypes, Op } from 'sequelize'
 
 @Table({
   tableName: 'videoStreamingPlaylist',
@@ -50,6 +50,10 @@ export class VideoStreamingPlaylistModel extends Model<VideoStreamingPlaylistMod
   p2pMediaLoaderInfohashes: string[]
 
   @AllowNull(false)
+  @Column
+  p2pMediaLoaderPeerVersion: number
+
+  @AllowNull(false)
   @Is('VideoStreamingSegmentsSha256Url', value => throwIfNotValid(value, isActivityPubUrlValid, 'segments sha256 url'))
   @Column
   segmentsSha256Url: string
@@ -78,26 +82,36 @@ export class VideoStreamingPlaylistModel extends Model<VideoStreamingPlaylistMod
   static doesInfohashExist (infoHash: string) {
     const query = 'SELECT 1 FROM "videoStreamingPlaylist" WHERE $infoHash = ANY("p2pMediaLoaderInfohashes") LIMIT 1'
     const options = {
-      type: Sequelize.QueryTypes.SELECT,
+      type: QueryTypes.SELECT as QueryTypes.SELECT,
       bind: { infoHash },
       raw: true
     }
 
-    return VideoModel.sequelize.query(query, options)
-              .then(results => {
-                return results.length === 1
-              })
+    return VideoModel.sequelize.query<object>(query, options)
+              .then(results => results.length === 1)
   }
 
   static buildP2PMediaLoaderInfoHashes (playlistUrl: string, videoFiles: VideoFileModel[]) {
     const hashes: string[] = []
 
-    // https://github.com/Novage/p2p-media-loader/blob/master/p2p-media-loader-core/lib/p2p-media-manager.ts#L97
+    // https://github.com/Novage/p2p-media-loader/blob/master/p2p-media-loader-core/lib/p2p-media-manager.ts#L115
     for (let i = 0; i < videoFiles.length; i++) {
-      hashes.push(sha1(`1${playlistUrl}+V${i}`))
+      hashes.push(sha1(`${P2P_MEDIA_LOADER_PEER_VERSION}${playlistUrl}+V${i}`))
     }
 
     return hashes
+  }
+
+  static listByIncorrectPeerVersion () {
+    const query = {
+      where: {
+        p2pMediaLoaderPeerVersion: {
+          [Op.ne]: P2P_MEDIA_LOADER_PEER_VERSION
+        }
+      }
+    }
+
+    return VideoStreamingPlaylistModel.findAll(query)
   }
 
   static loadWithVideo (id: number) {

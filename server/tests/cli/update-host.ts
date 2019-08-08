@@ -3,26 +3,26 @@
 import 'mocha'
 import * as chai from 'chai'
 import { VideoDetails } from '../../../shared/models/videos'
-import { waitJobs } from '../../../shared/utils/server/jobs'
-import { addVideoCommentThread } from '../../../shared/utils/videos/video-comments'
+import { waitJobs } from '../../../shared/extra-utils/server/jobs'
+import { addVideoCommentThread } from '../../../shared/extra-utils/videos/video-comments'
 import {
   addVideoChannel,
+  cleanupTests,
   createUser,
   execCLI,
-  flushTests,
+  flushAndRunServer,
   getEnvCli,
   getVideo,
   getVideoChannelsList,
   getVideosList,
   killallServers,
   makeActivityPubGetRequest,
-  parseTorrentVideo,
-  runServer,
+  parseTorrentVideo, reRunServer,
   ServerInfo,
   setAccessTokensToServers,
   uploadVideo
-} from '../../../shared/utils'
-import { getAccountsList } from '../../../shared/utils/users/accounts'
+} from '../../../shared/extra-utils'
+import { getAccountsList } from '../../../shared/extra-utils/users/accounts'
 
 const expect = chai.expect
 
@@ -32,15 +32,13 @@ describe('Test update host scripts', function () {
   before(async function () {
     this.timeout(60000)
 
-    await flushTests()
-
     const overrideConfig = {
       webserver: {
         port: 9256
       }
     }
     // Run server 2 to have transcoding enabled
-    server = await runServer(2, overrideConfig)
+    server = await flushAndRunServer(2, overrideConfig)
     await setAccessTokensToServers([ server ])
 
     // Upload two videos for our needs
@@ -50,7 +48,7 @@ describe('Test update host scripts', function () {
     await uploadVideo(server.url, server.accessToken, videoAttributes)
 
     // Create a user
-    await createUser(server.url, server.accessToken, 'toto', 'coucou')
+    await createUser({ url: server.url, accessToken: server.accessToken, username: 'toto', password: 'coucou' })
 
     // Create channel
     const videoChannel = {
@@ -72,7 +70,7 @@ describe('Test update host scripts', function () {
 
     killallServers([ server ])
     // Run server with standard configuration
-    server = await runServer(2)
+    await reRunServer(server)
 
     const env = getEnvCli(server)
     await execCLI(`${env} npm run update-host`)
@@ -149,6 +147,6 @@ describe('Test update host scripts', function () {
   })
 
   after(async function () {
-    killallServers([ server ])
+    await cleanupTests([ server ])
   })
 })

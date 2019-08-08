@@ -2,7 +2,7 @@ import * as Sequelize from 'sequelize'
 import * as Bluebird from 'bluebird'
 import { AllowNull, BelongsTo, Column, CreatedAt, DataType, ForeignKey, Is, Model, Scopes, Table, UpdatedAt } from 'sequelize-typescript'
 import { isActivityPubUrlValid } from '../../helpers/custom-validators/activitypub/misc'
-import { CONSTRAINTS_FIELDS } from '../../initializers'
+import { CONSTRAINTS_FIELDS } from '../../initializers/constants'
 import { AccountModel } from '../account/account'
 import { ActorModel } from '../activitypub/actor'
 import { throwIfNotValid } from '../utils'
@@ -14,15 +14,15 @@ enum ScopeNames {
   WITH_ACTOR = 'WITH_ACTOR'
 }
 
-@Scopes({
+@Scopes(() => ({
   [ScopeNames.FULL]: {
     include: [
       {
-        model: () => ActorModel,
+        model: ActorModel,
         required: true
       },
       {
-        model: () => VideoModel,
+        model: VideoModel,
         required: true
       }
     ]
@@ -30,12 +30,12 @@ enum ScopeNames {
   [ScopeNames.WITH_ACTOR]: {
     include: [
       {
-        model: () => ActorModel,
+        model: ActorModel,
         required: true
       }
     ]
   }
-})
+}))
 @Table({
   tableName: 'videoShare',
   indexes: [

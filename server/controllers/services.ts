@@ -1,8 +1,7 @@
 import * as express from 'express'
-import { CONFIG, EMBED_SIZE, PREVIEWS_SIZE } from '../initializers'
+import { EMBED_SIZE, PREVIEWS_SIZE, WEBSERVER } from '../initializers/constants'
 import { asyncMiddleware, oembedValidator } from '../middlewares'
 import { accountNameWithHostGetValidator } from '../middlewares/validators'
-import { VideoModel } from '../models/video/video'
 
 const servicesRouter = express.Router()
 
@@ -25,7 +24,7 @@ export {
 
 function generateOEmbed (req: express.Request, res: express.Response) {
   const video = res.locals.video
-  const webserverUrl = CONFIG.WEBSERVER.URL
+  const webserverUrl = WEBSERVER.URL
   const maxHeight = parseInt(req.query.maxheight, 10)
   const maxWidth = parseInt(req.query.maxwidth, 10)
 

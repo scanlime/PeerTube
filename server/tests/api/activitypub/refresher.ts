@@ -20,8 +20,8 @@ import {
   uploadVideoAndGetId,
   wait,
   waitJobs
-} from '../../../../shared/utils'
-import { getAccount } from '../../../../shared/utils/users/accounts'
+} from '../../../../shared/extra-utils'
+import { getAccount } from '../../../../shared/extra-utils/users/accounts'
 import { VideoPlaylistPrivacy } from '../../../../shared/models/videos'
 
 describe('Test AP refresher', function () {
@@ -153,7 +153,7 @@ describe('Test AP refresher', function () {
     })
   })
 
-  after(async function () {
+  after(function () {
     killallServers(servers)
   })
 })

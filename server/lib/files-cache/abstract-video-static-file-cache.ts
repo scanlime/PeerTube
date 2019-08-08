@@ -1,52 +1,30 @@
-import * as AsyncLRU from 'async-lru'
-import { createWriteStream, remove } from 'fs-extra'
+import { remove } from 'fs-extra'
 import { logger } from '../../helpers/logger'
-import { VideoModel } from '../../models/video/video'
-import { fetchRemoteVideoStaticFile } from '../activitypub'
+import * as memoizee from 'memoizee'
+
+type GetFilePathResult = { isOwned: boolean, path: string } | undefined
 
 export abstract class AbstractVideoStaticFileCache <T> {
 
-  protected lru
+  getFilePath: (params: T) => Promise<GetFilePathResult>
 
-  abstract getFilePath (params: T): Promise<string>
+  abstract getFilePathImpl (params: T): Promise<GetFilePathResult>
 
   // Load and save the remote file, then return the local path from filesystem
-  protected abstract loadRemoteFile (key: string): Promise<string>
+  protected abstract loadRemoteFile (key: string): Promise<GetFilePathResult>
 
   init (max: number, maxAge: number) {
-    this.lru = new AsyncLRU({
-      max,
+    this.getFilePath = memoizee(this.getFilePathImpl, {
       maxAge,
-      load: (key, cb) => {
-        this.loadRemoteFile(key)
-          .then(res => cb(null, res))
-          .catch(err => cb(err))
+      max,
+      promise: true,
+      dispose: (result?: GetFilePathResult) => {
+        if (result && result.isOwned !== true) {
+          remove(result.path)
+            .then(() => logger.debug('%s removed from %s', result.path, this.constructor.name))
+            .catch(err => logger.error('Cannot remove %s from cache %s.', result.path, this.constructor.name, { err }))
+        }
       }
-    })
-
-    this.lru.on('evict', (obj: { key: string, value: string }) => {
-      remove(obj.value)
-        .then(() => logger.debug('%s evicted from %s', obj.value, this.constructor.name))
-    })
-  }
-
-  protected loadFromLRU (key: string) {
-    return new Promise<string>((res, rej) => {
-      this.lru.get(key, (err, value) => {
-        err ? rej(err) : res(value)
-      })
-    })
-  }
-
-  protected saveRemoteVideoFileAndReturnPath (video: VideoModel, remoteStaticPath: string, destPath: string) {
-    return new Promise<string>((res, rej) => {
-      const req = fetchRemoteVideoStaticFile(video, remoteStaticPath, rej)
-
-      const stream = createWriteStream(destPath)
-
-      req.pipe(stream)
-         .on('error', (err) => rej(err))
-         .on('finish', () => res(destPath))
     })
   }
 }

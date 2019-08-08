@@ -12,7 +12,7 @@ import { logger } from '../../helpers/logger'
 import { createPrivateAndPublicKeys } from '../../helpers/peertube-crypto'
 import { doRequest, downloadImage } from '../../helpers/requests'
 import { getUrlFromWebfinger } from '../../helpers/webfinger'
-import { AVATARS_SIZE, CONFIG, MIMETYPES, sequelizeTypescript } from '../../initializers'
+import { AVATARS_SIZE, MIMETYPES, WEBSERVER } from '../../initializers/constants'
 import { AccountModel } from '../../models/account/account'
 import { ActorModel } from '../../models/activitypub/actor'
 import { AvatarModel } from '../../models/avatar/avatar'
@@ -21,6 +21,8 @@ import { VideoChannelModel } from '../../models/video/video-channel'
 import { JobQueue } from '../job-queue'
 import { getServerActor } from '../../helpers/utils'
 import { ActorFetchByUrlType, fetchActorByUrl } from '../../helpers/actor'
+import { CONFIG } from '../../initializers/config'
+import { sequelizeTypescript } from '../../initializers/database'
 
 // Set account keys, this could be long so process after the account creation and do not block the client
 function setAsyncActorKeys (actor: ActorModel) {
@@ -116,7 +118,7 @@ function buildActorInstance (type: ActivityPubActorType, url: string, preferredU
     followingCount: 0,
     inboxUrl: url + '/inbox',
     outboxUrl: url + '/outbox',
-    sharedInboxUrl: CONFIG.WEBSERVER.URL + '/inbox',
+    sharedInboxUrl: WEBSERVER.URL + '/inbox',
     followersUrl: url + '/followers',
     followingUrl: url + '/following'
   })
@@ -268,7 +270,7 @@ async function refreshActorIfNeeded (
       return { refreshed: true, actor }
     })
   } catch (err) {
-    logger.warn('Cannot refresh actor.', { err })
+    logger.warn('Cannot refresh actor %s.', actor.url, { err })
     return { actor, refreshed: false }
   }
 }
@@ -341,6 +343,8 @@ function saveActorAndServerAndModelIfNotExist (
       actorCreated.VideoChannel.Actor = actorCreated
       actorCreated.VideoChannel.Account = ownerActor.Account
     }
+
+    actorCreated.Server = server
 
     return actorCreated
   }

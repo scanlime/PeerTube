@@ -3,12 +3,13 @@ import { createClient, RedisClient } from 'redis'
 import { logger } from '../helpers/logger'
 import { generateRandomString } from '../helpers/utils'
 import {
-  CONFIG,
   CONTACT_FORM_LIFETIME,
   USER_EMAIL_VERIFY_LIFETIME,
   USER_PASSWORD_RESET_LIFETIME,
-  VIDEO_VIEW_LIFETIME
-} from '../initializers'
+  VIDEO_VIEW_LIFETIME,
+  WEBSERVER
+} from '../initializers/constants'
+import { CONFIG } from '../initializers/config'
 
 type CachedRoute = {
   body: string,
@@ -30,7 +31,7 @@ class Redis {
     if (this.initialized === true) return
     this.initialized = true
 
-    this.client = createClient(Redis.getRedisClient())
+    this.client = createClient(Redis.getRedisClientOptions())
 
     this.client.on('error', err => {
       logger.error('Error in Redis client.', { err })
@@ -41,10 +42,10 @@ class Redis {
       this.client.auth(CONFIG.REDIS.AUTH)
     }
 
-    this.prefix = 'redis-' + CONFIG.WEBSERVER.HOST + '-'
+    this.prefix = 'redis-' + WEBSERVER.HOST + '-'
   }
 
-  static getRedisClient () {
+  static getRedisClientOptions () {
     return Object.assign({},
       (CONFIG.REDIS.AUTH && CONFIG.REDIS.AUTH != null) ? { password: CONFIG.REDIS.AUTH } : {},
       (CONFIG.REDIS.DB) ? { db: CONFIG.REDIS.DB } : {},
@@ -52,6 +53,14 @@ class Redis {
       { host: CONFIG.REDIS.HOSTNAME, port: CONFIG.REDIS.PORT } :
       { path: CONFIG.REDIS.SOCKET }
     )
+  }
+
+  getClient () {
+    return this.client
+  }
+
+  getPrefix () {
+    return this.prefix
   }
 
   /************* Forgot password *************/

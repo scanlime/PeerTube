@@ -11,14 +11,13 @@ import * as pem from 'pem'
 import { URL } from 'url'
 import { truncate } from 'lodash'
 import { exec } from 'child_process'
-import { isArray } from './custom-validators/misc'
 
 const objectConverter = (oldObject: any, keyConverter: (e: string) => string, valueConverter: (e: any) => any) => {
   if (!oldObject || typeof oldObject !== 'object') {
     return valueConverter(oldObject)
   }
 
-  if (isArray(oldObject)) {
+  if (Array.isArray(oldObject)) {
     return oldObject.map(e => objectConverter(e, keyConverter, valueConverter))
   }
 
@@ -41,7 +40,7 @@ const timeTable = {
   month:        3600000 * 24 * 30
 }
 
-export function parseDuration (duration: number | string): number {
+export function parseDurationToMs (duration: number | string): number {
   if (typeof duration === 'number') return duration
 
   if (typeof duration === 'string') {
@@ -58,7 +57,7 @@ export function parseDuration (duration: number | string): number {
     }
   }
 
-  throw new Error('Duration could not be properly parsed')
+  throw new Error(`Duration ${duration} could not be properly parsed`)
 }
 
 export function parseBytes (value: string | number): number {

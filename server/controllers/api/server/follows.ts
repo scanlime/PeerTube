@@ -2,22 +2,29 @@ import * as express from 'express'
 import { UserRight } from '../../../../shared/models/users'
 import { logger } from '../../../helpers/logger'
 import { getFormattedObjects, getServerActor } from '../../../helpers/utils'
-import { sequelizeTypescript, SERVER_ACTOR_NAME } from '../../../initializers'
-import { sendUndoFollow } from '../../../lib/activitypub/send'
+import { SERVER_ACTOR_NAME } from '../../../initializers/constants'
+import { sendAccept, sendReject, sendUndoFollow } from '../../../lib/activitypub/send'
 import {
   asyncMiddleware,
   authenticate,
   ensureUserHasRight,
   paginationValidator,
-  removeFollowingValidator,
   setBodyHostsPort,
   setDefaultPagination,
   setDefaultSort
 } from '../../../middlewares'
-import { followersSortValidator, followingSortValidator, followValidator } from '../../../middlewares/validators'
+import {
+  acceptOrRejectFollowerValidator,
+  followersSortValidator,
+  followingSortValidator,
+  followValidator,
+  getFollowerValidator,
+  removeFollowingValidator
+} from '../../../middlewares/validators'
 import { ActorFollowModel } from '../../../models/activitypub/actor-follow'
 import { JobQueue } from '../../../lib/job-queue'
 import { removeRedundancyOf } from '../../../lib/redundancy'
+import { sequelizeTypescript } from '../../../initializers/database'
 
 const serverFollowsRouter = express.Router()
 serverFollowsRouter.get('/following',
@@ -40,7 +47,7 @@ serverFollowsRouter.delete('/following/:host',
   authenticate,
   ensureUserHasRight(UserRight.MANAGE_SERVER_FOLLOW),
   asyncMiddleware(removeFollowingValidator),
-  asyncMiddleware(removeFollow)
+  asyncMiddleware(removeFollowing)
 )
 
 serverFollowsRouter.get('/followers',
@@ -49,6 +56,29 @@ serverFollowsRouter.get('/followers',
   setDefaultSort,
   setDefaultPagination,
   asyncMiddleware(listFollowers)
+)
+
+serverFollowsRouter.delete('/followers/:nameWithHost',
+  authenticate,
+  ensureUserHasRight(UserRight.MANAGE_SERVER_FOLLOW),
+  asyncMiddleware(getFollowerValidator),
+  asyncMiddleware(removeOrRejectFollower)
+)
+
+serverFollowsRouter.post('/followers/:nameWithHost/reject',
+  authenticate,
+  ensureUserHasRight(UserRight.MANAGE_SERVER_FOLLOW),
+  asyncMiddleware(getFollowerValidator),
+  acceptOrRejectFollowerValidator,
+  asyncMiddleware(removeOrRejectFollower)
+)
+
+serverFollowsRouter.post('/followers/:nameWithHost/accept',
+  authenticate,
+  ensureUserHasRight(UserRight.MANAGE_SERVER_FOLLOW),
+  asyncMiddleware(getFollowerValidator),
+  acceptOrRejectFollowerValidator,
+  asyncMiddleware(acceptFollower)
 )
 
 // ---------------------------------------------------------------------------
@@ -103,7 +133,7 @@ async function followInstance (req: express.Request, res: express.Response) {
   return res.status(204).end()
 }
 
-async function removeFollow (req: express.Request, res: express.Response) {
+async function removeFollowing (req: express.Request, res: express.Response) {
   const follow = res.locals.follow
 
   await sequelizeTypescript.transaction(async t => {
@@ -120,6 +150,27 @@ async function removeFollow (req: express.Request, res: express.Response) {
 
     await follow.destroy({ transaction: t })
   })
+
+  return res.status(204).end()
+}
+
+async function removeOrRejectFollower (req: express.Request, res: express.Response) {
+  const follow = res.locals.follow
+
+  await sendReject(follow.ActorFollower, follow.ActorFollowing)
+
+  await follow.destroy()
+
+  return res.status(204).end()
+}
+
+async function acceptFollower (req: express.Request, res: express.Response) {
+  const follow = res.locals.follow
+
+  await sendAccept(follow)
+
+  follow.state = 'accepted'
+  await follow.save()
 
   return res.status(204).end()
 }

@@ -5,18 +5,18 @@ import * as chai from 'chai'
 import { About } from '../../../../shared/models/server/about.model'
 import { CustomConfig } from '../../../../shared/models/server/custom-config.model'
 import {
+  cleanupTests,
   deleteCustomConfig,
+  flushAndRunServer,
   getAbout,
-  killallServers,
-  reRunServer,
-  flushTests,
   getConfig,
   getCustomConfig,
+  killallServers,
   registerUser,
-  runServer,
+  reRunServer,
   setAccessTokensToServers,
   updateCustomConfig
-} from '../../../../shared/utils'
+} from '../../../../shared/extra-utils'
 import { ServerConfig } from '../../../../shared/models'
 
 const expect = chai.expect
@@ -63,6 +63,9 @@ function checkInitialConfig (data: CustomConfig) {
   expect(data.import.videos.http.enabled).to.be.true
   expect(data.import.videos.torrent.enabled).to.be.true
   expect(data.autoBlacklist.videos.ofUsers.enabled).to.be.false
+
+  expect(data.followers.instance.enabled).to.be.true
+  expect(data.followers.instance.manualApproval).to.be.false
 }
 
 function checkUpdatedConfig (data: CustomConfig) {
@@ -105,6 +108,9 @@ function checkUpdatedConfig (data: CustomConfig) {
   expect(data.import.videos.http.enabled).to.be.false
   expect(data.import.videos.torrent.enabled).to.be.false
   expect(data.autoBlacklist.videos.ofUsers.enabled).to.be.true
+
+  expect(data.followers.instance.enabled).to.be.false
+  expect(data.followers.instance.manualApproval).to.be.true
 }
 
 describe('Test config', function () {
@@ -112,9 +118,7 @@ describe('Test config', function () {
 
   before(async function () {
     this.timeout(30000)
-
-    await flushTests()
-    server = await runServer(1)
+    server = await flushAndRunServer(1)
     await setAccessTokensToServers([ server ])
   })
 
@@ -234,6 +238,12 @@ describe('Test config', function () {
             enabled: true
           }
         }
+      },
+      followers: {
+        instance: {
+          enabled: false,
+          manualApproval: true
+        }
       }
     }
     await updateCustomConfig(server.url, server.accessToken, newCustomConfig)
@@ -291,6 +301,6 @@ describe('Test config', function () {
   })
 
   after(async function () {
-    killallServers([ server ])
+    await cleanupTests([ server ])
   })
 })

@@ -6,14 +6,15 @@ import {
   advancedVideosSearch,
   flushTests,
   killallServers,
-  runServer,
+  flushAndRunServer,
   searchVideo,
   ServerInfo,
   setAccessTokensToServers,
   uploadVideo,
   wait,
-  immutableAssign
-} from '../../../../shared/utils'
+  immutableAssign,
+  cleanupTests
+} from '../../../../shared/extra-utils'
 
 const expect = chai.expect
 
@@ -24,9 +25,7 @@ describe('Test a videos search', function () {
   before(async function () {
     this.timeout(30000)
 
-    await flushTests()
-
-    server = await runServer(1)
+    server = await flushAndRunServer(1)
 
     await setAccessTokensToServers([ server ])
 
@@ -408,11 +407,6 @@ describe('Test a videos search', function () {
   })
 
   after(async function () {
-    killallServers([ server ])
-
-    // Keep the logs if the test failed
-    if (this['ok']) {
-      await flushTests()
-    }
+    await cleanupTests([ server ])
   })
 })

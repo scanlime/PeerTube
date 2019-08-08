@@ -1,17 +1,17 @@
 import * as Sequelize from 'sequelize'
 import * as uuidv4 from 'uuid/v4'
 import { ActivityPubActorType } from '../../shared/models/activitypub'
-import { sequelizeTypescript, SERVER_ACTOR_NAME } from '../initializers'
+import { SERVER_ACTOR_NAME } from '../initializers/constants'
 import { AccountModel } from '../models/account/account'
 import { UserModel } from '../models/account/user'
 import { buildActorInstance, getAccountActivityPubUrl, setAsyncActorKeys } from './activitypub'
 import { createVideoChannel } from './video-channel'
 import { VideoChannelModel } from '../models/video/video-channel'
-import { FilteredModelAttributes } from 'sequelize-typescript/lib/models/Model'
 import { ActorModel } from '../models/activitypub/actor'
 import { UserNotificationSettingModel } from '../models/account/user-notification-setting'
 import { UserNotificationSetting, UserNotificationSettingValue } from '../../shared/models/users'
 import { createWatchLaterPlaylist } from './video-playlist'
+import { sequelizeTypescript } from '../initializers/database'
 
 async function createUserAccountAndChannelAndPlaylist (userToCreate: UserModel, validateUser = true) {
   const { user, account, videoChannel } = await sequelizeTypescript.transaction(async t => {
@@ -72,7 +72,7 @@ async function createLocalAccountWithoutKeys (
     userId,
     applicationId,
     actorId: actorInstanceCreated.id
-  } as FilteredModelAttributes<AccountModel>)
+  })
 
   const accountInstanceCreated = await accountInstance.save({ transaction: t })
   accountInstanceCreated.Actor = actorInstanceCreated
@@ -110,7 +110,8 @@ function createDefaultUserNotificationSettings (user: UserModel, t: Sequelize.Tr
     blacklistOnMyVideo: UserNotificationSettingValue.WEB | UserNotificationSettingValue.EMAIL,
     newUserRegistration: UserNotificationSettingValue.WEB,
     commentMention: UserNotificationSettingValue.WEB,
-    newFollow: UserNotificationSettingValue.WEB
+    newFollow: UserNotificationSettingValue.WEB,
+    newInstanceFollower: UserNotificationSettingValue.WEB
   }
 
   return UserNotificationSettingModel.create(values, { transaction: t })

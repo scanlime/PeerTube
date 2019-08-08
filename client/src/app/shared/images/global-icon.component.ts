@@ -1,4 +1,4 @@
-import { Component, ElementRef, Input, OnInit } from '@angular/core'
+import { ChangeDetectionStrategy, Component, ElementRef, Input, OnInit } from '@angular/core'
 
 const icons = {
   'add': require('../../../assets/images/global/add.html'),
@@ -43,7 +43,9 @@ const icons = {
   'videos': require('../../../assets/images/global/videos.html'),
   'folder': require('../../../assets/images/global/folder.html'),
   'administration': require('../../../assets/images/menu/administration.html'),
-  'subscriptions': require('../../../assets/images/menu/subscriptions.html')
+  'subscriptions': require('../../../assets/images/menu/subscriptions.html'),
+  'users': require('../../../assets/images/global/users.html'),
+  'refresh': require('../../../assets/images/global/refresh.html')
 }
 
 export type GlobalIconName = keyof typeof icons
@@ -51,7 +53,8 @@ export type GlobalIconName = keyof typeof icons
 @Component({
   selector: 'my-global-icon',
   template: '',
-  styleUrls: [ './global-icon.component.scss' ]
+  styleUrls: [ './global-icon.component.scss' ],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class GlobalIconComponent implements OnInit {
   @Input() iconName: GlobalIconName

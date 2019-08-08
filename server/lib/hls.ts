@@ -1,6 +1,6 @@
 import { VideoModel } from '../models/video/video'
-import { basename, join, dirname } from 'path'
-import { CONFIG, HLS_STREAMING_PLAYLIST_DIRECTORY } from '../initializers'
+import { basename, dirname, join } from 'path'
+import { HLS_STREAMING_PLAYLIST_DIRECTORY, P2P_MEDIA_LOADER_PEER_VERSION } from '../initializers/constants'
 import { close, ensureDir, move, open, outputJSON, pathExists, read, readFile, remove, writeFile } from 'fs-extra'
 import { getVideoFileSize } from '../helpers/ffmpeg-utils'
 import { sha256 } from '../helpers/core-utils'
@@ -9,6 +9,24 @@ import { logger } from '../helpers/logger'
 import { doRequest, doRequestAndSaveToFile } from '../helpers/requests'
 import { generateRandomString } from '../helpers/utils'
 import { flatten, uniq } from 'lodash'
+import { VideoFileModel } from '../models/video/video-file'
+import { CONFIG } from '../initializers/config'
+import { sequelizeTypescript } from '../initializers/database'
+
+async function updateStreamingPlaylistsInfohashesIfNeeded () {
+  const playlistsToUpdate = await VideoStreamingPlaylistModel.listByIncorrectPeerVersion()
+
+  // Use separate SQL queries, because we could have many videos to update
+  for (const playlist of playlistsToUpdate) {
+    await sequelizeTypescript.transaction(async t => {
+      const videoFiles = await VideoFileModel.listByStreamingPlaylist(playlist.id, t)
+
+      playlist.p2pMediaLoaderInfohashes = VideoStreamingPlaylistModel.buildP2PMediaLoaderInfoHashes(playlist.playlistUrl, videoFiles)
+      playlist.p2pMediaLoaderPeerVersion = P2P_MEDIA_LOADER_PEER_VERSION
+      await playlist.save({ transaction: t })
+    })
+  }
+}
 
 async function updateMasterHLSPlaylist (video: VideoModel) {
   const directory = join(HLS_STREAMING_PLAYLIST_DIRECTORY, video.uuid)
@@ -159,7 +177,8 @@ function downloadPlaylistSegments (playlistUrl: string, destinationDir: string, 
 export {
   updateMasterHLSPlaylist,
   updateSha256Segments,
-  downloadPlaylistSegments
+  downloadPlaylistSegments,
+  updateStreamingPlaylistsInfohashesIfNeeded
 }
 
 // ---------------------------------------------------------------------------

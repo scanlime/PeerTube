@@ -5,16 +5,15 @@ import 'mocha'
 import {
   checkBadCountPagination,
   checkBadStartPagination,
-  flushTests,
-  killallServers,
+  cleanupTests,
+  flushAndRunServer,
   makeGetRequest,
   makePostBodyRequest,
   makePutBodyRequest,
-  runServer,
   ServerInfo,
   setAccessTokensToServers,
   uploadVideo
-} from '../../../../shared/utils'
+} from '../../../../shared/extra-utils'
 
 const expect = chai.expect
 
@@ -29,9 +28,7 @@ describe('Test videos history API validator', function () {
   before(async function () {
     this.timeout(30000)
 
-    await flushTests()
-
-    server = await runServer(1)
+    server = await flushAndRunServer(1)
 
     await setAccessTokensToServers([ server ])
 
@@ -129,11 +126,6 @@ describe('Test videos history API validator', function () {
   })
 
   after(async function () {
-    killallServers([ server ])
-
-    // Keep the logs if the test failed
-    if (this['ok']) {
-      await flushTests()
-    }
+    await cleanupTests([ server ])
   })
 })

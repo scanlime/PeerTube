@@ -21,7 +21,7 @@ import { VideoCommentModel } from '../models/video/video-comment'
 import { VideoFileModel } from '../models/video/video-file'
 import { VideoShareModel } from '../models/video/video-share'
 import { VideoTagModel } from '../models/video/video-tag'
-import { CONFIG } from './constants'
+import { CONFIG } from './config'
 import { ScheduleVideoUpdateModel } from '../models/video/schedule-video-update'
 import { VideoCaptionModel } from '../models/video/video-caption'
 import { VideoImportModel } from '../models/video/video-import'
@@ -36,6 +36,8 @@ import { UserNotificationSettingModel } from '../models/account/user-notificatio
 import { VideoStreamingPlaylistModel } from '../models/video/video-streaming-playlist'
 import { VideoPlaylistModel } from '../models/video/video-playlist'
 import { VideoPlaylistElementModel } from '../models/video/video-playlist-element'
+import { ThumbnailModel } from '../models/video/thumbnail'
+import { QueryTypes, Transaction } from 'sequelize'
 
 require('pg').defaults.parseInt8 = true // Avoid BIGINT to be converted to string
 
@@ -57,8 +59,7 @@ const sequelizeTypescript = new SequelizeTypescript({
     max: poolMax
   },
   benchmark: isTestInstance(),
-  isolationLevel: SequelizeTypescript.Transaction.ISOLATION_LEVELS.SERIALIZABLE,
-  operatorsAliases: false,
+  isolationLevel: Transaction.ISOLATION_LEVELS.SERIALIZABLE,
   logging: (message: string, benchmark: number) => {
     if (process.env.NODE_DB_LOG === 'false') return
 
@@ -85,6 +86,7 @@ async function initDatabaseModels (silent: boolean) {
     AccountVideoRateModel,
     UserModel,
     VideoAbuseModel,
+    VideoModel,
     VideoChangeOwnershipModel,
     VideoChannelModel,
     VideoShareModel,
@@ -92,7 +94,6 @@ async function initDatabaseModels (silent: boolean) {
     VideoCaptionModel,
     VideoBlacklistModel,
     VideoTagModel,
-    VideoModel,
     VideoCommentModel,
     ScheduleVideoUpdateModel,
     VideoImportModel,
@@ -105,7 +106,8 @@ async function initDatabaseModels (silent: boolean) {
     UserNotificationSettingModel,
     VideoStreamingPlaylistModel,
     VideoPlaylistModel,
-    VideoPlaylistElementModel
+    VideoPlaylistElementModel,
+    ThumbnailModel
   ])
 
   // Check extensions exist in the database
@@ -138,11 +140,16 @@ async function checkPostgresExtensions () {
 }
 
 async function checkPostgresExtension (extension: string) {
-  const query = `SELECT true AS enabled FROM pg_available_extensions WHERE name = '${extension}' AND installed_version IS NOT NULL;`
-  const [ res ] = await sequelizeTypescript.query(query, { raw: true })
+  const query = `SELECT 1 FROM pg_available_extensions WHERE name = '${extension}' AND installed_version IS NOT NULL;`
+  const options = {
+    type: QueryTypes.SELECT as QueryTypes.SELECT,
+    raw: true
+  }
 
-  if (!res || res.length === 0 || res[ 0 ][ 'enabled' ] !== true) {
-    // Try to create the extension ourself
+  const res = await sequelizeTypescript.query<object>(query, options)
+
+  if (!res || res.length === 0) {
+    // Try to create the extension ourselves
     try {
       await sequelizeTypescript.query(`CREATE EXTENSION ${extension};`, { raw: true })
 

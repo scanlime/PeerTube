@@ -10,7 +10,7 @@ import {
   createUser, removeVideoFromBlacklist,
   reportVideoAbuse,
   resetPassword,
-  runServer,
+  flushAndRunServer,
   unblockUser,
   uploadVideo,
   userLogin,
@@ -18,10 +18,10 @@ import {
   flushTests,
   killallServers,
   ServerInfo,
-  setAccessTokensToServers
-} from '../../../../shared/utils'
-import { MockSmtpServer } from '../../../../shared/utils/miscs/email'
-import { waitJobs } from '../../../../shared/utils/server/jobs'
+  setAccessTokensToServers, cleanupTests
+} from '../../../../shared/extra-utils'
+import { MockSmtpServer } from '../../../../shared/extra-utils/miscs/email'
+import { waitJobs } from '../../../../shared/extra-utils/server/jobs'
 
 const expect = chai.expect
 
@@ -43,18 +43,16 @@ describe('Test emails', function () {
 
     await MockSmtpServer.Instance.collectEmails(emails)
 
-    await flushTests()
-
     const overrideConfig = {
       smtp: {
         hostname: 'localhost'
       }
     }
-    server = await runServer(1, overrideConfig)
+    server = await flushAndRunServer(1, overrideConfig)
     await setAccessTokensToServers([ server ])
 
     {
-      const res = await createUser(server.url, server.accessToken, user.username, user.password)
+      const res = await createUser({ url: server.url, accessToken: server.accessToken, username: user.username, password: user.password })
       userId = res.body.user.id
 
       userAccessToken = await userLogin(server, user)
@@ -260,6 +258,7 @@ describe('Test emails', function () {
 
   after(async function () {
     MockSmtpServer.Instance.kill()
-    killallServers([ server ])
+
+    await cleanupTests([ server ])
   })
 })

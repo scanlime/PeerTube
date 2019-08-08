@@ -4,6 +4,7 @@ import * as chai from 'chai'
 import 'mocha'
 import { User, Video } from '../../../../shared/index'
 import {
+  cleanupTests,
   createUser,
   doubleFollow,
   flushAndRunMultipleServers,
@@ -13,7 +14,7 @@ import {
   updateVideoChannelAvatar,
   uploadVideo,
   userLogin
-} from '../../../../shared/utils'
+} from '../../../../shared/extra-utils'
 import {
   addVideoChannel,
   deleteVideoChannel,
@@ -26,8 +27,8 @@ import {
   ServerInfo,
   setAccessTokensToServers,
   updateVideoChannel
-} from '../../../../shared/utils/index'
-import { waitJobs } from '../../../../shared/utils/server/jobs'
+} from '../../../../shared/extra-utils/index'
+import { waitJobs } from '../../../../shared/extra-utils/server/jobs'
 
 const expect = chai.expect
 
@@ -41,8 +42,6 @@ describe('Test video channels', function () {
 
   before(async function () {
     this.timeout(30000)
-
-    await flushTests()
 
     servers = await flushAndRunMultipleServers(2)
 
@@ -270,7 +269,7 @@ describe('Test video channels', function () {
     }
 
     {
-      await createUser(servers[ 0 ].url, servers[ 0 ].accessToken, 'toto', 'password')
+      await createUser({ url: servers[ 0 ].url, accessToken: servers[ 0 ].accessToken, username: 'toto', password: 'password' })
       const accessToken = await userLogin(servers[ 0 ], { username: 'toto', password: 'password' })
 
       const res = await getMyUserInformation(servers[ 0 ].url, accessToken)
@@ -280,6 +279,6 @@ describe('Test video channels', function () {
   })
 
   after(async function () {
-    killallServers(servers)
+    await cleanupTests(servers)
   })
 })

@@ -5,14 +5,14 @@ import * as program from 'commander'
 import { join } from 'path'
 import { VideoPrivacy } from '../../shared/models/videos'
 import { doRequestAndSaveToFile } from '../helpers/requests'
-import { CONSTRAINTS_FIELDS } from '../initializers'
-import { getClient, getVideoCategories, login, searchVideoWithSort, uploadVideo } from '../../shared/utils/index'
+import { CONSTRAINTS_FIELDS } from '../initializers/constants'
+import { getClient, getVideoCategories, login, searchVideoWithSort, uploadVideo } from '../../shared/extra-utils/index'
 import { truncate } from 'lodash'
 import * as prompt from 'prompt'
 import { remove } from 'fs-extra'
 import { sha256 } from '../helpers/core-utils'
-import { safeGetYoutubeDL, buildOriginallyPublishedAt } from '../helpers/youtube-dl'
-import { getSettings, netrc } from './cli'
+import { buildOriginallyPublishedAt, safeGetYoutubeDL } from '../helpers/youtube-dl'
+import { getNetrc, getRemoteObjectOrDie, getSettings } from './cli'
 
 let accessToken: string
 let client: { id: string, secret: string }
@@ -32,58 +32,30 @@ program
   .option('-v, --verbose', 'Verbose mode')
   .parse(process.argv)
 
-getSettings()
-.then(settings => {
-  if (
-    (!program['url'] ||
-    !program['username'] ||
-    !program['password']) &&
-    (settings.remotes.length === 0)
-  ) {
-    if (!program['url']) console.error('--url field is required.')
-    if (!program['username']) console.error('--username field is required.')
-    if (!program['password']) console.error('--password field is required.')
-    if (!program['targetUrl']) console.error('--targetUrl field is required.')
-    process.exit(-1)
-  }
+Promise.all([ getSettings(), getNetrc() ])
+       .then(([ settings, netrc ]) => {
+         const { url, username, password } = getRemoteObjectOrDie(program, settings)
 
-  if (
-    (!program['url'] ||
-    !program['username'] ||
-    !program['password']) &&
-    (settings.remotes.length > 0)
-  ) {
-    if (!program['url']) {
-      program['url'] = (settings.default !== -1) ?
-        settings.remotes[settings.default] :
-        settings.remotes[0]
-    }
+         if (!program[ 'targetUrl' ]) {
+           console.error('--targetUrl field is required.')
 
-    if (!program['username']) program['username'] = netrc.machines[program['url']].login
-    if (!program['password']) program['password'] = netrc.machines[program['url']].password
-  }
+           process.exit(-1)
+         }
 
-  if (
-    !program['targetUrl']
-  ) {
-    if (!program['targetUrl']) console.error('--targetUrl field is required.')
-    process.exit(-1)
-  }
+         removeEndSlashes(url)
+         removeEndSlashes(program[ 'targetUrl' ])
 
-  removeEndSlashes(program['url'])
-  removeEndSlashes(program['targetUrl'])
+         const user = {
+           username: username,
+           password: password
+         }
 
-  const user = {
-    username: program['username'],
-    password: program['password']
-  }
-
-  run(user, program['url'])
-    .catch(err => {
-      console.error(err)
-      process.exit(-1)
-    })
-})
+         run(user, url)
+           .catch(err => {
+             console.error(err)
+             process.exit(-1)
+           })
+       })
 
 async function promptPassword () {
   return new Promise((res, rej) => {
@@ -126,7 +98,7 @@ async function run (user, url: string) {
   const youtubeDL = await safeGetYoutubeDL()
 
   const options = [ '-j', '--flat-playlist', '--playlist-reverse' ]
-  youtubeDL.getInfo(program['targetUrl'], options, processOptions, async (err, info) => {
+  youtubeDL.getInfo(program[ 'targetUrl' ], options, processOptions, async (err, info) => {
     if (err) {
       console.log(err.message)
       process.exit(1)
@@ -143,20 +115,20 @@ async function run (user, url: string) {
     console.log('Will download and upload %d videos.\n', infoArray.length)
 
     for (const info of infoArray) {
-      await processVideo(info, program['language'], processOptions.cwd, url, user)
+      await processVideo(info, program[ 'language' ], processOptions.cwd, url, user)
     }
 
-    console.log('Video/s for user %s imported: %s', program['username'], program['targetUrl'])
+    console.log('Video/s for user %s imported: %s', program[ 'username' ], program[ 'targetUrl' ])
     process.exit(0)
   })
 }
 
 function processVideo (info: any, languageCode: string, cwd: string, url: string, user) {
   return new Promise(async res => {
-    if (program['verbose']) console.log('Fetching object.', info)
+    if (program[ 'verbose' ]) console.log('Fetching object.', info)
 
     const videoInfo = await fetchObject(info)
-    if (program['verbose']) console.log('Fetched object.', videoInfo)
+    if (program[ 'verbose' ]) console.log('Fetched object.', videoInfo)
 
     const result = await searchVideoWithSort(url, videoInfo.title, '-match')
 
@@ -197,9 +169,9 @@ async function uploadVideoOnPeerTube (videoInfo: any, videoPath: string, cwd: st
   let tags = []
   if (Array.isArray(videoInfo.tags)) {
     tags = videoInfo.tags
-      .filter(t => t.length < CONSTRAINTS_FIELDS.VIDEOS.TAG.max && t.length > CONSTRAINTS_FIELDS.VIDEOS.TAG.min)
-      .map(t => t.normalize())
-      .slice(0, 5)
+                    .filter(t => t.length < CONSTRAINTS_FIELDS.VIDEOS.TAG.max && t.length > CONSTRAINTS_FIELDS.VIDEOS.TAG.min)
+                    .map(t => t.normalize())
+                    .slice(0, 5)
   }
 
   let thumbnailfile
@@ -263,7 +235,7 @@ async function uploadVideoOnPeerTube (videoInfo: any, videoPath: string, cwd: st
 async function getCategory (categories: string[], url: string) {
   if (!categories) return undefined
 
-  const categoryString = categories[0]
+  const categoryString = categories[ 0 ]
 
   if (categoryString === 'News & Politics') return 11
 
@@ -271,7 +243,7 @@ async function getCategory (categories: string[], url: string) {
   const categoriesServer = res.body
 
   for (const key of Object.keys(categoriesServer)) {
-    const categoryServer = categoriesServer[key]
+    const categoryServer = categoriesServer[ key ]
     if (categoryString.toLowerCase() === categoryServer.toLowerCase()) return parseInt(key, 10)
   }
 
@@ -295,12 +267,12 @@ function normalizeObject (obj: any) {
     // Deprecated key
     if (key === 'resolution') continue
 
-    const value = obj[key]
+    const value = obj[ key ]
 
     if (typeof value === 'string') {
-      newObj[key] = value.normalize()
+      newObj[ key ] = value.normalize()
     } else {
-      newObj[key] = value
+      newObj[ key ] = value
     }
   }
 

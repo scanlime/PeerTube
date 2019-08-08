@@ -2,12 +2,12 @@
 
 import 'mocha'
 
-import { flushTests, immutableAssign, killallServers, makeGetRequest, runServer, ServerInfo } from '../../../../shared/utils'
+import { cleanupTests, flushAndRunServer, immutableAssign, makeGetRequest, ServerInfo } from '../../../../shared/extra-utils'
 import {
   checkBadCountPagination,
   checkBadSortPagination,
   checkBadStartPagination
-} from '../../../../shared/utils/requests/check-api-params'
+} from '../../../../shared/extra-utils/requests/check-api-params'
 
 describe('Test videos API validator', function () {
   let server: ServerInfo
@@ -17,9 +17,7 @@ describe('Test videos API validator', function () {
   before(async function () {
     this.timeout(30000)
 
-    await flushTests()
-
-    server = await runServer(1)
+    server = await flushAndRunServer(1)
   })
 
   describe('When searching videos', function () {
@@ -147,11 +145,6 @@ describe('Test videos API validator', function () {
   })
 
   after(async function () {
-    killallServers([ server ])
-
-    // Keep the logs if the test failed
-    if (this['ok']) {
-      await flushTests()
-    }
+    await cleanupTests([ server ])
   })
 })

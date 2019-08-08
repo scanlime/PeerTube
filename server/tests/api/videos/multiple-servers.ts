@@ -9,7 +9,7 @@ import { VideoComment, VideoCommentThreadTree } from '../../../../shared/models/
 import {
   addVideoChannel,
   checkTmpIsEmpty,
-  checkVideoFilesWereRemoved,
+  checkVideoFilesWereRemoved, cleanupTests,
   completeVideoCheck,
   createUser,
   dateIsValid,
@@ -32,15 +32,15 @@ import {
   viewVideo,
   wait,
   webtorrentAdd
-} from '../../../../shared/utils'
+} from '../../../../shared/extra-utils'
 import {
   addVideoCommentReply,
   addVideoCommentThread,
   deleteVideoComment,
   getVideoCommentThreads,
   getVideoThreadComments
-} from '../../../../shared/utils/videos/video-comments'
-import { waitJobs } from '../../../../shared/utils/server/jobs'
+} from '../../../../shared/extra-utils/videos/video-comments'
+import { waitJobs } from '../../../../shared/extra-utils/server/jobs'
 
 const expect = chai.expect
 
@@ -164,7 +164,7 @@ describe('Test multiple servers', function () {
         username: 'user1',
         password: 'super_password'
       }
-      await createUser(servers[1].url, servers[1].accessToken, user.username, user.password)
+      await createUser({ url: servers[ 1 ].url, accessToken: servers[ 1 ].accessToken, username: user.username, password: user.password })
       const userAccessToken = await userLogin(servers[1], user)
 
       const videoAttributes = {
@@ -1030,11 +1030,6 @@ describe('Test multiple servers', function () {
   })
 
   after(async function () {
-    killallServers(servers)
-
-    // Keep the logs if the test failed
-    if (this['ok']) {
-      await flushTests()
-    }
+    await cleanupTests(servers)
   })
 })

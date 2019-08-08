@@ -4,6 +4,7 @@ import * as chai from 'chai'
 import 'mocha'
 import { VideoDetails, VideoImport, VideoPrivacy } from '../../../../shared/models/videos'
 import {
+  cleanupTests,
   doubleFollow,
   flushAndRunMultipleServers,
   getMyUserInformation,
@@ -14,9 +15,9 @@ import {
   killallServers,
   ServerInfo,
   setAccessTokensToServers
-} from '../../../../shared/utils'
-import { waitJobs } from '../../../../shared/utils/server/jobs'
-import { getMagnetURI, getYoutubeVideoUrl, importVideo, getMyVideoImports } from '../../../../shared/utils/videos/video-imports'
+} from '../../../../shared/extra-utils'
+import { waitJobs } from '../../../../shared/extra-utils/server/jobs'
+import { getMagnetURI, getYoutubeVideoUrl, importVideo, getMyVideoImports } from '../../../../shared/extra-utils/videos/video-imports'
 
 const expect = chai.expect
 
@@ -242,6 +243,6 @@ describe('Test video imports', function () {
   })
 
   after(async function () {
-    killallServers(servers)
+    await cleanupTests(servers)
   })
 })

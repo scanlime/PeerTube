@@ -4,7 +4,7 @@ import { ServerConfig, UserRight } from '../../../shared'
 import { About } from '../../../shared/models/server/about.model'
 import { CustomConfig } from '../../../shared/models/server/custom-config.model'
 import { isSignupAllowed, isSignupAllowedForCurrentIP } from '../../helpers/signup'
-import { CONFIG, CONSTRAINTS_FIELDS, reloadConfig } from '../../initializers'
+import { CONSTRAINTS_FIELDS } from '../../initializers/constants'
 import { asyncMiddleware, authenticate, ensureUserHasRight } from '../../middlewares'
 import { customConfigUpdateValidator } from '../../middlewares/validators/config'
 import { ClientHtml } from '../../lib/client-html'
@@ -14,6 +14,7 @@ import { getServerCommit } from '../../helpers/utils'
 import { Emailer } from '../../lib/emailer'
 import { isNumeric } from 'validator'
 import { objectConverter } from '../../helpers/core-utils'
+import { CONFIG, reloadConfig } from '../../initializers/config'
 
 const packageJSON = require('../../../../package.json')
 const configRouter = express.Router()
@@ -136,6 +137,9 @@ async function getConfig (req: express.Request, res: express.Response) {
       videos: {
         intervalDays: CONFIG.TRENDING.VIDEOS.INTERVAL_DAYS
       }
+    },
+    tracker: {
+      enabled: CONFIG.TRACKER.ENABLED
     }
   }
 
@@ -278,6 +282,12 @@ function customConfig (): CustomConfig {
         ofUsers: {
           enabled: CONFIG.AUTO_BLACKLIST.VIDEOS.OF_USERS.ENABLED
         }
+      }
+    },
+    followers: {
+      instance: {
+        enabled: CONFIG.FOLLOWERS.INSTANCE.ENABLED,
+        manualApproval: CONFIG.FOLLOWERS.INSTANCE.MANUAL_APPROVAL
       }
     }
   }

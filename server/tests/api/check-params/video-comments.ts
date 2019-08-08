@@ -3,16 +3,23 @@
 import * as chai from 'chai'
 import 'mocha'
 import {
+  cleanupTests,
   createUser,
-  flushTests, killallServers, makeDeleteRequest, makeGetRequest, makePostBodyRequest, runServer, ServerInfo, setAccessTokensToServers,
-  uploadVideo, userLogin
-} from '../../../../shared/utils'
+  flushAndRunServer,
+  makeDeleteRequest,
+  makeGetRequest,
+  makePostBodyRequest,
+  ServerInfo,
+  setAccessTokensToServers,
+  uploadVideo,
+  userLogin
+} from '../../../../shared/extra-utils'
 import {
   checkBadCountPagination,
   checkBadSortPagination,
   checkBadStartPagination
-} from '../../../../shared/utils/requests/check-api-params'
-import { addVideoCommentThread } from '../../../../shared/utils/videos/video-comments'
+} from '../../../../shared/extra-utils/requests/check-api-params'
+import { addVideoCommentThread } from '../../../../shared/extra-utils/videos/video-comments'
 
 const expect = chai.expect
 
@@ -29,9 +36,7 @@ describe('Test video comments API validator', function () {
   before(async function () {
     this.timeout(30000)
 
-    await flushTests()
-
-    server = await runServer(1)
+    server = await flushAndRunServer(1)
 
     await setAccessTokensToServers([ server ])
 
@@ -52,7 +57,7 @@ describe('Test video comments API validator', function () {
         username: 'user1',
         password: 'my super password'
       }
-      await createUser(server.url, server.accessToken, user.username, user.password)
+      await createUser({ url: server.url, accessToken: server.accessToken, username: user.username, password: user.password })
       userAccessToken = await userLogin(server, user)
     }
   })
@@ -254,11 +259,6 @@ describe('Test video comments API validator', function () {
   })
 
   after(async function () {
-    killallServers([ server ])
-
-    // Keep the logs if the test failed
-    if (this['ok']) {
-      await flushTests()
-    }
+    await cleanupTests([ server ])
   })
 })

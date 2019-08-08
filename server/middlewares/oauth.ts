@@ -1,7 +1,7 @@
 import * as express from 'express'
 import * as OAuthServer from 'express-oauth-server'
 import 'express-validator'
-import { OAUTH_LIFETIME } from '../initializers'
+import { OAUTH_LIFETIME } from '../initializers/constants'
 import { logger } from '../helpers/logger'
 import { Socket } from 'socket.io'
 import { getAccessToken } from '../lib/oauth-model'
@@ -34,6 +34,8 @@ function authenticateSocket (socket: Socket, next: (err?: any) => void) {
   const accessToken = socket.handshake.query.accessToken
 
   logger.debug('Checking socket access token %s.', accessToken)
+
+  if (!accessToken) return next(new Error('No access token provided'))
 
   getAccessToken(accessToken)
     .then(tokenDB => {

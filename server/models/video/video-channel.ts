@@ -8,7 +8,7 @@ import {
   Default,
   DefaultScope,
   ForeignKey,
-  HasMany, IFindOptions,
+  HasMany,
   Is,
   Model,
   Scopes,
@@ -28,14 +28,14 @@ import { AccountModel, ScopeNames as AccountModelScopeNames } from '../account/a
 import { ActorModel, unusedActorAttributesForAPI } from '../activitypub/actor'
 import { buildServerIdsFollowedBy, buildTrigramSearchIndex, createSimilarityAttribute, getSort, throwIfNotValid } from '../utils'
 import { VideoModel } from './video'
-import { CONFIG, CONSTRAINTS_FIELDS } from '../../initializers'
+import { CONSTRAINTS_FIELDS, WEBSERVER } from '../../initializers/constants'
 import { ServerModel } from '../server/server'
-import { DefineIndexesOptions } from 'sequelize'
+import { FindOptions, ModelIndexesOptions, Op } from 'sequelize'
 import { AvatarModel } from '../avatar/avatar'
 import { VideoPlaylistModel } from './video-playlist'
 
 // FIXME: Define indexes here because there is an issue with TS and Sequelize.literal when called directly in the annotation
-const indexes: DefineIndexesOptions[] = [
+const indexes: ModelIndexesOptions[] = [
   buildTrigramSearchIndex('video_channel_name_trigram', 'name'),
 
   {
@@ -58,17 +58,17 @@ type AvailableForListOptions = {
   actorId: number
 }
 
-@DefaultScope({
+@DefaultScope(() => ({
   include: [
     {
-      model: () => ActorModel,
+      model: ActorModel,
       required: true
     }
   ]
-})
-@Scopes({
+}))
+@Scopes(() => ({
   [ScopeNames.SUMMARY]: (withAccount = false) => {
-    const base: IFindOptions<VideoChannelModel> = {
+    const base: FindOptions = {
       attributes: [ 'name', 'description', 'id', 'actorId' ],
       include: [
         {
@@ -111,13 +111,13 @@ type AvailableForListOptions = {
           },
           model: ActorModel,
           where: {
-            [Sequelize.Op.or]: [
+            [Op.or]: [
               {
                 serverId: null
               },
               {
                 serverId: {
-                  [ Sequelize.Op.in ]: Sequelize.literal(inQueryInstanceFollow)
+                  [ Op.in ]: Sequelize.literal(inQueryInstanceFollow)
                 }
               }
             ]
@@ -142,22 +142,22 @@ type AvailableForListOptions = {
   [ScopeNames.WITH_ACCOUNT]: {
     include: [
       {
-        model: () => AccountModel,
+        model: AccountModel,
         required: true
       }
     ]
   },
   [ScopeNames.WITH_VIDEOS]: {
     include: [
-      () => VideoModel
+      VideoModel
     ]
   },
   [ScopeNames.WITH_ACTOR]: {
     include: [
-      () => ActorModel
+      ActorModel
     ]
   }
-})
+}))
 @Table({
   tableName: 'videoChannel',
   indexes
@@ -171,13 +171,13 @@ export class VideoChannelModel extends Model<VideoChannelModel> {
 
   @AllowNull(true)
   @Default(null)
-  @Is('VideoChannelDescription', value => throwIfNotValid(value, isVideoChannelDescriptionValid, 'description'))
+  @Is('VideoChannelDescription', value => throwIfNotValid(value, isVideoChannelDescriptionValid, 'description', true))
   @Column(DataType.STRING(CONSTRAINTS_FIELDS.VIDEO_CHANNELS.DESCRIPTION.max))
   description: string
 
   @AllowNull(true)
   @Default(null)
-  @Is('VideoChannelSupport', value => throwIfNotValid(value, isVideoChannelSupportValid, 'support'))
+  @Is('VideoChannelSupport', value => throwIfNotValid(value, isVideoChannelSupportValid, 'support', true))
   @Column(DataType.STRING(CONSTRAINTS_FIELDS.VIDEO_CHANNELS.SUPPORT.max))
   support: string
 
@@ -312,7 +312,7 @@ export class VideoChannelModel extends Model<VideoChannelModel> {
       limit: options.count,
       order: getSort(options.sort),
       where: {
-        [Sequelize.Op.or]: [
+        [Op.or]: [
           Sequelize.literal(
             'lower(immutable_unaccent("VideoChannelModel"."name")) % lower(immutable_unaccent(' + escapedSearch + '))'
           ),
@@ -419,7 +419,7 @@ export class VideoChannelModel extends Model<VideoChannelModel> {
   static loadByNameWithHostAndPopulateAccount (nameWithHost: string) {
     const [ name, host ] = nameWithHost.split('@')
 
-    if (!host || host === CONFIG.WEBSERVER.HOST) return VideoChannelModel.loadLocalByNameAndPopulateAccount(name)
+    if (!host || host === WEBSERVER.HOST) return VideoChannelModel.loadLocalByNameAndPopulateAccount(name)
 
     return VideoChannelModel.loadByNameAndHostAndPopulateAccount(name, host)
   }

@@ -6,7 +6,7 @@ import { UserNotificationModel } from '../models/account/user-notification'
 import { VideoCommentModel } from '../models/video/video-comment'
 import { UserModel } from '../models/account/user'
 import { PeerTubeSocket } from './peertube-socket'
-import { CONFIG } from '../initializers/constants'
+import { CONFIG } from '../initializers/config'
 import { VideoPrivacy, VideoState } from '../../shared/models/videos'
 import { VideoAbuseModel } from '../models/video/video-abuse'
 import { VideoBlacklistModel } from '../models/video/video-blacklist'
@@ -92,16 +92,23 @@ class Notifier {
         .catch(err => logger.error('Cannot notify moderators of new user registration (%s).', user.username, { err }))
   }
 
-  notifyOfNewFollow (actorFollow: ActorFollowModel): void {
+  notifyOfNewUserFollow (actorFollow: ActorFollowModel): void {
     this.notifyUserOfNewActorFollow(actorFollow)
       .catch(err => {
         logger.error(
           'Cannot notify owner of channel %s of a new follow by %s.',
           actorFollow.ActorFollowing.VideoChannel.getDisplayName(),
           actorFollow.ActorFollower.Account.getDisplayName(),
-          err
+          { err }
         )
       })
+  }
+
+  notifyOfNewInstanceFollow (actorFollow: ActorFollowModel): void {
+    this.notifyAdminsOfNewInstanceFollow(actorFollow)
+        .catch(err => {
+          logger.error('Cannot notify administrators of new follower %s.', actorFollow.ActorFollower.url, { err })
+        })
   }
 
   private async notifySubscribersOfNewVideo (video: VideoModel) {
@@ -259,6 +266,33 @@ class Notifier {
     }
 
     return this.notify({ users: [ user ], settingGetter, notificationCreator, emailSender })
+  }
+
+  private async notifyAdminsOfNewInstanceFollow (actorFollow: ActorFollowModel) {
+    const admins = await UserModel.listWithRight(UserRight.MANAGE_SERVER_FOLLOW)
+
+    logger.info('Notifying %d administrators of new instance follower: %s.', admins.length, actorFollow.ActorFollower.url)
+
+    function settingGetter (user: UserModel) {
+      return user.NotificationSetting.newInstanceFollower
+    }
+
+    async function notificationCreator (user: UserModel) {
+      const notification = await UserNotificationModel.create({
+        type: UserNotificationType.NEW_INSTANCE_FOLLOWER,
+        userId: user.id,
+        actorFollowId: actorFollow.id
+      })
+      notification.ActorFollow = actorFollow
+
+      return notification
+    }
+
+    function emailSender (emails: string[]) {
+      return Emailer.Instance.addNewInstanceFollowerNotification(emails, actorFollow)
+    }
+
+    return this.notify({ users: admins, settingGetter, notificationCreator, emailSender })
   }
 
   private async notifyModeratorsOfNewVideoAbuse (videoAbuse: VideoAbuseModel) {

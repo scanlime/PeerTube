@@ -1,10 +1,11 @@
 import * as Bluebird from 'bluebird'
 import { createWriteStream, remove } from 'fs-extra'
 import * as request from 'request'
-import { ACTIVITY_PUB, CONFIG } from '../initializers'
+import { ACTIVITY_PUB } from '../initializers/constants'
 import { processImage } from './image-utils'
 import { join } from 'path'
 import { logger } from './logger'
+import { CONFIG } from '../initializers/config'
 
 function doRequest <T> (
   requestOptions: request.CoreOptions & request.UriOptions & { activityPub?: boolean },
@@ -49,7 +50,14 @@ async function downloadImage (url: string, destDir: string, destName: string, si
   await doRequestAndSaveToFile({ method: 'GET', uri: url }, tmpPath)
 
   const destPath = join(destDir, destName)
-  await processImage({ path: tmpPath }, destPath, size)
+
+  try {
+    await processImage(tmpPath, destPath, size)
+  } catch (err) {
+    await remove(tmpPath)
+
+    throw err
+  }
 }
 
 // ---------------------------------------------------------------------------

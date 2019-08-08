@@ -2,7 +2,7 @@ import * as Bull from 'bull'
 import { JobState, JobType } from '../../../shared/models'
 import { logger } from '../../helpers/logger'
 import { Redis } from '../redis'
-import { CONFIG, JOB_ATTEMPTS, JOB_COMPLETED_LIFETIME, JOB_CONCURRENCY, JOB_TTL, REPEAT_JOBS } from '../../initializers'
+import { JOB_ATTEMPTS, JOB_COMPLETED_LIFETIME, JOB_CONCURRENCY, JOB_TTL, REPEAT_JOBS, WEBSERVER } from '../../initializers/constants'
 import { ActivitypubHttpBroadcastPayload, processActivityPubHttpBroadcast } from './handlers/activitypub-http-broadcast'
 import { ActivitypubHttpFetcherPayload, processActivityPubHttpFetcher } from './handlers/activitypub-http-fetcher'
 import { ActivitypubHttpUnicastPayload, processActivityPubHttpUnicast } from './handlers/activitypub-http-unicast'
@@ -68,10 +68,10 @@ class JobQueue {
     if (this.initialized === true) return
     this.initialized = true
 
-    this.jobRedisPrefix = 'bull-' + CONFIG.WEBSERVER.HOST
+    this.jobRedisPrefix = 'bull-' + WEBSERVER.HOST
     const queueOptions = {
       prefix: this.jobRedisPrefix,
-      redis: Redis.getRedisClient(),
+      redis: Redis.getRedisClientOptions(),
       settings: {
         maxStalledCount: 10 // transcoding could be long, so jobs can often be interrupted by restarts
       }

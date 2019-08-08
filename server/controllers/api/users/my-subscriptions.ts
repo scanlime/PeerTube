@@ -1,7 +1,7 @@
 import * as express from 'express'
 import 'multer'
 import { getFormattedObjects } from '../../../helpers/utils'
-import { CONFIG, sequelizeTypescript } from '../../../initializers'
+import { WEBSERVER } from '../../../initializers/constants'
 import {
   asyncMiddleware,
   asyncRetryTransactionMiddleware,
@@ -20,6 +20,7 @@ import { VideoFilter } from '../../../../shared/models/videos/video-query.type'
 import { ActorFollowModel } from '../../../models/activitypub/actor-follow'
 import { JobQueue } from '../../../lib/job-queue'
 import { logger } from '../../../helpers/logger'
+import { sequelizeTypescript } from '../../../initializers/database'
 
 const mySubscriptionsRouter = express.Router()
 
@@ -80,7 +81,7 @@ async function areSubscriptionsExist (req: express.Request, res: express.Respons
 
   const handles = uris.map(u => {
     let [ name, host ] = u.split('@')
-    if (host === CONFIG.WEBSERVER.HOST) host = null
+    if (host === WEBSERVER.HOST) host = null
 
     return { name, host, uri: u }
   })
