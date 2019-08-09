@@ -3,6 +3,8 @@ import { filter, take } from 'rxjs/operators'
 import { NavigationEnd, Router } from '@angular/router'
 import { Subscription } from 'rxjs'
 import { NgbDropdown } from '@ng-bootstrap/ng-bootstrap'
+import { GlobalIconName } from '@app/shared/images/global-icon.component'
+import { ScreenService } from '@app/shared/misc/screen.service'
 
 export type TopMenuDropdownParam = {
   label: string
@@ -11,6 +13,8 @@ export type TopMenuDropdownParam = {
   children?: {
     label: string
     routerLink: string
+
+    iconName?: GlobalIconName
   }[]
 }
 
@@ -23,11 +27,16 @@ export class TopMenuDropdownComponent implements OnInit, OnDestroy {
   @Input() menuEntries: TopMenuDropdownParam[] = []
 
   suffixLabels: { [ parentLabel: string ]: string }
+  hasIcons = false
+  container: undefined | 'body' = undefined
 
   private openedOnHover = false
   private routeSub: Subscription
 
-  constructor (private router: Router) {}
+  constructor (
+    private router: Router,
+    private screen: ScreenService
+  ) {}
 
   ngOnInit () {
     this.updateChildLabels(window.location.pathname)
@@ -35,6 +44,16 @@ export class TopMenuDropdownComponent implements OnInit, OnDestroy {
     this.routeSub = this.router.events
                         .pipe(filter(event => event instanceof NavigationEnd))
                         .subscribe(() => this.updateChildLabels(window.location.pathname))
+
+    this.hasIcons = this.menuEntries.some(
+      e => e.children && e.children.some(c => !!c.iconName)
+    )
+
+    // FIXME: We have to set body for the container to avoid because of scroll overflow on mobile view
+    // But this break our hovering system
+    if (this.screen.isInMobileView()) {
+      this.container = 'body'
+    }
   }
 
   ngOnDestroy () {
@@ -48,7 +67,7 @@ export class TopMenuDropdownComponent implements OnInit, OnDestroy {
     // Menu was closed
     dropdown.openChange
             .pipe(take(1))
-            .subscribe(e => this.openedOnHover = false)
+            .subscribe(() => this.openedOnHover = false)
   }
 
   dropdownAnchorClicked (dropdown: NgbDropdown) {

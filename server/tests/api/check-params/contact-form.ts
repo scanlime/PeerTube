@@ -7,18 +7,18 @@ import {
   immutableAssign,
   killallServers,
   reRunServer,
-  runServer,
+  flushAndRunServer,
   ServerInfo,
-  setAccessTokensToServers
-} from '../../../../shared/utils'
+  setAccessTokensToServers, cleanupTests
+} from '../../../../shared/extra-utils'
 import {
   checkBadCountPagination,
   checkBadSortPagination,
   checkBadStartPagination
-} from '../../../../shared/utils/requests/check-api-params'
-import { getAccount } from '../../../../shared/utils/users/accounts'
-import { sendContactForm } from '../../../../shared/utils/server/contact-form'
-import { MockSmtpServer } from '../../../../shared/utils/miscs/email'
+} from '../../../../shared/extra-utils/requests/check-api-params'
+import { getAccount } from '../../../../shared/extra-utils/users/accounts'
+import { sendContactForm } from '../../../../shared/extra-utils/server/contact-form'
+import { MockSmtpServer } from '../../../../shared/extra-utils/miscs/email'
 
 describe('Test contact form API validators', function () {
   let server: ServerInfo
@@ -28,17 +28,17 @@ describe('Test contact form API validators', function () {
     fromEmail: 'toto@example.com',
     body: 'Hello, how are you?'
   }
+  let emailPort: number
 
   // ---------------------------------------------------------------
 
   before(async function () {
     this.timeout(60000)
 
-    await flushTests()
-    await MockSmtpServer.Instance.collectEmails(emails)
+    emailPort = await MockSmtpServer.Instance.collectEmails(emails)
 
     // Email is disabled
-    server = await runServer(1)
+    server = await flushAndRunServer(1)
   })
 
   it('Should not accept a contact form if emails are disabled', async function () {
@@ -51,7 +51,7 @@ describe('Test contact form API validators', function () {
     killallServers([ server ])
 
     // Contact form is disabled
-    await reRunServer(server, { smtp: { hostname: 'localhost' }, contact_form: { enabled: false } })
+    await reRunServer(server, { smtp: { hostname: 'localhost', port: emailPort }, contact_form: { enabled: false } })
     await sendContactForm(immutableAssign(defaultBody, { url: server.url, expectedStatus: 409 }))
   })
 
@@ -61,7 +61,7 @@ describe('Test contact form API validators', function () {
     killallServers([ server ])
 
     // Email & contact form enabled
-    await reRunServer(server, { smtp: { hostname: 'localhost' } })
+    await reRunServer(server, { smtp: { hostname: 'localhost', port: emailPort } })
 
     await sendContactForm(immutableAssign(defaultBody, { url: server.url, expectedStatus: 400, fromEmail: 'badEmail' }))
     await sendContactForm(immutableAssign(defaultBody, { url: server.url, expectedStatus: 400, fromEmail: 'badEmail@' }))
@@ -86,11 +86,7 @@ describe('Test contact form API validators', function () {
 
   after(async function () {
     MockSmtpServer.Instance.kill()
-    killallServers([ server ])
 
-    // Keep the logs if the test failed
-    if (this['ok']) {
-      await flushTests()
-    }
+    await cleanupTests([ server ])
   })
 })

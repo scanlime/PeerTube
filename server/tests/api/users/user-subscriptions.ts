@@ -3,6 +3,7 @@
 import * as chai from 'chai'
 import 'mocha'
 import {
+  cleanupTests,
   createUser,
   doubleFollow,
   flushAndRunMultipleServers,
@@ -11,18 +12,18 @@ import {
   unfollow,
   updateVideo,
   userLogin
-} from '../../../../shared/utils'
-import { killallServers, ServerInfo, uploadVideo } from '../../../../shared/utils/index'
-import { setAccessTokensToServers } from '../../../../shared/utils/users/login'
+} from '../../../../shared/extra-utils'
+import { killallServers, ServerInfo, uploadVideo } from '../../../../shared/extra-utils/index'
+import { setAccessTokensToServers } from '../../../../shared/extra-utils/users/login'
 import { Video, VideoChannel } from '../../../../shared/models/videos'
-import { waitJobs } from '../../../../shared/utils/server/jobs'
+import { waitJobs } from '../../../../shared/extra-utils/server/jobs'
 import {
   addUserSubscription,
   listUserSubscriptions,
   listUserSubscriptionVideos,
   removeUserSubscription,
   getUserSubscription, areSubscriptionsExist
-} from '../../../../shared/utils/users/user-subscriptions'
+} from '../../../../shared/extra-utils/users/user-subscriptions'
 
 const expect = chai.expect
 
@@ -45,7 +46,7 @@ describe('Test users subscriptions', function () {
     {
       for (const server of servers) {
         const user = { username: 'user' + server.serverNumber, password: 'password' }
-        await createUser(server.url, server.accessToken, user.username, user.password)
+        await createUser({ url: server.url, accessToken: server.accessToken, username: user.username, password: user.password })
 
         const accessToken = await userLogin(server, user)
         users.push({ accessToken })
@@ -369,6 +370,6 @@ describe('Test users subscriptions', function () {
   })
 
   after(async function () {
-    killallServers(servers)
+    await cleanupTests(servers)
   })
 })

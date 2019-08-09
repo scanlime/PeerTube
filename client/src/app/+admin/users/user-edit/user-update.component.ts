@@ -10,6 +10,7 @@ import { FormValidatorService } from '@app/shared/forms/form-validators/form-val
 import { UserValidatorsService } from '@app/shared/forms/form-validators/user-validators.service'
 import { ConfigService } from '@app/+admin/config/shared/config.service'
 import { UserService } from '@app/shared'
+import { UserAdminFlag } from '@shared/models/users/user-flag.model'
 
 @Component({
   selector: 'my-user-update',
@@ -19,6 +20,7 @@ import { UserService } from '@app/shared'
 export class UserUpdateComponent extends UserEdit implements OnInit, OnDestroy {
   error: string
   userId: number
+  userEmail: string
   username: string
 
   private paramsSub: Subscription
@@ -45,7 +47,8 @@ export class UserUpdateComponent extends UserEdit implements OnInit, OnDestroy {
       email: this.userValidatorsService.USER_EMAIL,
       role: this.userValidatorsService.USER_ROLE,
       videoQuota: this.userValidatorsService.USER_VIDEO_QUOTA,
-      videoQuotaDaily: this.userValidatorsService.USER_VIDEO_QUOTA_DAILY
+      videoQuotaDaily: this.userValidatorsService.USER_VIDEO_QUOTA_DAILY,
+      byPassAutoBlacklist: null
     }, defaultValues)
 
     this.paramsSub = this.route.params.subscribe(routeParams => {
@@ -66,6 +69,7 @@ export class UserUpdateComponent extends UserEdit implements OnInit, OnDestroy {
     this.error = undefined
 
     const userUpdate: UserUpdate = this.form.value
+    userUpdate.adminFlags = this.buildAdminFlags(this.form.value)
 
     // A select in HTML is always mapped as a string, we convert it to number
     userUpdate.videoQuota = parseInt(this.form.value['videoQuota'], 10)
@@ -89,15 +93,29 @@ export class UserUpdateComponent extends UserEdit implements OnInit, OnDestroy {
     return this.i18n('Update user')
   }
 
+  resetPassword () {
+    this.userService.askResetPassword(this.userEmail).subscribe(
+      () => {
+        this.notifier.success(
+          this.i18n('An email asking for password reset has been sent to {{username}}.', { username: this.username })
+        )
+      },
+
+      err => this.error = err.message
+    )
+  }
+
   private onUserFetched (userJson: User) {
     this.userId = userJson.id
     this.username = userJson.username
+    this.userEmail = userJson.email
 
     this.form.patchValue({
       email: userJson.email,
       role: userJson.role,
       videoQuota: userJson.videoQuota,
-      videoQuotaDaily: userJson.videoQuotaDaily
+      videoQuotaDaily: userJson.videoQuotaDaily,
+      byPassAutoBlacklist: userJson.adminFlags & UserAdminFlag.BY_PASS_VIDEO_AUTO_BLACKLIST
     })
   }
 }

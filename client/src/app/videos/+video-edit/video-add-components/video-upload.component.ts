@@ -163,9 +163,10 @@ export class VideoUploadComponent extends VideoSend implements OnInit, OnDestroy
     }
 
     const privacy = this.firstStepPrivacyId.toString()
-    const nsfw = false
+    const nsfw = this.serverService.getConfig().instance.isNSFW
     const waitTranscoding = true
     const commentsEnabled = true
+    const downloadEnabled = true
     const channelId = this.firstStepChannelId.toString()
 
     const formData = new FormData()
@@ -174,6 +175,7 @@ export class VideoUploadComponent extends VideoSend implements OnInit, OnDestroy
     formData.append('privacy', VideoPrivacy.PRIVATE.toString())
     formData.append('nsfw', '' + nsfw)
     formData.append('commentsEnabled', '' + commentsEnabled)
+    formData.append('downloadEnabled', '' + downloadEnabled)
     formData.append('waitTranscoding', '' + waitTranscoding)
     formData.append('channelId', '' + channelId)
     formData.append('videofile', videofile)
@@ -188,7 +190,7 @@ export class VideoUploadComponent extends VideoSend implements OnInit, OnDestroy
       channelId
     })
 
-    this.videoPrivacies = this.videoService.explainedPrivacyLabels(this.videoPrivacies)
+    this.explainedVideoPrivacies = this.videoService.explainedPrivacyLabels(this.videoPrivacies)
 
     this.videoUploadObservable = this.videoService.uploadVideo(formData).subscribe(
       event => {

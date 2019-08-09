@@ -12,7 +12,7 @@ import { logger } from '../../helpers/logger'
 import { createPrivateAndPublicKeys } from '../../helpers/peertube-crypto'
 import { doRequest, downloadImage } from '../../helpers/requests'
 import { getUrlFromWebfinger } from '../../helpers/webfinger'
-import { AVATARS_SIZE, CONFIG, MIMETYPES, sequelizeTypescript } from '../../initializers'
+import { AVATARS_SIZE, MIMETYPES, WEBSERVER } from '../../initializers/constants'
 import { AccountModel } from '../../models/account/account'
 import { ActorModel } from '../../models/activitypub/actor'
 import { AvatarModel } from '../../models/avatar/avatar'
@@ -21,6 +21,8 @@ import { VideoChannelModel } from '../../models/video/video-channel'
 import { JobQueue } from '../job-queue'
 import { getServerActor } from '../../helpers/utils'
 import { ActorFetchByUrlType, fetchActorByUrl } from '../../helpers/actor'
+import { CONFIG } from '../../initializers/config'
+import { sequelizeTypescript } from '../../initializers/database'
 
 // Set account keys, this could be long so process after the account creation and do not block the client
 function setAsyncActorKeys (actor: ActorModel) {
@@ -44,6 +46,7 @@ async function getOrCreateActorAndServerAndModel (
 ) {
   const actorUrl = getAPId(activityActor)
   let created = false
+  let accountPlaylistsUrl: string
 
   let actor = await fetchActorByUrl(actorUrl, fetchType)
   // Orphan actor (not associated to an account of channel) so recreate it
@@ -70,7 +73,8 @@ async function getOrCreateActorAndServerAndModel (
 
       try {
         // Don't recurse another time
-        ownerActor = await getOrCreateActorAndServerAndModel(accountAttributedTo.id, 'all', false)
+        const recurseIfNeeded = false
+        ownerActor = await getOrCreateActorAndServerAndModel(accountAttributedTo.id, 'all', recurseIfNeeded)
       } catch (err) {
         logger.error('Cannot get or create account attributed to video channel ' + actor.url)
         throw new Error(err)
@@ -79,6 +83,7 @@ async function getOrCreateActorAndServerAndModel (
 
     actor = await retryTransactionWrapper(saveActorAndServerAndModelIfNotExist, result, ownerActor)
     created = true
+    accountPlaylistsUrl = result.playlists
   }
 
   if (actor.Account) actor.Account.Actor = actor
@@ -89,6 +94,12 @@ async function getOrCreateActorAndServerAndModel (
 
   if ((created === true || refreshed === true) && updateCollections === true) {
     const payload = { uri: actor.outboxUrl, type: 'activity' as 'activity' }
+    await JobQueue.Instance.createJob({ type: 'activitypub-http-fetcher', payload })
+  }
+
+  // We created a new account: fetch the playlists
+  if (created === true && actor.Account && accountPlaylistsUrl) {
+    const payload = { uri: accountPlaylistsUrl, accountId: actor.Account.id, type: 'account-playlists' as 'account-playlists' }
     await JobQueue.Instance.createJob({ type: 'activitypub-http-fetcher', payload })
   }
 
@@ -107,7 +118,7 @@ function buildActorInstance (type: ActivityPubActorType, url: string, preferredU
     followingCount: 0,
     inboxUrl: url + '/inbox',
     outboxUrl: url + '/outbox',
-    sharedInboxUrl: CONFIG.WEBSERVER.URL + '/inbox',
+    sharedInboxUrl: WEBSERVER.URL + '/inbox',
     followersUrl: url + '/followers',
     followingUrl: url + '/following'
   })
@@ -259,7 +270,7 @@ async function refreshActorIfNeeded (
       return { refreshed: true, actor }
     })
   } catch (err) {
-    logger.warn('Cannot refresh actor.', { err })
+    logger.warn('Cannot refresh actor %s.', actor.url, { err })
     return { actor, refreshed: false }
   }
 }
@@ -333,6 +344,8 @@ function saveActorAndServerAndModelIfNotExist (
       actorCreated.VideoChannel.Account = ownerActor.Account
     }
 
+    actorCreated.Server = server
+
     return actorCreated
   }
 }
@@ -342,6 +355,7 @@ type FetchRemoteActorResult = {
   name: string
   summary: string
   support?: string
+  playlists?: string
   avatarName?: string
   attributedTo: ActivityPubAttributedTo[]
 }
@@ -355,17 +369,18 @@ async function fetchRemoteActor (actorUrl: string): Promise<{ statusCode?: numbe
 
   logger.info('Fetching remote actor %s.', actorUrl)
 
-  const requestResult = await doRequest(options)
+  const requestResult = await doRequest<ActivityPubActor>(options)
   normalizeActor(requestResult.body)
 
-  const actorJSON: ActivityPubActor = requestResult.body
+  const actorJSON = requestResult.body
   if (isActorObjectValid(actorJSON) === false) {
     logger.debug('Remote actor JSON is not valid.', { actorJSON })
     return { result: undefined, statusCode: requestResult.response.statusCode }
   }
 
   if (checkUrlsSameHost(actorJSON.id, actorUrl) !== true) {
-    throw new Error('Actor url ' + actorUrl + ' has not the same host than its AP id ' + actorJSON.id)
+    logger.warn('Actor url %s has not the same host than its AP id %s', actorUrl, actorJSON.id)
+    return { result: undefined, statusCode: requestResult.response.statusCode }
   }
 
   const followersCount = await fetchActorTotalItems(actorJSON.followers)
@@ -398,6 +413,7 @@ async function fetchRemoteActor (actorUrl: string): Promise<{ statusCode?: numbe
       avatarName,
       summary: actorJSON.summary,
       support: actorJSON.support,
+      playlists: actorJSON.playlists,
       attributedTo: actorJSON.attributedTo
     }
   }

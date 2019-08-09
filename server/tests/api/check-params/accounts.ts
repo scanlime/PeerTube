@@ -2,15 +2,15 @@
 
 import 'mocha'
 
-import { flushTests, killallServers, runServer, ServerInfo } from '../../../../shared/utils'
+import { cleanupTests, flushAndRunServer, ServerInfo } from '../../../../shared/extra-utils'
 import {
   checkBadCountPagination,
   checkBadSortPagination,
   checkBadStartPagination
-} from '../../../../shared/utils/requests/check-api-params'
-import { getAccount } from '../../../../shared/utils/users/accounts'
+} from '../../../../shared/extra-utils/requests/check-api-params'
+import { getAccount } from '../../../../shared/extra-utils/users/accounts'
 
-describe('Test users API validators', function () {
+describe('Test accounts API validators', function () {
   const path = '/api/v1/accounts/'
   let server: ServerInfo
 
@@ -19,9 +19,7 @@ describe('Test users API validators', function () {
   before(async function () {
     this.timeout(30000)
 
-    await flushTests()
-
-    server = await runServer(1)
+    server = await flushAndRunServer(1)
   })
 
   describe('When listing accounts', function () {
@@ -45,11 +43,6 @@ describe('Test users API validators', function () {
   })
 
   after(async function () {
-    killallServers([ server ])
-
-    // Keep the logs if the test failed
-    if (this['ok']) {
-      await flushTests()
-    }
+    await cleanupTests([ server ])
   })
 })

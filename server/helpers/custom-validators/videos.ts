@@ -5,15 +5,16 @@ import 'multer'
 import * as validator from 'validator'
 import { UserRight, VideoFilter, VideoPrivacy, VideoRateType } from '../../../shared'
 import {
-  CONSTRAINTS_FIELDS, MIMETYPES,
+  CONSTRAINTS_FIELDS,
+  MIMETYPES,
   VIDEO_CATEGORIES,
   VIDEO_LICENCES,
   VIDEO_PRIVACIES,
   VIDEO_RATE_TYPES,
   VIDEO_STATES
-} from '../../initializers'
+} from '../../initializers/constants'
 import { VideoModel } from '../../models/video/video'
-import { exists, isArray, isFileValid } from './misc'
+import { exists, isArray, isDateValid, isFileValid } from './misc'
 import { VideoChannelModel } from '../../models/video/video-channel'
 import { UserModel } from '../../models/account/user'
 import * as magnetUtil from 'magnet-uri'
@@ -115,6 +116,10 @@ function isScheduleVideoUpdatePrivacyValid (value: number) {
     )
 }
 
+function isVideoOriginallyPublishedAtValid (value: string | null) {
+  return value === null || isDateValid(value)
+}
+
 function isVideoFileInfoHashValid (value: string | null | undefined) {
   return exists(value) && validator.isLength(value, VIDEOS_CONSTRAINTS_FIELDS.INFO_HASH)
 }
@@ -161,7 +166,7 @@ function checkUserCanManageVideo (user: UserModel, video: VideoModel, right: Use
   return true
 }
 
-async function isVideoExist (id: string, res: Response, fetchType: VideoFetchType = 'all') {
+async function doesVideoExist (id: number | string, res: Response, fetchType: VideoFetchType = 'all') {
   const userId = res.locals.oauth ? res.locals.oauth.token.User.id : undefined
 
   const video = await fetchVideo(id, fetchType, userId)
@@ -178,7 +183,7 @@ async function isVideoExist (id: string, res: Response, fetchType: VideoFetchTyp
   return true
 }
 
-async function isVideoChannelOfAccountExist (channelId: number, user: UserModel, res: Response) {
+async function doesVideoChannelOfAccountExist (channelId: number, user: UserModel, res: Response) {
   if (user.hasRight(UserRight.UPDATE_ANY_VIDEO) === true) {
     const videoChannel = await VideoChannelModel.loadAndPopulateAccount(channelId)
     if (videoChannel === null) {
@@ -220,6 +225,7 @@ export {
   isVideoTagsValid,
   isVideoFPSResolutionValid,
   isScheduleVideoUpdatePrivacyValid,
+  isVideoOriginallyPublishedAtValid,
   isVideoFile,
   isVideoMagnetUriValid,
   isVideoStateValid,
@@ -231,9 +237,9 @@ export {
   isVideoPrivacyValid,
   isVideoFileResolutionValid,
   isVideoFileSizeValid,
-  isVideoExist,
+  doesVideoExist,
   isVideoImage,
-  isVideoChannelOfAccountExist,
+  doesVideoChannelOfAccountExist,
   isVideoSupportValid,
   isVideoFilterValid
 }

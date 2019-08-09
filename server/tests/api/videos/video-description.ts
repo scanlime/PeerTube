@@ -3,6 +3,7 @@
 import * as chai from 'chai'
 import 'mocha'
 import {
+  cleanupTests,
   flushAndRunMultipleServers,
   getVideo,
   getVideoDescription,
@@ -12,9 +13,9 @@ import {
   setAccessTokensToServers,
   updateVideo,
   uploadVideo
-} from '../../../../shared/utils/index'
-import { doubleFollow } from '../../../../shared/utils/server/follows'
-import { waitJobs } from '../../../../shared/utils/server/jobs'
+} from '../../../../shared/extra-utils/index'
+import { doubleFollow } from '../../../../shared/extra-utils/server/follows'
+import { waitJobs } from '../../../../shared/extra-utils/server/jobs'
 
 const expect = chai.expect
 
@@ -100,6 +101,6 @@ describe('Test video description', function () {
   })
 
   after(async function () {
-    killallServers(servers)
+    await cleanupTests(servers)
   })
 })

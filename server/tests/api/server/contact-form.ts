@@ -2,10 +2,18 @@
 
 import * as chai from 'chai'
 import 'mocha'
-import { flushTests, killallServers, runServer, ServerInfo, setAccessTokensToServers, wait } from '../../../../shared/utils'
-import { MockSmtpServer } from '../../../../shared/utils/miscs/email'
-import { waitJobs } from '../../../../shared/utils/server/jobs'
-import { sendContactForm } from '../../../../shared/utils/server/contact-form'
+import {
+  flushTests,
+  killallServers,
+  flushAndRunServer,
+  ServerInfo,
+  setAccessTokensToServers,
+  wait,
+  cleanupTests
+} from '../../../../shared/extra-utils'
+import { MockSmtpServer } from '../../../../shared/extra-utils/miscs/email'
+import { waitJobs } from '../../../../shared/extra-utils/server/jobs'
+import { sendContactForm } from '../../../../shared/extra-utils/server/contact-form'
 
 const expect = chai.expect
 
@@ -18,14 +26,12 @@ describe('Test contact form', function () {
 
     await MockSmtpServer.Instance.collectEmails(emails)
 
-    await flushTests()
-
     const overrideConfig = {
       smtp: {
         hostname: 'localhost'
       }
     }
-    server = await runServer(1, overrideConfig)
+    server = await flushAndRunServer(1, overrideConfig)
     await setAccessTokensToServers([ server ])
   })
 
@@ -45,7 +51,8 @@ describe('Test contact form', function () {
 
     const email = emails[0]
 
-    expect(email['from'][0]['address']).equal('toto@example.com')
+    expect(email['from'][0]['address']).equal('test-admin@localhost')
+    expect(email['from'][0]['name']).equal('toto@example.com')
     expect(email['to'][0]['address']).equal('admin1@example.com')
     expect(email['subject']).contains('Contact form')
     expect(email['text']).contains('my super message')
@@ -81,6 +88,7 @@ describe('Test contact form', function () {
 
   after(async function () {
     MockSmtpServer.Instance.kill()
-    killallServers([ server ])
+
+    await cleanupTests([ server ])
   })
 })

@@ -4,19 +4,20 @@ import { UserModel } from '../models/account/user'
 import { ApplicationModel } from '../models/application/application'
 import { OAuthClientModel } from '../models/oauth/oauth-client'
 import { parse } from 'url'
-import { CONFIG } from './constants'
+import { CONFIG } from './config'
 import { logger } from '../helpers/logger'
 import { getServerActor } from '../helpers/utils'
 import { RecentlyAddedStrategy } from '../../shared/models/redundancy'
 import { isArray } from '../helpers/custom-validators/misc'
 import { uniq } from 'lodash'
 import { Emailer } from '../lib/emailer'
+import { WEBSERVER } from './constants'
 
 async function checkActivityPubUrls () {
   const actor = await getServerActor()
 
   const parsed = parse(actor.url)
-  if (CONFIG.WEBSERVER.HOST !== parsed.host) {
+  if (WEBSERVER.HOST !== parsed.host) {
     const NODE_ENV = config.util.getEnv('NODE_ENV')
     const NODE_CONFIG_DIR = config.util.getEnv('NODE_CONFIG_DIR')
 
@@ -34,6 +35,12 @@ async function checkActivityPubUrls () {
 // Return an error message, or null if everything is okay
 function checkConfig () {
 
+  // Moved configuration keys
+  if (config.has('services.csp-logger')) {
+    logger.warn('services.csp-logger configuration has been renamed to csp.report_uri. Please update your configuration file.')
+  }
+
+  // Email verification
   if (!Emailer.isEnabled()) {
     if (CONFIG.SIGNUP.ENABLED && CONFIG.SIGNUP.REQUIRES_EMAIL_VERIFICATION) {
       return 'Emailer is disabled but you require signup email verification.'
@@ -77,6 +84,8 @@ function checkConfig () {
     if (recentlyAddedStrategy && isNaN(recentlyAddedStrategy.minViews)) {
       return 'Min views in recently added strategy is not a number'
     }
+  } else {
+    return 'Videos redundancy should be an array (you must uncomment lines containing - too)'
   }
 
   // Check storage directory locations

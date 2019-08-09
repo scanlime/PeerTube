@@ -4,12 +4,13 @@ import { logger } from '../helpers/logger'
 import { UserModel } from '../models/account/user'
 import { OAuthClientModel } from '../models/oauth/oauth-client'
 import { OAuthTokenModel } from '../models/oauth/oauth-token'
-import { CONFIG } from '../initializers/constants'
+import { CACHE } from '../initializers/constants'
 import { Transaction } from 'sequelize'
+import { CONFIG } from '../initializers/config'
 
 type TokenInfo = { accessToken: string, refreshToken: string, accessTokenExpiresAt: Date, refreshTokenExpiresAt: Date }
-const accessTokenCache: { [ accessToken: string ]: OAuthTokenModel } = {}
-const userHavingToken: { [ userId: number ]: string } = {}
+let accessTokenCache: { [ accessToken: string ]: OAuthTokenModel } = {}
+let userHavingToken: { [ userId: number ]: string } = {}
 
 // ---------------------------------------------------------------------------
 
@@ -38,11 +39,19 @@ function clearCacheByToken (token: string) {
 function getAccessToken (bearerToken: string) {
   logger.debug('Getting access token (bearerToken: ' + bearerToken + ').')
 
+  if (!bearerToken) return Bluebird.resolve(undefined)
+
   if (accessTokenCache[bearerToken] !== undefined) return Bluebird.resolve(accessTokenCache[bearerToken])
 
   return OAuthTokenModel.getByTokenAndPopulateUser(bearerToken)
     .then(tokenModel => {
       if (tokenModel) {
+        // Reinit our cache
+        if (Object.keys(accessTokenCache).length > CACHE.USER_TOKENS.MAX_SIZE) {
+          accessTokenCache = {}
+          userHavingToken = {}
+        }
+
         accessTokenCache[ bearerToken ] = tokenModel
         userHavingToken[ tokenModel.userId ] = tokenModel.accessToken
       }

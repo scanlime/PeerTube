@@ -9,7 +9,6 @@ import {
   setDefaultSort,
   userNotificationsSortValidator
 } from '../../../middlewares'
-import { UserModel } from '../../../models/account/user'
 import { getFormattedObjects } from '../../../helpers/utils'
 import { UserNotificationModel } from '../../../models/account/user-notification'
 import { meRouter } from './me'
@@ -57,8 +56,8 @@ export {
 // ---------------------------------------------------------------------------
 
 async function updateNotificationSettings (req: express.Request, res: express.Response) {
-  const user: UserModel = res.locals.oauth.token.User
-  const body = req.body
+  const user = res.locals.oauth.token.User
+  const body = req.body as UserNotificationSetting
 
   const query = {
     where: {
@@ -70,12 +69,14 @@ async function updateNotificationSettings (req: express.Request, res: express.Re
     newVideoFromSubscription: body.newVideoFromSubscription,
     newCommentOnMyVideo: body.newCommentOnMyVideo,
     videoAbuseAsModerator: body.videoAbuseAsModerator,
+    videoAutoBlacklistAsModerator: body.videoAutoBlacklistAsModerator,
     blacklistOnMyVideo: body.blacklistOnMyVideo,
     myVideoPublished: body.myVideoPublished,
     myVideoImportFinished: body.myVideoImportFinished,
     newFollow: body.newFollow,
     newUserRegistration: body.newUserRegistration,
-    commentMention: body.commentMention
+    commentMention: body.commentMention,
+    newInstanceFollower: body.newInstanceFollower
   }
 
   await UserNotificationSettingModel.update(values, query)
@@ -84,7 +85,7 @@ async function updateNotificationSettings (req: express.Request, res: express.Re
 }
 
 async function listUserNotifications (req: express.Request, res: express.Response) {
-  const user: UserModel = res.locals.oauth.token.User
+  const user = res.locals.oauth.token.User
 
   const resultList = await UserNotificationModel.listForApi(user.id, req.query.start, req.query.count, req.query.sort, req.query.unread)
 
@@ -92,7 +93,7 @@ async function listUserNotifications (req: express.Request, res: express.Respons
 }
 
 async function markAsReadUserNotifications (req: express.Request, res: express.Response) {
-  const user: UserModel = res.locals.oauth.token.User
+  const user = res.locals.oauth.token.User
 
   await UserNotificationModel.markAsRead(user.id, req.body.ids)
 
@@ -100,7 +101,7 @@ async function markAsReadUserNotifications (req: express.Request, res: express.R
 }
 
 async function markAsReadAllUserNotifications (req: express.Request, res: express.Response) {
-  const user: UserModel = res.locals.oauth.token.User
+  const user = res.locals.oauth.token.User
 
   await UserNotificationModel.markAllAsRead(user.id)
 

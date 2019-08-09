@@ -1,9 +1,12 @@
-import { AllowNull, BelongsTo, Column, CreatedAt, DataType, ForeignKey, Is, Model, Table, UpdatedAt } from 'sequelize-typescript'
+import { AllowNull, BelongsTo, Column, CreatedAt, DataType, Default, ForeignKey, Is, Model, Table, UpdatedAt } from 'sequelize-typescript'
 import { getSortOnModel, SortType, throwIfNotValid } from '../utils'
-import { VideoModel } from './video'
-import { isVideoBlacklistReasonValid } from '../../helpers/custom-validators/video-blacklist'
-import { VideoBlacklist } from '../../../shared/models/videos'
-import { CONSTRAINTS_FIELDS } from '../../initializers'
+import { ScopeNames as VideoModelScopeNames, VideoModel } from './video'
+import { ScopeNames as VideoChannelScopeNames, VideoChannelModel } from './video-channel'
+import { isVideoBlacklistReasonValid, isVideoBlacklistTypeValid } from '../../helpers/custom-validators/video-blacklist'
+import { VideoBlacklist, VideoBlacklistType } from '../../../shared/models/videos'
+import { CONSTRAINTS_FIELDS } from '../../initializers/constants'
+import { FindOptions } from 'sequelize'
+import { ThumbnailModel } from './thumbnail'
 
 @Table({
   tableName: 'videoBlacklist',
@@ -17,13 +20,19 @@ import { CONSTRAINTS_FIELDS } from '../../initializers'
 export class VideoBlacklistModel extends Model<VideoBlacklistModel> {
 
   @AllowNull(true)
-  @Is('VideoBlacklistReason', value => throwIfNotValid(value, isVideoBlacklistReasonValid, 'reason'))
+  @Is('VideoBlacklistReason', value => throwIfNotValid(value, isVideoBlacklistReasonValid, 'reason', true))
   @Column(DataType.STRING(CONSTRAINTS_FIELDS.VIDEO_BLACKLIST.REASON.max))
   reason: string
 
   @AllowNull(false)
   @Column
   unfederated: boolean
+
+  @AllowNull(false)
+  @Default(null)
+  @Is('VideoBlacklistType', value => throwIfNotValid(value, isVideoBlacklistTypeValid, 'type'))
+  @Column
+  type: VideoBlacklistType
 
   @CreatedAt
   createdAt: Date
@@ -43,26 +52,51 @@ export class VideoBlacklistModel extends Model<VideoBlacklistModel> {
   })
   Video: VideoModel
 
-  static listForApi (start: number, count: number, sort: SortType) {
-    const query = {
-      offset: start,
-      limit: count,
-      order: getSortOnModel(sort.sortModel, sort.sortValue),
-      include: [
-        {
-          model: VideoModel,
-          required: true
-        }
-      ]
+  static listForApi (start: number, count: number, sort: SortType, type?: VideoBlacklistType) {
+    function buildBaseQuery (): FindOptions {
+      return {
+        offset: start,
+        limit: count,
+        order: getSortOnModel(sort.sortModel, sort.sortValue)
+      }
     }
 
-    return VideoBlacklistModel.findAndCountAll(query)
-      .then(({ rows, count }) => {
-        return {
-          data: rows,
-          total: count
-        }
-      })
+    const countQuery = buildBaseQuery()
+
+    const findQuery = buildBaseQuery()
+    findQuery.subQuery = false
+    findQuery.include = [
+      {
+        model: VideoModel,
+        required: true,
+        include: [
+          {
+            model: VideoChannelModel.scope({ method: [ VideoChannelScopeNames.SUMMARY, true ] }),
+            required: true
+          },
+          {
+            model: ThumbnailModel,
+            attributes: [ 'type', 'filename' ],
+            required: false
+          }
+        ]
+      }
+    ]
+
+    if (type) {
+      countQuery.where = { type }
+      findQuery.where = { type }
+    }
+
+    return Promise.all([
+      VideoBlacklistModel.count(countQuery),
+      VideoBlacklistModel.findAll(findQuery)
+    ]).then(([ count, rows ]) => {
+      return {
+        data: rows,
+        total: count
+      }
+    })
   }
 
   static loadByVideoId (id: number) {
@@ -76,26 +110,15 @@ export class VideoBlacklistModel extends Model<VideoBlacklistModel> {
   }
 
   toFormattedJSON (): VideoBlacklist {
-    const video = this.Video
-
     return {
       id: this.id,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
       reason: this.reason,
       unfederated: this.unfederated,
+      type: this.type,
 
-      video: {
-        id: video.id,
-        name: video.name,
-        uuid: video.uuid,
-        description: video.description,
-        duration: video.duration,
-        views: video.views,
-        likes: video.likes,
-        dislikes: video.dislikes,
-        nsfw: video.nsfw
-      }
+      video: this.Video.toFormattedJSON()
     }
   }
 }

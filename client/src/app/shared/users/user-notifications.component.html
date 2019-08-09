@@ -36,6 +36,14 @@
         </div>
       </ng-container>
 
+      <ng-container i18n *ngSwitchCase="UserNotificationType.VIDEO_AUTO_BLACKLIST_FOR_MODERATORS">
+        <my-global-icon iconName="no"></my-global-icon>
+
+        <div class="message">
+          The recently added video <a (click)="markAsRead(notification)" [routerLink]="notification.videoUrl">{{ notification.video.name }}</a> has been <a (click)="markAsRead(notification)" [routerLink]="notification.videoAutoBlacklistUrl">auto-blacklisted</a>
+        </div>
+      </ng-container>
+
       <ng-container i18n *ngSwitchCase="UserNotificationType.NEW_COMMENT_ON_MY_VIDEO">
         <img alt="" aria-labelledby="avatar" class="avatar" [src]="notification.comment.account.avatarUrl" />
 
@@ -56,7 +64,7 @@
         <my-global-icon iconName="cloud-download"></my-global-icon>
 
         <div class="message">
-          <a (click)="markAsRead(notification)" [routerLink]="notification.videoUrl">Your video import</a> {{ notification.videoImportIdentifier }} succeeded
+          <a (click)="markAsRead(notification)" [routerLink]="notification.videoUrl || notification.videoImportUrl">Your video import</a> {{ notification.videoImportIdentifier }} succeeded
         </div>
       </ng-container>
 
@@ -92,6 +100,15 @@
 
         <div class="message">
           <a (click)="markAsRead(notification)" [routerLink]="notification.accountUrl">{{ notification.comment.account.displayName }}</a> mentioned you on <a (click)="markAsRead(notification)" [routerLink]="notification.commentUrl">video {{ notification.comment.video.name }}</a>
+        </div>
+      </ng-container>
+
+      <ng-container i18n *ngSwitchCase="UserNotificationType.NEW_INSTANCE_FOLLOWER">
+        <my-global-icon iconName="users"></my-global-icon>
+
+        <div class="message">
+          Your instance has <a (click)="markAsRead(notification)" [routerLink]="notification.instanceFollowUrl">a new follower</a> ({{ notification.actorFollow.follower.host }})
+          <ng-container *ngIf="notification.actorFollow.state === 'pending'"> awaiting your approval</ng-container>
         </div>
       </ng-container>
     </ng-container>

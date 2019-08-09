@@ -18,6 +18,7 @@
   - [prune-storage.js](#prune-storagejs)
   - [optimize-old-videos.js](#optimize-old-videosjs)
   - [update-host.js](#update-hostjs)
+  - [reset-password.js](#reset-passwordjs)
   - [REPL (Read Eval Print Loop)](#repl-read-eval-print-loop)
     - [.help](#help)
     - [Lodash example](#lodash-example)
@@ -119,7 +120,7 @@ $ node dist/server/tools/peertube-import-videos.js \
 
 * `PEERTUBE_URL` : the full URL of your PeerTube server where you want to import, eg: https://peertube.cpy.re
 * `PEERTUBE_USER` : your PeerTube account where videos will be uploaded
-* `PEERTUBE_PASSWORD` : password of your PeerTube account (if `PEERTUBE_PASSWORD` is omitted, you will be prompted for it)
+* `PEERTUBE_PASSWORD` : password of your PeerTube account (if `--password PEERTUBE_PASSWORD` is omitted, you will be prompted for it)
 * `TARGET_URL` : the target url you want to import. Examples:
   * YouTube:
     * Channel: https://www.youtube.com/channel/ChannelId
@@ -225,6 +226,14 @@ to run:
 
 ```
 $ sudo -u peertube NODE_CONFIG_DIR=/var/www/peertube/config NODE_ENV=production npm run update-host
+```
+
+### reset-password.js
+
+To reset a user password from CLI, run:
+
+```
+$ sudo -u peertube NODE_CONFIG_DIR=/var/www/peertube/config NODE_ENV=production npm run reset-password -- -u target_username
 ```
 
 ### REPL ([Read Eval Print Loop](https://nodejs.org/docs/latest-v8.x/api/repl.html))

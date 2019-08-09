@@ -10,7 +10,7 @@ import { AccountModel } from '../account/account'
 import { getSort, throwIfNotValid } from '../utils'
 import { VideoModel } from './video'
 import { VideoAbuseState } from '../../../shared'
-import { CONSTRAINTS_FIELDS, VIDEO_ABUSE_STATES } from '../../initializers'
+import { CONSTRAINTS_FIELDS, VIDEO_ABUSE_STATES } from '../../initializers/constants'
 
 @Table({
   tableName: 'videoAbuse',
@@ -39,7 +39,7 @@ export class VideoAbuseModel extends Model<VideoAbuseModel> {
 
   @AllowNull(true)
   @Default(null)
-  @Is('VideoAbuseModerationComment', value => throwIfNotValid(value, isVideoAbuseModerationCommentValid, 'moderationComment'))
+  @Is('VideoAbuseModerationComment', value => throwIfNotValid(value, isVideoAbuseModerationCommentValid, 'moderationComment', true))
   @Column(DataType.STRING(CONSTRAINTS_FIELDS.VIDEO_ABUSES.MODERATION_COMMENT.max))
   moderationComment: string
 

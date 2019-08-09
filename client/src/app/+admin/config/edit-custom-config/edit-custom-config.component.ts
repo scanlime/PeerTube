@@ -5,7 +5,7 @@ import { CustomConfigValidatorsService, FormReactive, UserValidatorsService } fr
 import { Notifier } from '@app/core'
 import { CustomConfig } from '../../../../../../shared/models/server/custom-config.model'
 import { I18n } from '@ngx-translate/i18n-polyfill'
-import { BuildFormDefaultValues, FormValidatorService } from '@app/shared/forms/form-validators/form-validator.service'
+import { FormValidatorService } from '@app/shared/forms/form-validators/form-validator.service'
 
 @Component({
   selector: 'my-edit-custom-config',
@@ -66,6 +66,7 @@ export class EditCustomConfigComponent extends FormReactive implements OnInit {
         description: null,
         terms: null,
         defaultClientRoute: null,
+        isNSFW: false,
         defaultNSFWPolicy: null,
         customizations: {
           javascript: null,
@@ -116,6 +117,19 @@ export class EditCustomConfigComponent extends FormReactive implements OnInit {
         threads: this.customConfigValidatorsService.TRANSCODING_THREADS,
         allowAdditionalExtensions: null,
         resolutions: {}
+      },
+      autoBlacklist: {
+        videos: {
+          ofUsers: {
+            enabled: null
+          }
+        }
+      },
+      followers: {
+        instance: {
+          enabled: null,
+          manualApproval: null
+        }
       }
     }
 

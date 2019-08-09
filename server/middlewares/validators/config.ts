@@ -2,6 +2,8 @@ import * as express from 'express'
 import { body } from 'express-validator/check'
 import { isUserNSFWPolicyValid, isUserVideoQuotaValid, isUserVideoQuotaDailyValid } from '../../helpers/custom-validators/users'
 import { logger } from '../../helpers/logger'
+import { CustomConfig } from '../../../shared/models/server/custom-config.model'
+import { Emailer } from '../../lib/emailer'
 import { areValidationErrors } from './utils'
 
 const customConfigUpdateValidator = [
@@ -42,15 +44,34 @@ const customConfigUpdateValidator = [
   body('import.videos.http.enabled').isBoolean().withMessage('Should have a valid import video http enabled boolean'),
   body('import.videos.torrent.enabled').isBoolean().withMessage('Should have a valid import video torrent enabled boolean'),
 
+  body('followers.instance.enabled').isBoolean().withMessage('Should have a valid followers of instance boolean'),
+  body('followers.instance.manualApproval').isBoolean().withMessage('Should have a valid manual approval boolean'),
+
   async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     logger.debug('Checking customConfigUpdateValidator parameters', { parameters: req.body })
 
     if (areValidationErrors(req, res)) return
+    if (!checkInvalidConfigIfEmailDisabled(req.body as CustomConfig, res)) return
 
     return next()
   }
 ]
 
+// ---------------------------------------------------------------------------
+
 export {
   customConfigUpdateValidator
+}
+
+function checkInvalidConfigIfEmailDisabled (customConfig: CustomConfig, res: express.Response) {
+  if (Emailer.isEnabled()) return true
+
+  if (customConfig.signup.requiresEmailVerification === true) {
+    res.status(400)
+      .send({ error: 'Emailer is disabled but you require signup email verification.' })
+      .end()
+    return false
+  }
+
+  return true
 }

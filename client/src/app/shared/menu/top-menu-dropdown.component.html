@@ -3,7 +3,7 @@
 
     <a *ngIf="menuEntry.routerLink" [routerLink]="menuEntry.routerLink" routerLinkActive="active" class="title-page">{{ menuEntry.label }}</a>
 
-    <div *ngIf="!menuEntry.routerLink" ngbDropdown class="parent-entry" #dropdown="ngbDropdown" (mouseleave)="closeDropdownIfHovered(dropdown)">
+    <div *ngIf="!menuEntry.routerLink" ngbDropdown [container]="container" class="parent-entry" #dropdown="ngbDropdown" (mouseleave)="closeDropdownIfHovered(dropdown)">
       <span
         (mouseenter)="openDropdownOnHover(dropdown)" [ngClass]="{ active: !!suffixLabels[menuEntry.label] }" ngbDropdownAnchor
         (click)="dropdownAnchorClicked(dropdown)" role="button" class="title-page"
@@ -13,7 +13,11 @@
       </span>
 
       <div ngbDropdownMenu>
-        <a *ngFor="let menuChild of menuEntry.children" class="dropdown-item" [routerLink]="menuChild.routerLink">{{ menuChild.label }}</a>
+        <a *ngFor="let menuChild of menuEntry.children" class="dropdown-item" [ngClass]="{ icon: hasIcons }" [routerLink]="menuChild.routerLink">
+          <my-global-icon *ngIf="menuChild.iconName" [iconName]="menuChild.iconName"></my-global-icon>
+
+          {{ menuChild.label }}
+        </a>
       </div>
     </div>
 

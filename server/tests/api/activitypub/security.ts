@@ -3,18 +3,18 @@
 import 'mocha'
 
 import {
+  closeAllSequelize,
   flushAndRunMultipleServers,
   flushTests,
   killallServers,
-  makeFollowRequest,
-  makePOSTAPRequest,
   ServerInfo,
   setActorField
-} from '../../../../shared/utils'
-import { HTTP_SIGNATURE } from '../../../initializers'
+} from '../../../../shared/extra-utils'
+import { HTTP_SIGNATURE } from '../../../initializers/constants'
 import { buildDigest, buildGlobalHeaders } from '../../../lib/job-queue/handlers/utils/activitypub-http-utils'
 import * as chai from 'chai'
 import { activityPubContextify, buildSignedActivity } from '../../../helpers/activitypub'
+import { makeFollowRequest, makePOSTAPRequest } from '../../../../shared/extra-utils/requests/activitypub'
 
 const expect = chai.expect
 
@@ -179,9 +179,6 @@ describe('Test ActivityPub security', function () {
   after(async function () {
     killallServers(servers)
 
-    // Keep the logs if the test failed
-    if (this['ok']) {
-      await flushTests()
-    }
+    await closeAllSequelize(servers)
   })
 })

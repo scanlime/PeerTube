@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: PeerTube
-  version: 1.2.0-rc.1
+  version: 1.3.1
   contact:
     name: PeerTube Community
     url: 'https://joinpeertube.org'
@@ -842,7 +842,7 @@ paths:
                   description: Video name
                   type: string
                 tags:
-                  description: Video tags
+                  description: Video tags (maximum 5 tags each between 2 and 30 characters)
                   type: array
                   items:
                     type: string
@@ -1089,6 +1089,83 @@ paths:
               channelId=$CHANNEL_ID \
               name=$NAME \
               "Authorization:Bearer $token"
+  /videos/imports:
+    post:
+      summary: Import a torrent or magnetURI or HTTP ressource (if enabled by the instance administrator)
+      security:
+        - OAuth2: []
+      tags:
+        - Video
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoUploadResponse'
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                torrentfile:
+                  description: Torrent File
+                  type: string
+                  format: binary
+                targetUrl:
+                  description: HTTP target URL
+                  type: string
+                magnetUri:
+                  description: Magnet URI
+                  type: string
+                channelId:
+                  description: Channel id that will contain this video
+                  type: number
+                thumbnailfile:
+                  description: Video thumbnail file
+                  type: string
+                previewfile:
+                  description: Video preview file
+                  type: string
+                privacy:
+                  $ref: '#/components/schemas/VideoPrivacy'
+                category:
+                  description: Video category
+                  type: string
+                licence:
+                  description: Video licence
+                  type: string
+                language:
+                  description: Video language
+                  type: string
+                description:
+                  description: Video description
+                  type: string
+                waitTranscoding:
+                  description: Whether or not we wait transcoding before publish the video
+                  type: string
+                support:
+                  description: Text describing how to support the video uploader
+                  type: string
+                nsfw:
+                  description: Whether or not this video contains sensitive content
+                  type: string
+                name:
+                  description: Video name
+                  type: string
+                tags:
+                  description: Video tags
+                  type: array
+                  items:
+                    type: string
+                commentsEnabled:
+                  description: Enable or disable comments for this video
+                  type: string
+                scheduleUpdate: *ref_0
+              required:
+                - channelId
+                - name
   /videos/abuse:
     get:
       summary: Get list of reported video abuses
@@ -1199,13 +1276,13 @@ paths:
           $ref: '#/paths/~1users~1me/put/responses/204'
       requestBody:
         $ref: '#/components/requestBodies/VideoChannelInput'
-  '/video-channels/{id}':
+  '/video-channels/{channelHandle}':
     get:
       summary: Get a video channel by its id
       tags:
         - Video Channel
       parameters:
-        - $ref: '#/components/parameters/id3'
+        - $ref: '#/components/parameters/channelHandle'
       responses:
         '200':
           description: successful operation
@@ -1220,7 +1297,7 @@ paths:
       tags:
         - Video Channel
       parameters:
-        - $ref: '#/components/parameters/id3'
+        - $ref: '#/components/parameters/channelHandle'
       responses:
         '204':
           $ref: '#/paths/~1users~1me/put/responses/204'
@@ -1233,17 +1310,17 @@ paths:
       tags:
         - Video Channel
       parameters:
-        - $ref: '#/components/parameters/id3'
+        - $ref: '#/components/parameters/channelHandle'
       responses:
         '204':
           $ref: '#/paths/~1users~1me/put/responses/204'
-  '/video-channels/{id}/videos':
+  '/video-channels/{channelHandle}/videos':
     get:
       summary: Get videos of a video channel by its id
       tags:
         - Video Channel
       parameters:
-        - $ref: '#/components/parameters/id3'
+        - $ref: '#/components/parameters/channelHandle'
       responses:
         '200':
           description: successful operation
@@ -1267,6 +1344,35 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/VideoChannel'
+  '/accounts/{name}/ratings':
+    get:
+      summary: Get ratings of an account by its name
+      security:
+        - OAuth2: []
+      tags:
+        - User
+      parameters:
+        - $ref: '#/components/parameters/start'
+        - $ref: '#/components/parameters/count'
+        - $ref: '#/components/parameters/sort'
+        - name: rating
+          in: query
+          required: false
+          description: Optionaly filter which ratings to retrieve
+          schema:
+            type: string
+            enum:
+              - like
+              - dislike
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VideoRating'
   '/videos/{id}/comment-threads':
     get:
       summary: Get the comment threads of a video by its id
@@ -1505,11 +1611,11 @@ components:
       description: The video id or uuid
       schema:
         type: string
-    id3:
-      name: id
+    channelHandle:
+      name: channelHandle
       in: path
       required: true
-      description: The video channel id or uuid
+      description: "The video channel handle (example: 'my_username@example.com' or 'my_username')"
       schema:
         type: string
     commentId:
@@ -1867,6 +1973,8 @@ components:
             - Administrator
         videoQuota:
           type: number
+        videoQuotaDaily:
+          type: number
         createdAt:
           type: string
         account:
@@ -2002,6 +2110,9 @@ components:
         videoQuota:
           type: string
           description: 'The user videoQuota '
+        videoQuotaDaily:
+          type: string
+          description: 'The user daily video quota '
         role:
           type: integer
           format: int32
@@ -2015,6 +2126,7 @@ components:
         - password
         - email
         - videoQuota
+        - videoQuotaDaily
         - role
     UpdateUser:
       properties:
@@ -2027,6 +2139,9 @@ components:
         videoQuota:
           type: string
           description: 'The updated videoQuota of the user '
+        videoQuotaDaily:
+          type: string
+          description: 'The updated daily video quota of the user '
         role:
           type: string
           description: 'The updated role of the user '
@@ -2034,6 +2149,7 @@ components:
         - id
         - email
         - videoQuota
+        - videoQuotaDaily
         - role
     UpdateMe:
       properties:
@@ -2064,6 +2180,16 @@ components:
           description: 'Rating of the video '
       required:
         - id
+        - rating
+    VideoRating:
+      properties:
+        video:
+          $ref: '#/components/schemas/Video'
+        rating:
+          type: number
+          description: 'Rating of the video'
+      required:
+        - video
         - rating
     RegisterUser:
       properties:

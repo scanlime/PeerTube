@@ -3,6 +3,7 @@
 import 'mocha'
 
 import {
+  cleanupTests,
   createUser,
   doubleFollow,
   flushAndRunMultipleServers,
@@ -18,13 +19,13 @@ import {
   setAccessTokensToServers,
   uploadVideo,
   userLogin, waitJobs
-} from '../../../../shared/utils'
+} from '../../../../shared/extra-utils'
 import {
   checkBadCountPagination,
   checkBadSortPagination,
   checkBadStartPagination
-} from '../../../../shared/utils/requests/check-api-params'
-import { VideoDetails } from '../../../../shared/models/videos'
+} from '../../../../shared/extra-utils/requests/check-api-params'
+import { VideoDetails, VideoBlacklistType } from '../../../../shared/models/videos'
 import { expect } from 'chai'
 
 describe('Test video blacklist API validators', function () {
@@ -39,7 +40,6 @@ describe('Test video blacklist API validators', function () {
   before(async function () {
     this.timeout(120000)
 
-    await flushTests()
     servers = await flushAndRunMultipleServers(2)
 
     await setAccessTokensToServers(servers)
@@ -48,14 +48,14 @@ describe('Test video blacklist API validators', function () {
     {
       const username = 'user1'
       const password = 'my super password'
-      await createUser(servers[0].url, servers[0].accessToken, username, password)
+      await createUser({ url: servers[ 0 ].url, accessToken: servers[ 0 ].accessToken, username: username, password: password })
       userAccessToken1 = await userLogin(servers[0], { username, password })
     }
 
     {
       const username = 'user2'
       const password = 'my super password'
-      await createUser(servers[0].url, servers[0].accessToken, username, password)
+      await createUser({ url: servers[ 0 ].url, accessToken: servers[ 0 ].accessToken, username: username, password: password })
       userAccessToken2 = await userLogin(servers[0], { username, password })
     }
 
@@ -220,11 +220,11 @@ describe('Test video blacklist API validators', function () {
     const basePath = '/api/v1/videos/blacklist/'
 
     it('Should fail with a non authenticated user', async function () {
-      await getBlacklistedVideosList(servers[0].url, 'fake token', 401)
+      await getBlacklistedVideosList({ url: servers[0].url, token: 'fake token', specialStatus: 401 })
     })
 
     it('Should fail with a non admin user', async function () {
-      await getBlacklistedVideosList(servers[0].url, userAccessToken2, 403)
+      await getBlacklistedVideosList({ url: servers[0].url, token: userAccessToken2, specialStatus: 403 })
     })
 
     it('Should fail with a bad start pagination', async function () {
@@ -238,14 +238,17 @@ describe('Test video blacklist API validators', function () {
     it('Should fail with an incorrect sort', async function () {
       await checkBadSortPagination(servers[0].url, basePath, servers[0].accessToken)
     })
+
+    it('Should fail with an invalid type', async function () {
+      await getBlacklistedVideosList({ url: servers[0].url, token: servers[0].accessToken, type: 0, specialStatus: 400 })
+    })
+
+    it('Should succeed with the correct parameters', async function () {
+      await getBlacklistedVideosList({ url: servers[0].url, token: servers[0].accessToken, type: VideoBlacklistType.MANUAL })
+    })
   })
 
   after(async function () {
-    killallServers(servers)
-
-    // Keep the logs if the test failed
-    if (this['ok']) {
-      await flushTests()
-    }
+    await cleanupTests(servers)
   })
 })

@@ -1,17 +1,18 @@
 import { Transaction } from 'sequelize'
 import { AccountModel } from '../../models/account/account'
 import { VideoModel } from '../../models/video/video'
-import { sendCreateDislike, sendLike, sendUndoDislike, sendUndoLike } from './send'
+import { sendLike, sendUndoDislike, sendUndoLike } from './send'
 import { VideoRateType } from '../../../shared/models/videos'
 import * as Bluebird from 'bluebird'
 import { getOrCreateActorAndServerAndModel } from './actor'
 import { AccountVideoRateModel } from '../../models/account/account-video-rate'
 import { logger } from '../../helpers/logger'
-import { CRAWL_REQUEST_CONCURRENCY } from '../../initializers'
+import { CRAWL_REQUEST_CONCURRENCY } from '../../initializers/constants'
 import { doRequest } from '../../helpers/requests'
 import { checkUrlsSameHost, getAPId } from '../../helpers/activitypub'
 import { ActorModel } from '../../models/activitypub/actor'
 import { getVideoDislikeActivityPubUrl, getVideoLikeActivityPubUrl } from './url'
+import { sendDislike } from './send/send-dislike'
 
 async function createRates (ratesUrl: string[], video: VideoModel, rate: VideoRateType) {
   let rateCounts = 0
@@ -37,19 +38,14 @@ async function createRates (ratesUrl: string[], video: VideoModel, rate: VideoRa
 
       const actor = await getOrCreateActorAndServerAndModel(actorUrl)
 
-      const [ , created ] = await AccountVideoRateModel
-        .findOrCreate({
-          where: {
-            videoId: video.id,
-            accountId: actor.Account.id
-          },
-          defaults: {
-            videoId: video.id,
-            accountId: actor.Account.id,
-            type: rate,
-            url: body.id
-          }
-        })
+      const entry = {
+        videoId: video.id,
+        accountId: actor.Account.id,
+        type: rate,
+        url: body.id
+      }
+
+      const created = await AccountVideoRateModel.upsert(entry)
 
       if (created) rateCounts += 1
     } catch (err) {
@@ -60,7 +56,10 @@ async function createRates (ratesUrl: string[], video: VideoModel, rate: VideoRa
   logger.info('Adding %d %s to video %s.', rateCounts, rate, video.uuid)
 
   // This is "likes" and "dislikes"
-  if (rateCounts !== 0) await video.increment(rate + 's', { by: rateCounts })
+  if (rateCounts !== 0) {
+    const field = rate === 'like' ? 'likes' : 'dislikes'
+    await video.increment(field, { by: rateCounts })
+  }
 
   return
 }
@@ -82,7 +81,7 @@ async function sendVideoRateChange (account: AccountModel,
   // Like
   if (likes > 0) await sendLike(actor, video, t)
   // Dislike
-  if (dislikes > 0) await sendCreateDislike(actor, video, t)
+  if (dislikes > 0) await sendDislike(actor, video, t)
 }
 
 function getRateUrl (rateType: VideoRateType, actor: ActorModel, video: VideoModel) {

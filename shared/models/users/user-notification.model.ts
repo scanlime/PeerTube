@@ -1,3 +1,5 @@
+import { FollowState } from '../actors'
+
 export enum UserNotificationType {
   NEW_VIDEO_FROM_SUBSCRIPTION = 1,
   NEW_COMMENT_ON_MY_VIDEO = 2,
@@ -13,7 +15,11 @@ export enum UserNotificationType {
 
   NEW_USER_REGISTRATION = 9,
   NEW_FOLLOW = 10,
-  COMMENT_MENTION = 11
+  COMMENT_MENTION = 11,
+
+  VIDEO_AUTO_BLACKLIST_FOR_MODERATORS = 12,
+
+  NEW_INSTANCE_FOLLOWER = 13
 }
 
 export interface VideoInfo {
@@ -71,6 +77,7 @@ export interface UserNotification {
   actorFollow?: {
     id: number
     follower: ActorInfo
+    state: FollowState
     following: {
       type: 'account' | 'channel'
       name: string

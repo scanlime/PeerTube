@@ -59,6 +59,15 @@ export class UserNotificationSettingModel extends Model<UserNotificationSettingM
   @AllowNull(false)
   @Default(null)
   @Is(
+    'UserNotificationSettingVideoAutoBlacklistAsModerator',
+    value => throwIfNotValid(value, isUserNotificationSettingValid, 'videoAutoBlacklistAsModerator')
+  )
+  @Column
+  videoAutoBlacklistAsModerator: UserNotificationSettingValue
+
+  @AllowNull(false)
+  @Default(null)
+  @Is(
     'UserNotificationSettingBlacklistOnMyVideo',
     value => throwIfNotValid(value, isUserNotificationSettingValid, 'blacklistOnMyVideo')
   )
@@ -91,6 +100,15 @@ export class UserNotificationSettingModel extends Model<UserNotificationSettingM
   )
   @Column
   newUserRegistration: UserNotificationSettingValue
+
+  @AllowNull(false)
+  @Default(null)
+  @Is(
+    'UserNotificationSettingNewInstanceFollower',
+    value => throwIfNotValid(value, isUserNotificationSettingValid, 'newInstanceFollower')
+  )
+  @Column
+  newInstanceFollower: UserNotificationSettingValue
 
   @AllowNull(false)
   @Default(null)
@@ -139,12 +157,14 @@ export class UserNotificationSettingModel extends Model<UserNotificationSettingM
       newCommentOnMyVideo: this.newCommentOnMyVideo,
       newVideoFromSubscription: this.newVideoFromSubscription,
       videoAbuseAsModerator: this.videoAbuseAsModerator,
+      videoAutoBlacklistAsModerator: this.videoAutoBlacklistAsModerator,
       blacklistOnMyVideo: this.blacklistOnMyVideo,
       myVideoPublished: this.myVideoPublished,
       myVideoImportFinished: this.myVideoImportFinished,
       newUserRegistration: this.newUserRegistration,
       commentMention: this.commentMention,
-      newFollow: this.newFollow
+      newFollow: this.newFollow,
+      newInstanceFollower: this.newInstanceFollower
     }
   }
 }

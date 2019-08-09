@@ -1,14 +1,15 @@
 import { values } from 'lodash'
-import { Transaction } from 'sequelize'
+import { FindOptions, Op, Transaction } from 'sequelize'
 import { AllowNull, BelongsTo, Column, CreatedAt, DataType, ForeignKey, Is, Model, Table, UpdatedAt } from 'sequelize-typescript'
-import { IFindOptions } from 'sequelize-typescript/lib/interfaces/IFindOptions'
 import { VideoRateType } from '../../../shared/models/videos'
-import { CONSTRAINTS_FIELDS, VIDEO_RATE_TYPES } from '../../initializers'
+import { CONSTRAINTS_FIELDS, VIDEO_RATE_TYPES } from '../../initializers/constants'
 import { VideoModel } from '../video/video'
 import { AccountModel } from './account'
 import { ActorModel } from '../activitypub/actor'
-import { throwIfNotValid } from '../utils'
+import { getSort, throwIfNotValid } from '../utils'
 import { isActivityPubUrlValid } from '../../helpers/custom-validators/activitypub/misc'
+import { AccountVideoRate } from '../../../shared'
+import { ScopeNames as VideoChannelScopeNames, VideoChannelModel } from '../video/video-channel'
 
 /*
   Account rates per video.
@@ -38,7 +39,7 @@ import { isActivityPubUrlValid } from '../../helpers/custom-validators/activityp
 export class AccountVideoRateModel extends Model<AccountVideoRateModel> {
 
   @AllowNull(false)
-  @Column(DataType.ENUM(values(VIDEO_RATE_TYPES)))
+  @Column(DataType.ENUM(...values(VIDEO_RATE_TYPES)))
   type: VideoRateType
 
   @AllowNull(false)
@@ -77,7 +78,7 @@ export class AccountVideoRateModel extends Model<AccountVideoRateModel> {
   Account: AccountModel
 
   static load (accountId: number, videoId: number, transaction?: Transaction) {
-    const options: IFindOptions<AccountVideoRateModel> = {
+    const options: FindOptions = {
       where: {
         accountId,
         videoId
@@ -88,8 +89,40 @@ export class AccountVideoRateModel extends Model<AccountVideoRateModel> {
     return AccountVideoRateModel.findOne(options)
   }
 
+  static listByAccountForApi (options: {
+    start: number,
+    count: number,
+    sort: string,
+    type?: string,
+    accountId: number
+  }) {
+    const query: FindOptions = {
+      offset: options.start,
+      limit: options.count,
+      order: getSort(options.sort),
+      where: {
+        accountId: options.accountId
+      },
+      include: [
+        {
+          model: VideoModel,
+          required: true,
+          include: [
+            {
+              model: VideoChannelModel.scope({ method: [VideoChannelScopeNames.SUMMARY, true] }),
+              required: true
+            }
+          ]
+        }
+      ]
+    }
+    if (options.type) query.where['type'] = options.type
+
+    return AccountVideoRateModel.findAndCountAll(query)
+  }
+
   static loadLocalAndPopulateVideo (rateType: VideoRateType, accountName: string, videoId: number, transaction?: Transaction) {
-    const options: IFindOptions<AccountVideoRateModel> = {
+    const options: FindOptions = {
       where: {
         videoId,
         type: rateType
@@ -121,7 +154,7 @@ export class AccountVideoRateModel extends Model<AccountVideoRateModel> {
   }
 
   static loadByUrl (url: string, transaction: Transaction) {
-    const options: IFindOptions<AccountVideoRateModel> = {
+    const options: FindOptions = {
       where: {
         url
       }
@@ -157,5 +190,39 @@ export class AccountVideoRateModel extends Model<AccountVideoRateModel> {
     }
 
     return AccountVideoRateModel.findAndCountAll(query)
+  }
+
+  static cleanOldRatesOf (videoId: number, type: VideoRateType, beforeUpdatedAt: Date) {
+    return AccountVideoRateModel.sequelize.transaction(async t => {
+      const query = {
+        where: {
+          updatedAt: {
+            [Op.lt]: beforeUpdatedAt
+          },
+          videoId,
+          type
+        },
+        transaction: t
+      }
+
+      const deleted = await AccountVideoRateModel.destroy(query)
+
+      const options = {
+        transaction: t,
+        where: {
+          id: videoId
+        }
+      }
+
+      if (type === 'like') await VideoModel.increment({ likes: -deleted }, options)
+      else if (type === 'dislike') await VideoModel.increment({ dislikes: -deleted }, options)
+    })
+  }
+
+  toFormattedJSON (): AccountVideoRate {
+    return {
+      video: this.Video.toFormattedJSON(),
+      rating: this.type
+    }
   }
 }

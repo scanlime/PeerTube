@@ -3,6 +3,7 @@
 import 'mocha'
 
 import {
+  closeAllSequelize,
   createUser,
   doubleFollow,
   flushAndRunMultipleServers,
@@ -16,7 +17,7 @@ import {
   uploadVideo,
   userLogin,
   waitJobs
-} from '../../../../shared/utils'
+} from '../../../../shared/extra-utils'
 import * as chai from 'chai'
 import { Video } from '../../../../shared/models/videos'
 
@@ -37,7 +38,7 @@ describe('Test ActivityPub fetcher', function () {
 
     const user = { username: 'user1', password: 'password' }
     for (const server of servers) {
-      await createUser(server.url, server.accessToken, user.username, user.password)
+      await createUser({ url: server.url, accessToken: server.accessToken, username: user.username, password: user.password })
     }
 
     const userAccessToken = await userLogin(servers[0], user)
@@ -79,9 +80,6 @@ describe('Test ActivityPub fetcher', function () {
   after(async function () {
     killallServers(servers)
 
-    // Keep the logs if the test failed
-    if (this['ok']) {
-      await flushTests()
-    }
+    await closeAllSequelize(servers)
   })
 })

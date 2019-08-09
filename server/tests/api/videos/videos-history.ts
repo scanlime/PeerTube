@@ -3,21 +3,23 @@
 import * as chai from 'chai'
 import 'mocha'
 import {
+  cleanupTests,
   createUser,
-  flushTests,
+  flushAndRunServer,
   getVideosListWithToken,
   getVideoWithToken,
   killallServers,
-  runServer,
+  reRunServer,
   searchVideoWithToken,
   ServerInfo,
   setAccessTokensToServers,
   updateMyUser,
   uploadVideo,
-  userLogin
-} from '../../../../shared/utils'
+  userLogin,
+  wait
+} from '../../../../shared/extra-utils'
 import { Video, VideoDetails } from '../../../../shared/models/videos'
-import { listMyVideosHistory, removeMyVideosHistory, userWatchVideo } from '../../../../shared/utils/videos/video-history'
+import { listMyVideosHistory, removeMyVideosHistory, userWatchVideo } from '../../../../shared/extra-utils/videos/video-history'
 
 const expect = chai.expect
 
@@ -32,9 +34,7 @@ describe('Test videos history', function () {
   before(async function () {
     this.timeout(30000)
 
-    await flushTests()
-
-    server = await runServer(1)
+    server = await flushAndRunServer(1)
 
     await setAccessTokensToServers([ server ])
 
@@ -57,7 +57,7 @@ describe('Test videos history', function () {
       username: 'user_1',
       password: 'super password'
     }
-    await createUser(server.url, server.accessToken, user.username, user.password)
+    await createUser({ url: server.url, accessToken: server.accessToken, username: user.username, password: user.password })
     userAccessToken = await userLogin(server, user)
   })
 
@@ -192,12 +192,36 @@ describe('Test videos history', function () {
     expect(videos[1].name).to.equal('video 3')
   })
 
-  after(async function () {
+  it('Should not clean old history', async function () {
+    this.timeout(50000)
+
     killallServers([ server ])
 
-    // Keep the logs if the test failed
-    if (this['ok']) {
-      await flushTests()
-    }
+    await reRunServer(server, { history: { videos: { max_age: '10 days' } } })
+
+    await wait(6000)
+
+    // Should still have history
+
+    const res = await listMyVideosHistory(server.url, server.accessToken)
+
+    expect(res.body.total).to.equal(2)
+  })
+
+  it('Should clean old history', async function () {
+    this.timeout(50000)
+
+    killallServers([ server ])
+
+    await reRunServer(server, { history: { videos: { max_age: '5 seconds' } } })
+
+    await wait(6000)
+
+    const res = await listMyVideosHistory(server.url, server.accessToken)
+    expect(res.body.total).to.equal(0)
+  })
+
+  after(async function () {
+    await cleanupTests([ server ])
   })
 })

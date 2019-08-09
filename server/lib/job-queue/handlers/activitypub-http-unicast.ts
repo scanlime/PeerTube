@@ -2,8 +2,8 @@ import * as Bull from 'bull'
 import { logger } from '../../../helpers/logger'
 import { doRequest } from '../../../helpers/requests'
 import { buildGlobalHeaders, buildSignedRequestOptions, computeBody } from './utils/activitypub-http-utils'
-import { JOB_REQUEST_TIMEOUT } from '../../../initializers'
-import { ActorFollowScoreCache } from '../../cache'
+import { JOB_REQUEST_TIMEOUT } from '../../../initializers/constants'
+import { ActorFollowScoreCache } from '../../files-cache'
 
 export type ActivitypubHttpUnicastPayload = {
   uri: string

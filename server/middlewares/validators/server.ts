@@ -7,7 +7,7 @@ import { body } from 'express-validator/check'
 import { isUserDisplayNameValid } from '../../helpers/custom-validators/users'
 import { Emailer } from '../../lib/emailer'
 import { Redis } from '../../lib/redis'
-import { CONFIG } from '../../initializers/constants'
+import { CONFIG } from '../../initializers/config'
 
 const serverGetValidator = [
   body('host').custom(isHostValid).withMessage('Should have a valid host'),
@@ -57,7 +57,7 @@ const contactAdministratorValidator = [
         .end()
     }
 
-    if (await Redis.Instance.isContactFormIpExists(req.ip)) {
+    if (await Redis.Instance.doesContactFormIpExist(req.ip)) {
       logger.info('Refusing a contact form by %s: already sent one recently.', req.ip)
 
       return res

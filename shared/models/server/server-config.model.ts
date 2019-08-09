@@ -8,6 +8,7 @@ export interface ServerConfig {
     name: string
     shortDescription: string
     defaultClientRoute: string
+    isNSFW: boolean
     defaultNSFWPolicy: NSFWPolicyType
     customizations: {
       javascript: string
@@ -25,11 +26,15 @@ export interface ServerConfig {
 
   signup: {
     allowed: boolean,
-    allowedForCurrentIP: boolean,
+    allowedForCurrentIP: boolean
     requiresEmailVerification: boolean
   }
 
   transcoding: {
+    hls: {
+      enabled: boolean
+    }
+
     enabledResolutions: number[]
   }
 
@@ -44,11 +49,19 @@ export interface ServerConfig {
     }
   }
 
+  autoBlacklist: {
+    videos: {
+      ofUsers: {
+        enabled: boolean
+      }
+    }
+  }
+
   avatar: {
     file: {
       size: {
         max: number
-      },
+      }
       extensions: string[]
     }
   }
@@ -83,5 +96,9 @@ export interface ServerConfig {
     videos: {
       intervalDays: number
     }
+  }
+
+  tracker: {
+    enabled: boolean
   }
 }

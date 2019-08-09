@@ -2,10 +2,9 @@ import * as Bull from 'bull'
 import * as Bluebird from 'bluebird'
 import { logger } from '../../../helpers/logger'
 import { doRequest } from '../../../helpers/requests'
-import { ActorFollowModel } from '../../../models/activitypub/actor-follow'
 import { buildGlobalHeaders, buildSignedRequestOptions, computeBody } from './utils/activitypub-http-utils'
-import { BROADCAST_CONCURRENCY, JOB_REQUEST_TIMEOUT } from '../../../initializers'
-import { ActorFollowScoreCache } from '../../cache'
+import { BROADCAST_CONCURRENCY, JOB_REQUEST_TIMEOUT } from '../../../initializers/constants'
+import { ActorFollowScoreCache } from '../../files-cache'
 
 export type ActivitypubHttpBroadcastPayload = {
   uris: string[]

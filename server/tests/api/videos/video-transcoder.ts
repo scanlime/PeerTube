@@ -6,7 +6,7 @@ import { omit } from 'lodash'
 import { getMaxBitrate, VideoDetails, VideoResolution, VideoState } from '../../../../shared/models/videos'
 import { audio, getVideoFileBitrate, getVideoFileFPS, getVideoFileResolution } from '../../../helpers/ffmpeg-utils'
 import {
-  buildAbsoluteFixturePath,
+  buildAbsoluteFixturePath, cleanupTests,
   doubleFollow,
   flushAndRunMultipleServers,
   generateHighBitrateVideo,
@@ -19,9 +19,9 @@ import {
   setAccessTokensToServers,
   uploadVideo,
   webtorrentAdd
-} from '../../../../shared/utils'
+} from '../../../../shared/extra-utils'
 import { extname, join } from 'path'
-import { waitJobs } from '../../../../shared/utils/server/jobs'
+import { waitJobs } from '../../../../shared/extra-utils/server/jobs'
 import { VIDEO_TRANSCODING_FPS } from '../../../../server/initializers/constants'
 
 const expect = chai.expect
@@ -350,6 +350,6 @@ describe('Test video transcoding', function () {
   })
 
   after(async function () {
-    killallServers(servers)
+    await cleanupTests(servers)
   })
 })

@@ -19,10 +19,11 @@ import {
   isVideoFileSizeValid,
   isVideoFPSResolutionValid
 } from '../../helpers/custom-validators/videos'
-import { throwIfNotValid } from '../utils'
+import { parseAggregateResult, throwIfNotValid } from '../utils'
 import { VideoModel } from './video'
-import * as Sequelize from 'sequelize'
 import { VideoRedundancyModel } from '../redundancy/video-redundancy'
+import { VideoStreamingPlaylistModel } from './video-streaming-playlist'
+import { FindOptions, QueryTypes, Transaction } from 'sequelize'
 
 @Table({
   tableName: 'videoFile',
@@ -62,7 +63,7 @@ export class VideoFileModel extends Model<VideoFileModel> {
   extname: string
 
   @AllowNull(false)
-  @Is('VideoFileSize', value => throwIfNotValid(value, isVideoFileInfoHashValid, 'info hash'))
+  @Is('VideoFileInfohash', value => throwIfNotValid(value, isVideoFileInfoHashValid, 'info hash'))
   @Column
   infoHash: string
 
@@ -86,25 +87,23 @@ export class VideoFileModel extends Model<VideoFileModel> {
 
   @HasMany(() => VideoRedundancyModel, {
     foreignKey: {
-      allowNull: false
+      allowNull: true
     },
     onDelete: 'CASCADE',
     hooks: true
   })
   RedundancyVideos: VideoRedundancyModel[]
 
-  static isInfohashExists (infoHash: string) {
+  static doesInfohashExist (infoHash: string) {
     const query = 'SELECT 1 FROM "videoFile" WHERE "infoHash" = $infoHash LIMIT 1'
     const options = {
-      type: Sequelize.QueryTypes.SELECT,
+      type: QueryTypes.SELECT,
       bind: { infoHash },
       raw: true
     }
 
     return VideoModel.sequelize.query(query, options)
-              .then(results => {
-                return results.length === 1
-              })
+              .then(results => results.length === 1)
   }
 
   static loadWithVideo (id: number) {
@@ -117,11 +116,34 @@ export class VideoFileModel extends Model<VideoFileModel> {
       ]
     }
 
-    return VideoFileModel.findById(id, options)
+    return VideoFileModel.findByPk(id, options)
   }
 
-  static async getStats () {
-    let totalLocalVideoFilesSize = await VideoFileModel.sum('size', {
+  static listByStreamingPlaylist (streamingPlaylistId: number, transaction: Transaction) {
+    const query = {
+      include: [
+        {
+          model: VideoModel.unscoped(),
+          required: true,
+          include: [
+            {
+              model: VideoStreamingPlaylistModel.unscoped(),
+              required: true,
+              where: {
+                id: streamingPlaylistId
+              }
+            }
+          ]
+        }
+      ],
+      transaction
+    }
+
+    return VideoFileModel.findAll(query)
+  }
+
+  static getStats () {
+    const query: FindOptions = {
       include: [
         {
           attributes: [],
@@ -131,13 +153,12 @@ export class VideoFileModel extends Model<VideoFileModel> {
           }
         }
       ]
-    } as any)
-    // Sequelize could return null...
-    if (!totalLocalVideoFilesSize) totalLocalVideoFilesSize = 0
-
-    return {
-      totalLocalVideoFilesSize
     }
+
+    return VideoFileModel.aggregate('size', 'SUM', query)
+      .then(result => ({
+        totalLocalVideoFilesSize: parseAggregateResult(result)
+      }))
   }
 
   hasSameUniqueKeysThan (other: VideoFileModel) {

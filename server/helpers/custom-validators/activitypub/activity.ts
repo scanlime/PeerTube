@@ -9,20 +9,22 @@ import { isViewActivityValid } from './view'
 import { exists } from '../misc'
 import { isCacheFileObjectValid } from './cache-file'
 import { isFlagActivityValid } from './flag'
+import { isPlaylistObjectValid } from './playlist'
 
 function isRootActivityValid (activity: any) {
-  return Array.isArray(activity['@context']) && (
-    (
-      (activity.type === 'Collection' || activity.type === 'OrderedCollection') &&
-      validator.isInt(activity.totalItems, { min: 0 }) &&
-      Array.isArray(activity.items)
-    ) ||
-    (
-      isActivityPubUrlValid(activity.id) &&
-      exists(activity.actor) &&
-      (isActivityPubUrlValid(activity.actor) || isActivityPubUrlValid(activity.actor.id))
-    )
-  )
+  return isCollection(activity) || isActivity(activity)
+}
+
+function isCollection (activity: any) {
+  return (activity.type === 'Collection' || activity.type === 'OrderedCollection') &&
+    validator.isInt(activity.totalItems, { min: 0 }) &&
+    Array.isArray(activity.items)
+}
+
+function isActivity (activity: any) {
+  return isActivityPubUrlValid(activity.id) &&
+    exists(activity.actor) &&
+    (isActivityPubUrlValid(activity.actor) || isActivityPubUrlValid(activity.actor.id))
 }
 
 const activityCheckers: { [ P in ActivityType ]: (activity: Activity) => boolean } = {
@@ -78,6 +80,7 @@ function checkCreateActivity (activity: any) {
       isViewActivityValid(activity.object) ||
       isDislikeActivityValid(activity.object) ||
       isFlagActivityValid(activity.object) ||
+      isPlaylistObjectValid(activity.object) ||
 
       isCacheFileObjectValid(activity.object) ||
       sanitizeAndCheckVideoCommentObject(activity.object) ||
@@ -89,6 +92,7 @@ function checkUpdateActivity (activity: any) {
   return isBaseActivityValid(activity, 'Update') &&
     (
       isCacheFileObjectValid(activity.object) ||
+      isPlaylistObjectValid(activity.object) ||
       sanitizeAndCheckVideoTorrentObject(activity.object) ||
       sanitizeAndCheckActorObject(activity.object)
     )

@@ -8,10 +8,10 @@ import {
   flushTests,
   getEnvCli,
   killallServers,
-  runServer,
+  flushAndRunServer,
   ServerInfo,
-  setAccessTokensToServers
-} from '../../../shared/utils'
+  setAccessTokensToServers, cleanupTests
+} from '../../../shared/extra-utils'
 
 describe('Test CLI wrapper', function () {
   let server: ServerInfo
@@ -19,12 +19,10 @@ describe('Test CLI wrapper', function () {
 
   before(async function () {
     this.timeout(30000)
-
-    await flushTests()
-    server = await runServer(1)
+    server = await flushAndRunServer(1)
     await setAccessTokensToServers([ server ])
 
-    await createUser(server.url, server.accessToken, 'user_1', 'super password')
+    await createUser({ url: server.url, accessToken: server.accessToken, username: 'user_1', password: 'super password' })
   })
 
   it('Should display no selected instance', async function () {
@@ -48,6 +46,6 @@ describe('Test CLI wrapper', function () {
 
     await execCLI(cmd + ` auth del ${server.url}`)
 
-    killallServers([ server ])
+    await cleanupTests([ server ])
   })
 })

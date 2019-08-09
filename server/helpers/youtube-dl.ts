@@ -1,5 +1,5 @@
 import { truncate } from 'lodash'
-import { CONSTRAINTS_FIELDS, VIDEO_CATEGORIES } from '../initializers'
+import { CONSTRAINTS_FIELDS, VIDEO_CATEGORIES } from '../initializers/constants'
 import { logger } from './logger'
 import { generateVideoImportTmpPath } from './utils'
 import { join } from 'path'
@@ -16,6 +16,7 @@ export type YoutubeDLInfo = {
   nsfw?: boolean
   tags?: string[]
   thumbnailUrl?: string
+  originallyPublishedAt?: Date
 }
 
 const processOptions = {
@@ -46,6 +47,11 @@ function downloadYoutubeDLVideo (url: string, timeout: number) {
   logger.info('Importing youtubeDL video %s', url)
 
   const options = [ '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best', '-o', path ]
+
+  if (process.env.FFMPEG_PATH) {
+    options.push('--ffmpeg-location')
+    options.push(process.env.FFMPEG_PATH)
+  }
 
   return new Promise<string>(async (res, rej) => {
     const youtubeDL = await safeGetYoutubeDL()
@@ -142,13 +148,33 @@ async function safeGetYoutubeDL () {
   return youtubeDL
 }
 
+function buildOriginallyPublishedAt (obj: any) {
+  let originallyPublishedAt: Date = null
+
+  const uploadDateMatcher = /^(\d{4})(\d{2})(\d{2})$/.exec(obj.upload_date)
+  if (uploadDateMatcher) {
+    originallyPublishedAt = new Date()
+    originallyPublishedAt.setHours(0, 0, 0, 0)
+
+    const year = parseInt(uploadDateMatcher[1], 10)
+    // Month starts from 0
+    const month = parseInt(uploadDateMatcher[2], 10) - 1
+    const day = parseInt(uploadDateMatcher[3], 10)
+
+    originallyPublishedAt.setFullYear(year, month, day)
+  }
+
+  return originallyPublishedAt
+}
+
 // ---------------------------------------------------------------------------
 
 export {
   updateYoutubeDLBinary,
   downloadYoutubeDLVideo,
   getYoutubeDLInfo,
-  safeGetYoutubeDL
+  safeGetYoutubeDL,
+  buildOriginallyPublishedAt
 }
 
 // ---------------------------------------------------------------------------
@@ -180,7 +206,8 @@ function buildVideoInfo (obj: any) {
     licence: getLicence(obj.license),
     nsfw: isNSFW(obj),
     tags: getTags(obj.tags),
-    thumbnailUrl: obj.thumbnail || undefined
+    thumbnailUrl: obj.thumbnail || undefined,
+    originallyPublishedAt: buildOriginallyPublishedAt(obj)
   }
 }
 

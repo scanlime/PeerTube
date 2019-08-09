@@ -3,24 +3,23 @@
 import 'mocha'
 
 import {
+  cleanupTests,
   createUser,
   deleteVideoAbuse,
-  flushTests,
-  killallServers,
+  flushAndRunServer,
   makeGetRequest,
   makePostBodyRequest,
-  runServer,
   ServerInfo,
   setAccessTokensToServers,
   updateVideoAbuse,
   uploadVideo,
   userLogin
-} from '../../../../shared/utils'
+} from '../../../../shared/extra-utils'
 import {
   checkBadCountPagination,
   checkBadSortPagination,
   checkBadStartPagination
-} from '../../../../shared/utils/requests/check-api-params'
+} from '../../../../shared/extra-utils/requests/check-api-params'
 import { VideoAbuseState } from '../../../../shared/models/videos'
 
 describe('Test video abuses API validators', function () {
@@ -33,15 +32,13 @@ describe('Test video abuses API validators', function () {
   before(async function () {
     this.timeout(30000)
 
-    await flushTests()
-
-    server = await runServer(1)
+    server = await flushAndRunServer(1)
 
     await setAccessTokensToServers([ server ])
 
     const username = 'user1'
     const password = 'my super password'
-    await createUser(server.url, server.accessToken, username, password)
+    await createUser({ url: server.url, accessToken: server.accessToken, username: username, password: password })
     userAccessToken = await userLogin(server, { username, password })
 
     const res = await uploadVideo(server.url, server.accessToken, {})
@@ -191,11 +188,6 @@ describe('Test video abuses API validators', function () {
   })
 
   after(async function () {
-    killallServers([ server ])
-
-    // Keep the logs if the test failed
-    if (this['ok']) {
-      await flushTests()
-    }
+    await cleanupTests([ server ])
   })
 })

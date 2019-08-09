@@ -2,28 +2,17 @@ import * as express from 'express'
 import { extname, join } from 'path'
 import { VideoCreate, VideoPrivacy, VideoState, VideoUpdate } from '../../../../shared'
 import { getVideoFileFPS, getVideoFileResolution } from '../../../helpers/ffmpeg-utils'
-import { processImage } from '../../../helpers/image-utils'
 import { logger } from '../../../helpers/logger'
 import { auditLoggerFactory, getAuditIdFromRes, VideoAuditView } from '../../../helpers/audit-logger'
 import { getFormattedObjects, getServerActor } from '../../../helpers/utils'
-import {
-  CONFIG,
-  MIMETYPES,
-  PREVIEWS_SIZE,
-  sequelizeTypescript,
-  THUMBNAILS_SIZE,
-  VIDEO_CATEGORIES,
-  VIDEO_LANGUAGES,
-  VIDEO_LICENCES,
-  VIDEO_PRIVACIES
-} from '../../../initializers'
+import { autoBlacklistVideoIfNeeded } from '../../../lib/video-blacklist'
+import { MIMETYPES, VIDEO_CATEGORIES, VIDEO_LANGUAGES, VIDEO_LICENCES, VIDEO_PRIVACIES } from '../../../initializers/constants'
 import {
   changeVideoChannelShare,
   federateVideoIfNeeded,
   fetchRemoteVideoDescription,
   getVideoActivityPubUrl
 } from '../../../lib/activitypub'
-import { sendCreateView } from '../../../lib/activitypub/send'
 import { JobQueue } from '../../../lib/job-queue'
 import { Redis } from '../../../lib/redis'
 import {
@@ -37,6 +26,7 @@ import {
   setDefaultPagination,
   setDefaultSort,
   videosAddValidator,
+  videosCustomGetValidator,
   videosGetValidator,
   videosRemoveValidator,
   videosSortValidator,
@@ -59,6 +49,11 @@ import { resetSequelizeInstance } from '../../../helpers/database-utils'
 import { move } from 'fs-extra'
 import { watchingRouter } from './watching'
 import { Notifier } from '../../../lib/notifier'
+import { sendView } from '../../../lib/activitypub/send/send-view'
+import { CONFIG } from '../../../initializers/config'
+import { sequelizeTypescript } from '../../../initializers/database'
+import { createVideoMiniatureFromExisting, generateVideoMiniature } from '../../../lib/thumbnail'
+import { ThumbnailType } from '../../../../shared/models/videos/thumbnail.type'
 
 const auditLogger = auditLoggerFactory('videos')
 const videosRouter = express.Router()
@@ -123,9 +118,9 @@ videosRouter.get('/:id/description',
 )
 videosRouter.get('/:id',
   optionalAuthenticate,
-  asyncMiddleware(videosGetValidator),
+  asyncMiddleware(videosCustomGetValidator('only-video-with-rights')),
   asyncMiddleware(checkVideoFollowConstraints),
-  getVideo
+  asyncMiddleware(getVideo)
 )
 videosRouter.post('/:id/views',
   asyncMiddleware(videosGetValidator),
@@ -181,15 +176,18 @@ async function addVideo (req: express.Request, res: express.Response) {
     licence: videoInfo.licence,
     language: videoInfo.language,
     commentsEnabled: videoInfo.commentsEnabled || false,
+    downloadEnabled: videoInfo.downloadEnabled || true,
     waitTranscoding: videoInfo.waitTranscoding || false,
     state: CONFIG.TRANSCODING.ENABLED ? VideoState.TO_TRANSCODE : VideoState.PUBLISHED,
     nsfw: videoInfo.nsfw || false,
     description: videoInfo.description,
     support: videoInfo.support,
-    privacy: videoInfo.privacy,
+    privacy: videoInfo.privacy || VideoPrivacy.PRIVATE,
     duration: videoPhysicalFile['duration'], // duration was added by a previous middleware
-    channelId: res.locals.videoChannel.id
+    channelId: res.locals.videoChannel.id,
+    originallyPublishedAt: videoInfo.originallyPublishedAt
   }
+
   const video = new VideoModel(videoData)
   video.url = getVideoActivityPubUrl(video) // We use the UUID, so set the URL after building the object
 
@@ -215,29 +213,27 @@ async function addVideo (req: express.Request, res: express.Response) {
 
   // Process thumbnail or create it from the video
   const thumbnailField = req.files['thumbnailfile']
-  if (thumbnailField) {
-    const thumbnailPhysicalFile = thumbnailField[0]
-    await processImage(thumbnailPhysicalFile, join(CONFIG.STORAGE.THUMBNAILS_DIR, video.getThumbnailName()), THUMBNAILS_SIZE)
-  } else {
-    await video.createThumbnail(videoFile)
-  }
+  const thumbnailModel = thumbnailField
+    ? await createVideoMiniatureFromExisting(thumbnailField[0].path, video, ThumbnailType.MINIATURE)
+    : await generateVideoMiniature(video, videoFile, ThumbnailType.MINIATURE)
 
   // Process preview or create it from the video
   const previewField = req.files['previewfile']
-  if (previewField) {
-    const previewPhysicalFile = previewField[0]
-    await processImage(previewPhysicalFile, join(CONFIG.STORAGE.PREVIEWS_DIR, video.getPreviewName()), PREVIEWS_SIZE)
-  } else {
-    await video.createPreview(videoFile)
-  }
+  const previewModel = previewField
+    ? await createVideoMiniatureFromExisting(previewField[0].path, video, ThumbnailType.PREVIEW)
+    : await generateVideoMiniature(video, videoFile, ThumbnailType.PREVIEW)
 
   // Create the torrent file
   await video.createTorrentAndSetInfoHash(videoFile)
 
-  const videoCreated = await sequelizeTypescript.transaction(async t => {
+  const { videoCreated, videoWasAutoBlacklisted } = await sequelizeTypescript.transaction(async t => {
     const sequelizeOptions = { transaction: t }
 
     const videoCreated = await video.save(sequelizeOptions)
+
+    await videoCreated.addAndSaveThumbnail(thumbnailModel, t)
+    await videoCreated.addAndSaveThumbnail(previewModel, t)
+
     // Do not forget to add video channel information to the created video
     videoCreated.VideoChannel = res.locals.videoChannel
 
@@ -263,15 +259,23 @@ async function addVideo (req: express.Request, res: express.Response) {
       }, { transaction: t })
     }
 
-    await federateVideoIfNeeded(video, true, t)
+    const videoWasAutoBlacklisted = await autoBlacklistVideoIfNeeded(video, res.locals.oauth.token.User, t)
+
+    if (!videoWasAutoBlacklisted) {
+      await federateVideoIfNeeded(video, true, t)
+    }
 
     auditLogger.create(getAuditIdFromRes(res), new VideoAuditView(videoCreated.toFormattedDetailsJSON()))
     logger.info('Video with name %s and uuid %s created.', videoInfo.name, videoCreated.uuid)
 
-    return videoCreated
+    return { videoCreated, videoWasAutoBlacklisted }
   })
 
-  Notifier.Instance.notifyOnNewVideo(videoCreated)
+  if (videoWasAutoBlacklisted) {
+    Notifier.Instance.notifyOnVideoAutoBlacklist(videoCreated)
+  } else {
+    Notifier.Instance.notifyOnNewVideo(videoCreated)
+  }
 
   if (video.state === VideoState.TO_TRANSCODE) {
     // Put uuid because we don't have id auto incremented for now
@@ -280,7 +284,7 @@ async function addVideo (req: express.Request, res: express.Response) {
       isNewVideo: true
     }
 
-    await JobQueue.Instance.createJob({ type: 'video-file', payload: dataInput })
+    await JobQueue.Instance.createJob({ type: 'video-transcoding', payload: dataInput })
   }
 
   return res.json({
@@ -292,7 +296,7 @@ async function addVideo (req: express.Request, res: express.Response) {
 }
 
 async function updateVideo (req: express.Request, res: express.Response) {
-  const videoInstance: VideoModel = res.locals.video
+  const videoInstance = res.locals.video
   const videoFieldsSave = videoInstance.toJSON()
   const oldVideoAuditView = new VideoAuditView(videoInstance.toFormattedDetailsJSON())
   const videoInfoToUpdate: VideoUpdate = req.body
@@ -300,16 +304,13 @@ async function updateVideo (req: express.Request, res: express.Response) {
   const wasUnlistedVideo = videoInstance.privacy === VideoPrivacy.UNLISTED
 
   // Process thumbnail or create it from the video
-  if (req.files && req.files['thumbnailfile']) {
-    const thumbnailPhysicalFile = req.files['thumbnailfile'][0]
-    await processImage(thumbnailPhysicalFile, join(CONFIG.STORAGE.THUMBNAILS_DIR, videoInstance.getThumbnailName()), THUMBNAILS_SIZE)
-  }
+  const thumbnailModel = req.files && req.files['thumbnailfile']
+    ? await createVideoMiniatureFromExisting(req.files['thumbnailfile'][0].path, videoInstance, ThumbnailType.MINIATURE)
+    : undefined
 
-  // Process preview or create it from the video
-  if (req.files && req.files['previewfile']) {
-    const previewPhysicalFile = req.files['previewfile'][0]
-    await processImage(previewPhysicalFile, join(CONFIG.STORAGE.PREVIEWS_DIR, videoInstance.getPreviewName()), PREVIEWS_SIZE)
-  }
+  const previewModel = req.files && req.files['previewfile']
+    ? await createVideoMiniatureFromExisting(req.files['previewfile'][0].path, videoInstance, ThumbnailType.PREVIEW)
+    : undefined
 
   try {
     const videoInstanceUpdated = await sequelizeTypescript.transaction(async t => {
@@ -325,16 +326,25 @@ async function updateVideo (req: express.Request, res: express.Response) {
       if (videoInfoToUpdate.support !== undefined) videoInstance.set('support', videoInfoToUpdate.support)
       if (videoInfoToUpdate.description !== undefined) videoInstance.set('description', videoInfoToUpdate.description)
       if (videoInfoToUpdate.commentsEnabled !== undefined) videoInstance.set('commentsEnabled', videoInfoToUpdate.commentsEnabled)
+      if (videoInfoToUpdate.downloadEnabled !== undefined) videoInstance.set('downloadEnabled', videoInfoToUpdate.downloadEnabled)
+
+      if (videoInfoToUpdate.originallyPublishedAt !== undefined && videoInfoToUpdate.originallyPublishedAt !== null) {
+        videoInstance.originallyPublishedAt = new Date(videoInfoToUpdate.originallyPublishedAt)
+      }
+
       if (videoInfoToUpdate.privacy !== undefined) {
         const newPrivacy = parseInt(videoInfoToUpdate.privacy.toString(), 10)
-        videoInstance.set('privacy', newPrivacy)
+        videoInstance.privacy = newPrivacy
 
         if (wasPrivateVideo === true && newPrivacy !== VideoPrivacy.PRIVATE) {
-          videoInstance.set('publishedAt', new Date())
+          videoInstance.publishedAt = new Date()
         }
       }
 
       const videoInstanceUpdated = await videoInstance.save(sequelizeOptions)
+
+      if (thumbnailModel) await videoInstanceUpdated.addAndSaveThumbnail(thumbnailModel, t)
+      if (previewModel) await videoInstanceUpdated.addAndSaveThumbnail(previewModel, t)
 
       // Video tags update?
       if (videoInfoToUpdate.tags !== undefined) {
@@ -395,22 +405,24 @@ async function updateVideo (req: express.Request, res: express.Response) {
   return res.type('json').status(204).end()
 }
 
-function getVideo (req: express.Request, res: express.Response) {
-  const videoInstance = res.locals.video
+async function getVideo (req: express.Request, res: express.Response) {
+  // We need more attributes
+  const userId: number = res.locals.oauth ? res.locals.oauth.token.User.id : null
+  const video = await VideoModel.loadForGetAPI(res.locals.video.id, undefined, userId)
 
-  if (videoInstance.isOutdated()) {
-    JobQueue.Instance.createJob({ type: 'activitypub-refresher', payload: { type: 'video', url: videoInstance.url } })
-      .catch(err => logger.error('Cannot create AP refresher job for video %s.', videoInstance.url, { err }))
+  if (video.isOutdated()) {
+    JobQueue.Instance.createJob({ type: 'activitypub-refresher', payload: { type: 'video', url: video.url } })
+      .catch(err => logger.error('Cannot create AP refresher job for video %s.', video.url, { err }))
   }
 
-  return res.json(videoInstance.toFormattedDetailsJSON())
+  return res.json(video.toFormattedDetailsJSON())
 }
 
 async function viewVideo (req: express.Request, res: express.Response) {
   const videoInstance = res.locals.video
 
   const ip = req.ip
-  const exists = await Redis.Instance.isVideoIPViewExists(ip, videoInstance.uuid)
+  const exists = await Redis.Instance.doesVideoIPViewExist(ip, videoInstance.uuid)
   if (exists) {
     logger.debug('View for ip %s and video %s already exists.', ip, videoInstance.uuid)
     return res.status(204).end()
@@ -422,7 +434,7 @@ async function viewVideo (req: express.Request, res: express.Response) {
   ])
 
   const serverActor = await getServerActor()
-  await sendCreateView(serverActor, videoInstance, undefined)
+  await sendView(serverActor, videoInstance, undefined)
 
   return res.status(204).end()
 }
@@ -461,7 +473,7 @@ async function listVideos (req: express.Request, res: express.Response) {
 }
 
 async function removeVideo (req: express.Request, res: express.Response) {
-  const videoInstance: VideoModel = res.locals.video
+  const videoInstance = res.locals.video
 
   await sequelizeTypescript.transaction(async t => {
     await videoInstance.destroy({ transaction: t })

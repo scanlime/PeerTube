@@ -1,8 +1,9 @@
 import * as express from 'express'
 import 'express-validator'
-import { body, param } from 'express-validator/check'
-import { isIdOrUUIDValid, isIdValid } from '../../../helpers/custom-validators/misc'
-import { isVideoExist, isVideoRatingTypeValid } from '../../../helpers/custom-validators/videos'
+import { body, param, query } from 'express-validator/check'
+import { isIdOrUUIDValid } from '../../../helpers/custom-validators/misc'
+import { isRatingValid } from '../../../helpers/custom-validators/video-rates'
+import { doesVideoExist, isVideoRatingTypeValid } from '../../../helpers/custom-validators/videos'
 import { logger } from '../../../helpers/logger'
 import { areValidationErrors } from '../utils'
 import { AccountVideoRateModel } from '../../../models/account/account-video-rate'
@@ -17,7 +18,7 @@ const videoUpdateRateValidator = [
     logger.debug('Checking videoRate parameters', { parameters: req.body })
 
     if (areValidationErrors(req, res)) return
-    if (!await isVideoExist(req.params.id, res)) return
+    if (!await doesVideoExist(req.params.id, res)) return
 
     return next()
   }
@@ -47,9 +48,22 @@ const getAccountVideoRateValidator = function (rateType: VideoRateType) {
   ]
 }
 
+const videoRatingValidator = [
+  query('rating').optional().custom(isRatingValid).withMessage('Value must be one of "like" or "dislike"'),
+
+  async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    logger.debug('Checking rating parameter', { parameters: req.params })
+
+    if (areValidationErrors(req, res)) return
+
+    return next()
+  }
+]
+
 // ---------------------------------------------------------------------------
 
 export {
   videoUpdateRateValidator,
-  getAccountVideoRateValidator
+  getAccountVideoRateValidator,
+  videoRatingValidator
 }

@@ -4,15 +4,14 @@ import 'mocha'
 import * as chai from 'chai'
 import {
   addVideoChannel,
+  cleanupTests,
   createUser,
-  flushTests,
-  killallServers,
+  flushAndRunServer,
   makeGetRequest,
-  runServer,
   ServerInfo,
   setAccessTokensToServers,
   uploadVideo
-} from '../../shared/utils'
+} from '../../shared/extra-utils'
 import { VideoPrivacy } from '../../shared/models/videos'
 
 const expect = chai.expect
@@ -23,9 +22,7 @@ describe('Test misc endpoints', function () {
   before(async function () {
     this.timeout(120000)
 
-    await flushTests()
-
-    server = await runServer(1)
+    server = await flushAndRunServer(1)
     await setAccessTokensToServers([ server ])
   })
 
@@ -149,8 +146,8 @@ describe('Test misc endpoints', function () {
       await addVideoChannel(server.url, server.accessToken, { name: 'channel1', displayName: 'channel 1' })
       await addVideoChannel(server.url, server.accessToken, { name: 'channel2', displayName: 'channel 2' })
 
-      await createUser(server.url, server.accessToken, 'user1', 'password')
-      await createUser(server.url, server.accessToken, 'user2', 'password')
+      await createUser({ url: server.url, accessToken: server.accessToken, username: 'user1', password: 'password' })
+      await createUser({ url: server.url, accessToken: server.accessToken, username: 'user2', password: 'password' })
 
       const res = await makeGetRequest({
         url: server.url,
@@ -174,6 +171,6 @@ describe('Test misc endpoints', function () {
   })
 
   after(async function () {
-    killallServers([ server ])
+    await cleanupTests([ server ])
   })
 })

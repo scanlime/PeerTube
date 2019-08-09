@@ -9,7 +9,7 @@ import { VideoComment, VideoCommentThreadTree } from '../../../../shared/models/
 import {
   addVideoChannel,
   checkTmpIsEmpty,
-  checkVideoFilesWereRemoved,
+  checkVideoFilesWereRemoved, cleanupTests,
   completeVideoCheck,
   createUser,
   dateIsValid,
@@ -32,15 +32,15 @@ import {
   viewVideo,
   wait,
   webtorrentAdd
-} from '../../../../shared/utils'
+} from '../../../../shared/extra-utils'
 import {
   addVideoCommentReply,
   addVideoCommentThread,
   deleteVideoComment,
   getVideoCommentThreads,
   getVideoThreadComments
-} from '../../../../shared/utils/videos/video-comments'
-import { waitJobs } from '../../../../shared/utils/server/jobs'
+} from '../../../../shared/extra-utils/videos/video-comments'
+import { waitJobs } from '../../../../shared/extra-utils/server/jobs'
 
 const expect = chai.expect
 
@@ -98,6 +98,7 @@ describe('Test multiple servers', function () {
         nsfw: true,
         description: 'my super description for server 1',
         support: 'my super support text for server 1',
+        originallyPublishedAt: '2019-02-10T13:38:14.449Z',
         tags: [ 'tag1p1', 'tag2p1' ],
         channelId: videoChannelId,
         fixture: 'video_short1.webm'
@@ -118,6 +119,7 @@ describe('Test multiple servers', function () {
           nsfw: true,
           description: 'my super description for server 1',
           support: 'my super support text for server 1',
+          originallyPublishedAt: '2019-02-10T13:38:14.449Z',
           account: {
             name: 'root',
             host: 'localhost:9001'
@@ -128,6 +130,7 @@ describe('Test multiple servers', function () {
           tags: [ 'tag1p1', 'tag2p1' ],
           privacy: VideoPrivacy.PUBLIC,
           commentsEnabled: true,
+          downloadEnabled: true,
           channel: {
             displayName: 'my channel',
             name: 'super_channel_name',
@@ -161,7 +164,7 @@ describe('Test multiple servers', function () {
         username: 'user1',
         password: 'super_password'
       }
-      await createUser(servers[1].url, servers[1].accessToken, user.username, user.password)
+      await createUser({ url: servers[ 1 ].url, accessToken: servers[ 1 ].accessToken, username: user.username, password: user.password })
       const userAccessToken = await userLogin(servers[1], user)
 
       const videoAttributes = {
@@ -199,6 +202,7 @@ describe('Test multiple servers', function () {
           },
           isLocal,
           commentsEnabled: true,
+          downloadEnabled: true,
           duration: 5,
           tags: [ 'tag1p2', 'tag2p2', 'tag3p2' ],
           privacy: VideoPrivacy.PUBLIC,
@@ -307,6 +311,7 @@ describe('Test multiple servers', function () {
           isLocal,
           duration: 5,
           commentsEnabled: true,
+          downloadEnabled: true,
           tags: [ 'tag1p3' ],
           privacy: VideoPrivacy.PUBLIC,
           channel: {
@@ -338,6 +343,7 @@ describe('Test multiple servers', function () {
             host: 'localhost:9003'
           },
           commentsEnabled: true,
+          downloadEnabled: true,
           isLocal,
           duration: 5,
           tags: [ 'tag2p3', 'tag3p3', 'tag4p3' ],
@@ -573,15 +579,15 @@ describe('Test multiple servers', function () {
       this.timeout(20000)
 
       await rateVideo(servers[0].url, servers[0].accessToken, remoteVideosServer1[0], 'like')
-      await wait(200)
+      await wait(500)
       await rateVideo(servers[0].url, servers[0].accessToken, remoteVideosServer1[0], 'dislike')
-      await wait(200)
+      await wait(500)
       await rateVideo(servers[0].url, servers[0].accessToken, remoteVideosServer1[0], 'like')
       await rateVideo(servers[2].url, servers[2].accessToken, localVideosServer3[1], 'like')
-      await wait(200)
+      await wait(500)
       await rateVideo(servers[2].url, servers[2].accessToken, localVideosServer3[1], 'dislike')
       await rateVideo(servers[2].url, servers[2].accessToken, remoteVideosServer3[1], 'dislike')
-      await wait(200)
+      await wait(500)
       await rateVideo(servers[2].url, servers[2].accessToken, remoteVideosServer3[0], 'like')
 
       await waitJobs(servers)
@@ -621,6 +627,7 @@ describe('Test multiple servers', function () {
         support: 'my super support text updated',
         tags: [ 'tag_up_1', 'tag_up_2' ],
         thumbnailfile: 'thumbnail.jpg',
+        originallyPublishedAt: '2019-02-11T13:38:14.449Z',
         previewfile: 'preview.jpg'
       }
 
@@ -648,6 +655,7 @@ describe('Test multiple servers', function () {
           nsfw: true,
           description: 'my super description updated',
           support: 'my super support text updated',
+          originallyPublishedAt: '2019-02-11T13:38:14.449Z',
           account: {
             name: 'root',
             host: 'localhost:9003'
@@ -655,6 +663,7 @@ describe('Test multiple servers', function () {
           isLocal,
           duration: 5,
           commentsEnabled: true,
+          downloadEnabled: true,
           tags: [ 'tag_up_1', 'tag_up_2' ],
           privacy: VideoPrivacy.PUBLIC,
           channel: {
@@ -914,11 +923,12 @@ describe('Test multiple servers', function () {
       }
     })
 
-    it('Should disable comments', async function () {
+    it('Should disable comments and download', async function () {
       this.timeout(20000)
 
       const attributes = {
-        commentsEnabled: false
+        commentsEnabled: false,
+        downloadEnabled: false
       }
 
       await updateVideo(servers[0].url, servers[0].accessToken, videoUUID, attributes)
@@ -928,6 +938,7 @@ describe('Test multiple servers', function () {
       for (const server of servers) {
         const res = await getVideo(server.url, videoUUID)
         expect(res.body.commentsEnabled).to.be.false
+        expect(res.body.downloadEnabled).to.be.false
 
         const text = 'my super forbidden comment'
         await addVideoCommentThread(server.url, server.accessToken, videoUUID, text, 409)
@@ -976,6 +987,7 @@ describe('Test multiple servers', function () {
           isLocal,
           duration: 5,
           commentsEnabled: false,
+          downloadEnabled: true,
           tags: [ ],
           privacy: VideoPrivacy.PUBLIC,
           channel: {
@@ -1018,11 +1030,6 @@ describe('Test multiple servers', function () {
   })
 
   after(async function () {
-    killallServers(servers)
-
-    // Keep the logs if the test failed
-    if (this['ok']) {
-      await flushTests()
-    }
+    await cleanupTests(servers)
   })
 })

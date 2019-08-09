@@ -29,25 +29,22 @@ export class AboutInstanceComponent implements OnInit {
     return this.serverService.getConfig().instance.name
   }
 
-  get userVideoQuota () {
-    return this.serverService.getConfig().user.videoQuota
-  }
-
-  get isSignupAllowed () {
-    return this.serverService.getConfig().signup.allowed
-  }
-
   get isContactFormEnabled () {
     return this.serverService.getConfig().email.enabled && this.serverService.getConfig().contactForm.enabled
+  }
+
+  get isNSFW () {
+    return this.serverService.getConfig().instance.isNSFW
   }
 
   ngOnInit () {
     this.instanceService.getAbout()
       .subscribe(
-        res => {
+        async res => {
           this.shortDescription = res.instance.shortDescription
-          this.descriptionHTML = this.markdownService.textMarkdownToHTML(res.instance.description)
-          this.termsHTML = this.markdownService.textMarkdownToHTML(res.instance.terms)
+
+          this.descriptionHTML = await this.markdownService.textMarkdownToHTML(res.instance.description)
+          this.termsHTML = await this.markdownService.textMarkdownToHTML(res.instance.terms)
         },
 
         () => this.notifier.error(this.i18n('Cannot get about information from server'))

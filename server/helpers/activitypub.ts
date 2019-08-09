@@ -2,7 +2,7 @@ import * as Bluebird from 'bluebird'
 import * as validator from 'validator'
 import { ResultList } from '../../shared/models'
 import { Activity } from '../../shared/models/activitypub'
-import { ACTIVITY_PUB } from '../initializers'
+import { ACTIVITY_PUB } from '../initializers/constants'
 import { ActorModel } from '../models/activitypub/actor'
 import { signJsonLDObject } from './peertube-crypto'
 import { pageToStartAndCount } from './core-utils'
@@ -15,7 +15,7 @@ function activityPubContextify <T> (data: T) {
       'https://w3id.org/security/v1',
       {
         RsaSignature2017: 'https://w3id.org/security#RsaSignature2017',
-        pt: 'https://joinpeertube.org/ns',
+        pt: 'https://joinpeertube.org/ns#',
         sc: 'http://schema.org#',
         Hashtag: 'as:Hashtag',
         uuid: 'sc:identifier',
@@ -24,15 +24,54 @@ function activityPubContextify <T> (data: T) {
         subtitleLanguage: 'sc:subtitleLanguage',
         sensitive: 'as:sensitive',
         language: 'sc:inLanguage',
-        views: 'sc:Number',
-        state: 'sc:Number',
-        size: 'sc:Number',
-        fps: 'sc:Number',
-        commentsEnabled: 'sc:Boolean',
-        waitTranscoding: 'sc:Boolean',
         expires: 'sc:expires',
-        support: 'sc:Text',
-        CacheFile: 'pt:CacheFile'
+        CacheFile: 'pt:CacheFile',
+        Infohash: 'pt:Infohash',
+        originallyPublishedAt: 'sc:datePublished',
+        views: {
+          '@type': 'sc:Number',
+          '@id': 'pt:views'
+        },
+        state: {
+          '@type': 'sc:Number',
+          '@id': 'pt:state'
+        },
+        size: {
+          '@type': 'sc:Number',
+          '@id': 'pt:size'
+        },
+        fps: {
+          '@type': 'sc:Number',
+          '@id': 'pt:fps'
+        },
+        startTimestamp: {
+          '@type': 'sc:Number',
+          '@id': 'pt:startTimestamp'
+        },
+        stopTimestamp: {
+          '@type': 'sc:Number',
+          '@id': 'pt:stopTimestamp'
+        },
+        position: {
+          '@type': 'sc:Number',
+          '@id': 'pt:position'
+        },
+        commentsEnabled: {
+          '@type': 'sc:Boolean',
+          '@id': 'pt:commentsEnabled'
+        },
+        downloadEnabled: {
+          '@type': 'sc:Boolean',
+          '@id': 'pt:downloadEnabled'
+        },
+        waitTranscoding: {
+          '@type': 'sc:Boolean',
+          '@id': 'pt:waitTranscoding'
+        },
+        support: {
+          '@type': 'sc:Text',
+          '@id': 'pt:support'
+        }
       },
       {
         likes: {
@@ -41,6 +80,10 @@ function activityPubContextify <T> (data: T) {
         },
         dislikes: {
           '@id': 'as:dislikes',
+          '@type': '@id'
+        },
+        playlists: {
+          '@id': 'pt:playlists',
           '@type': '@id'
         },
         shares: {
@@ -64,7 +107,7 @@ async function activityPubCollectionPagination (baseUrl: string, handler: Activi
 
     return {
       id: baseUrl,
-      type: 'OrderedCollection',
+      type: 'OrderedCollectionPage',
       totalItems: result.total,
       first: baseUrl + '?page=1'
     }

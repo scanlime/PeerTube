@@ -10,7 +10,7 @@ import * as Bluebird from 'bluebird'
 import { doRequest } from '../../helpers/requests'
 import { getOrCreateActorAndServerAndModel } from './actor'
 import { logger } from '../../helpers/logger'
-import { CRAWL_REQUEST_CONCURRENCY } from '../../initializers'
+import { CRAWL_REQUEST_CONCURRENCY } from '../../initializers/constants'
 import { checkUrlsSameHost, getAPId } from '../../helpers/activitypub'
 
 async function shareVideoByServerAndChannel (video: VideoModel, t: Transaction) {
@@ -54,12 +54,7 @@ async function addVideoShares (shareUrls: string[], instance: VideoModel) {
         url: shareUrl
       }
 
-      await VideoShareModel.findOrCreate({
-        where: {
-          url: shareUrl
-        },
-        defaults: entry
-      })
+      await VideoShareModel.upsert(entry)
     } catch (err) {
       logger.warn('Cannot add share %s.', shareUrl, { err })
     }

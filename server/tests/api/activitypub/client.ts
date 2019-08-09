@@ -11,7 +11,7 @@ import {
   ServerInfo,
   setAccessTokensToServers,
   uploadVideo
-} from '../../../../shared/utils'
+} from '../../../../shared/extra-utils'
 
 const expect = chai.expect
 
@@ -21,8 +21,6 @@ describe('Test activitypub', function () {
 
   before(async function () {
     this.timeout(30000)
-
-    await flushTests()
 
     servers = await flushAndRunMultipleServers(2)
 
@@ -61,7 +59,7 @@ describe('Test activitypub', function () {
     expect(res.header.location).to.equal('http://localhost:9001/videos/watch/' + videoUUID)
   })
 
-  after(async function () {
+  after(function () {
     killallServers(servers)
   })
 })

@@ -36,7 +36,7 @@ export {
 // ---------------------------------------------------------------------------
 
 async function listMyVideosHistory (req: express.Request, res: express.Response) {
-  const user: UserModel = res.locals.oauth.token.User
+  const user = res.locals.oauth.token.User
 
   const resultList = await UserVideoHistoryModel.listForApi(user, req.query.start, req.query.count)
 
@@ -44,11 +44,11 @@ async function listMyVideosHistory (req: express.Request, res: express.Response)
 }
 
 async function removeUserHistory (req: express.Request, res: express.Response) {
-  const user: UserModel = res.locals.oauth.token.User
+  const user = res.locals.oauth.token.User
   const beforeDate = req.body.beforeDate || null
 
   await sequelizeTypescript.transaction(t => {
-    return UserVideoHistoryModel.removeHistoryBefore(user, beforeDate, t)
+    return UserVideoHistoryModel.removeUserHistoryBefore(user, beforeDate, t)
   })
 
   // Do not send the delete to other instances, we delete OUR copy of this video abuse

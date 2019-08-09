@@ -5,18 +5,18 @@ import * as chai from 'chai'
 import { About } from '../../../../shared/models/server/about.model'
 import { CustomConfig } from '../../../../shared/models/server/custom-config.model'
 import {
+  cleanupTests,
   deleteCustomConfig,
+  flushAndRunServer,
   getAbout,
-  killallServers,
-  reRunServer,
-  flushTests,
   getConfig,
   getCustomConfig,
+  killallServers,
   registerUser,
-  runServer,
+  reRunServer,
   setAccessTokensToServers,
   updateCustomConfig
-} from '../../../../shared/utils'
+} from '../../../../shared/extra-utils'
 import { ServerConfig } from '../../../../shared/models'
 
 const expect = chai.expect
@@ -30,6 +30,7 @@ function checkInitialConfig (data: CustomConfig) {
   expect(data.instance.description).to.equal('Welcome to this PeerTube instance!')
   expect(data.instance.terms).to.equal('No terms for now.')
   expect(data.instance.defaultClientRoute).to.equal('/videos/trending')
+  expect(data.instance.isNSFW).to.be.false
   expect(data.instance.defaultNSFWPolicy).to.equal('display')
   expect(data.instance.customizations.css).to.be.empty
   expect(data.instance.customizations.javascript).to.be.empty
@@ -57,8 +58,14 @@ function checkInitialConfig (data: CustomConfig) {
   expect(data.transcoding.resolutions['480p']).to.be.true
   expect(data.transcoding.resolutions['720p']).to.be.true
   expect(data.transcoding.resolutions['1080p']).to.be.true
+  expect(data.transcoding.hls.enabled).to.be.true
+
   expect(data.import.videos.http.enabled).to.be.true
   expect(data.import.videos.torrent.enabled).to.be.true
+  expect(data.autoBlacklist.videos.ofUsers.enabled).to.be.false
+
+  expect(data.followers.instance.enabled).to.be.true
+  expect(data.followers.instance.manualApproval).to.be.false
 }
 
 function checkUpdatedConfig (data: CustomConfig) {
@@ -67,6 +74,7 @@ function checkUpdatedConfig (data: CustomConfig) {
   expect(data.instance.description).to.equal('my super description')
   expect(data.instance.terms).to.equal('my super terms')
   expect(data.instance.defaultClientRoute).to.equal('/videos/recently-added')
+  expect(data.instance.isNSFW).to.be.true
   expect(data.instance.defaultNSFWPolicy).to.equal('blur')
   expect(data.instance.customizations.javascript).to.equal('alert("coucou")')
   expect(data.instance.customizations.css).to.equal('body { background-color: red; }')
@@ -79,7 +87,7 @@ function checkUpdatedConfig (data: CustomConfig) {
 
   expect(data.signup.enabled).to.be.false
   expect(data.signup.limit).to.equal(5)
-  expect(data.signup.requiresEmailVerification).to.be.true
+  expect(data.signup.requiresEmailVerification).to.be.false
 
   expect(data.admin.email).to.equal('superadmin1@example.com')
   expect(data.contactForm.enabled).to.be.false
@@ -95,9 +103,14 @@ function checkUpdatedConfig (data: CustomConfig) {
   expect(data.transcoding.resolutions['480p']).to.be.true
   expect(data.transcoding.resolutions['720p']).to.be.false
   expect(data.transcoding.resolutions['1080p']).to.be.false
+  expect(data.transcoding.hls.enabled).to.be.false
 
   expect(data.import.videos.http.enabled).to.be.false
   expect(data.import.videos.torrent.enabled).to.be.false
+  expect(data.autoBlacklist.videos.ofUsers.enabled).to.be.true
+
+  expect(data.followers.instance.enabled).to.be.false
+  expect(data.followers.instance.manualApproval).to.be.true
 }
 
 describe('Test config', function () {
@@ -105,9 +118,7 @@ describe('Test config', function () {
 
   before(async function () {
     this.timeout(30000)
-
-    await flushTests()
-    server = await runServer(1)
+    server = await flushAndRunServer(1)
     await setAccessTokensToServers([ server ])
   })
 
@@ -160,6 +171,7 @@ describe('Test config', function () {
         description: 'my super description',
         terms: 'my super terms',
         defaultClientRoute: '/videos/recently-added',
+        isNSFW: true,
         defaultNSFWPolicy: 'blur' as 'blur',
         customizations: {
           javascript: 'alert("coucou")',
@@ -183,7 +195,7 @@ describe('Test config', function () {
       signup: {
         enabled: false,
         limit: 5,
-        requiresEmailVerification: true
+        requiresEmailVerification: false
       },
       admin: {
         email: 'superadmin1@example.com'
@@ -205,6 +217,9 @@ describe('Test config', function () {
           '480p': true,
           '720p': false,
           '1080p': false
+        },
+        hls: {
+          enabled: false
         }
       },
       import: {
@@ -215,6 +230,19 @@ describe('Test config', function () {
           torrent: {
             enabled: false
           }
+        }
+      },
+      autoBlacklist: {
+        videos: {
+          ofUsers: {
+            enabled: true
+          }
+        }
+      },
+      followers: {
+        instance: {
+          enabled: false,
+          manualApproval: true
         }
       }
     }
@@ -273,6 +301,6 @@ describe('Test config', function () {
   })
 
   after(async function () {
-    killallServers([ server ])
+    await cleanupTests([ server ])
   })
 })

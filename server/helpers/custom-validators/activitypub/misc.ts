@@ -1,5 +1,5 @@
 import * as validator from 'validator'
-import { CONSTRAINTS_FIELDS } from '../../../initializers'
+import { CONSTRAINTS_FIELDS } from '../../../initializers/constants'
 import { isTestInstance } from '../../core-utils'
 import { exists } from '../misc'
 
@@ -25,8 +25,7 @@ function isActivityPubUrlValid (url: string) {
 }
 
 function isBaseActivityValid (activity: any, type: string) {
-  return (activity['@context'] === undefined || Array.isArray(activity['@context'])) &&
-    activity.type === type &&
+  return activity.type === type &&
     isActivityPubUrlValid(activity.id) &&
     isObjectValid(activity.actor) &&
     isUrlCollectionValid(activity.to) &&

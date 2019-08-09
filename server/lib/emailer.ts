@@ -1,7 +1,7 @@
 import { createTransport, Transporter } from 'nodemailer'
 import { isTestInstance } from '../helpers/core-utils'
 import { bunyanLogger, logger } from '../helpers/logger'
-import { CONFIG } from '../initializers'
+import { CONFIG } from '../initializers/config'
 import { UserModel } from '../models/account/user'
 import { VideoModel } from '../models/video/video'
 import { JobQueue } from './job-queue'
@@ -12,6 +12,16 @@ import { VideoAbuseModel } from '../models/video/video-abuse'
 import { VideoBlacklistModel } from '../models/video/video-blacklist'
 import { VideoImportModel } from '../models/video/video-import'
 import { ActorFollowModel } from '../models/activitypub/actor-follow'
+import { WEBSERVER } from '../initializers/constants'
+
+type SendEmailOptions = {
+  to: string[]
+  subject: string
+  text: string
+
+  fromDisplayName?: string
+  replyTo?: string
+}
 
 class Emailer {
 
@@ -82,7 +92,7 @@ class Emailer {
 
   addNewVideoFromSubscriberNotification (to: string[], video: VideoModel) {
     const channelName = video.VideoChannel.getDisplayName()
-    const videoUrl = CONFIG.WEBSERVER.URL + video.getWatchStaticPath()
+    const videoUrl = WEBSERVER.URL + video.getWatchStaticPath()
 
     const text = `Hi dear user,\n\n` +
       `Your subscription ${channelName} just published a new video: ${video.name}` +
@@ -120,8 +130,26 @@ class Emailer {
     return JobQueue.Instance.createJob({ type: 'email', payload: emailPayload })
   }
 
+  addNewInstanceFollowerNotification (to: string[], actorFollow: ActorFollowModel) {
+    const awaitingApproval = actorFollow.state === 'pending' ? ' awaiting manual approval.' : ''
+
+    const text = `Hi dear admin,\n\n` +
+      `Your instance has a new follower: ${actorFollow.ActorFollower.url}${awaitingApproval}` +
+      `\n\n` +
+      `Cheers,\n` +
+      `PeerTube.`
+
+    const emailPayload: EmailPayload = {
+      to,
+      subject: 'New instance follower',
+      text
+    }
+
+    return JobQueue.Instance.createJob({ type: 'email', payload: emailPayload })
+  }
+
   myVideoPublishedNotification (to: string[], video: VideoModel) {
-    const videoUrl = CONFIG.WEBSERVER.URL + video.getWatchStaticPath()
+    const videoUrl = WEBSERVER.URL + video.getWatchStaticPath()
 
     const text = `Hi dear user,\n\n` +
       `Your video ${video.name} has been published.` +
@@ -141,7 +169,7 @@ class Emailer {
   }
 
   myVideoImportSuccessNotification (to: string[], videoImport: VideoImportModel) {
-    const videoUrl = CONFIG.WEBSERVER.URL + videoImport.Video.getWatchStaticPath()
+    const videoUrl = WEBSERVER.URL + videoImport.Video.getWatchStaticPath()
 
     const text = `Hi dear user,\n\n` +
       `Your video import ${videoImport.getTargetIdentifier()} is finished.` +
@@ -161,7 +189,7 @@ class Emailer {
   }
 
   myVideoImportErrorNotification (to: string[], videoImport: VideoImportModel) {
-    const importUrl = CONFIG.WEBSERVER.URL + '/my-account/video-imports'
+    const importUrl = WEBSERVER.URL + '/my-account/video-imports'
 
     const text = `Hi dear user,\n\n` +
       `Your video import ${videoImport.getTargetIdentifier()} encountered an error.` +
@@ -183,7 +211,7 @@ class Emailer {
   addNewCommentOnMyVideoNotification (to: string[], comment: VideoCommentModel) {
     const accountName = comment.Account.getDisplayName()
     const video = comment.Video
-    const commentUrl = CONFIG.WEBSERVER.URL + comment.getCommentStaticPath()
+    const commentUrl = WEBSERVER.URL + comment.getCommentStaticPath()
 
     const text = `Hi dear user,\n\n` +
       `A new comment has been posted by ${accountName} on your video ${video.name}` +
@@ -205,7 +233,7 @@ class Emailer {
   addNewCommentMentionNotification (to: string[], comment: VideoCommentModel) {
     const accountName = comment.Account.getDisplayName()
     const video = comment.Video
-    const commentUrl = CONFIG.WEBSERVER.URL + comment.getCommentStaticPath()
+    const commentUrl = WEBSERVER.URL + comment.getCommentStaticPath()
 
     const text = `Hi dear user,\n\n` +
       `${accountName} mentioned you on video ${video.name}` +
@@ -225,10 +253,10 @@ class Emailer {
   }
 
   addVideoAbuseModeratorsNotification (to: string[], videoAbuse: VideoAbuseModel) {
-    const videoUrl = CONFIG.WEBSERVER.URL + videoAbuse.Video.getWatchStaticPath()
+    const videoUrl = WEBSERVER.URL + videoAbuse.Video.getWatchStaticPath()
 
     const text = `Hi,\n\n` +
-      `${CONFIG.WEBSERVER.HOST} received an abuse for the following video ${videoUrl}\n\n` +
+      `${WEBSERVER.HOST} received an abuse for the following video ${videoUrl}\n\n` +
       `Cheers,\n` +
       `PeerTube.`
 
@@ -241,15 +269,38 @@ class Emailer {
     return JobQueue.Instance.createJob({ type: 'email', payload: emailPayload })
   }
 
-  addNewUserRegistrationNotification (to: string[], user: UserModel) {
+  addVideoAutoBlacklistModeratorsNotification (to: string[], video: VideoModel) {
+    const VIDEO_AUTO_BLACKLIST_URL = WEBSERVER.URL + '/admin/moderation/video-auto-blacklist/list'
+    const videoUrl = WEBSERVER.URL + video.getWatchStaticPath()
+
     const text = `Hi,\n\n` +
-      `User ${user.username} just registered on ${CONFIG.WEBSERVER.HOST} PeerTube instance.\n\n` +
+      `A recently added video was auto-blacklisted and requires moderator review before publishing.` +
+      `\n\n` +
+      `You can view it and take appropriate action on ${videoUrl}` +
+      `\n\n` +
+      `A full list of auto-blacklisted videos can be reviewed here: ${VIDEO_AUTO_BLACKLIST_URL}` +
+      `\n\n` +
       `Cheers,\n` +
       `PeerTube.`
 
     const emailPayload: EmailPayload = {
       to,
-      subject: '[PeerTube] New user registration on ' + CONFIG.WEBSERVER.HOST,
+      subject: '[PeerTube] An auto-blacklisted video is awaiting review',
+      text
+    }
+
+    return JobQueue.Instance.createJob({ type: 'email', payload: emailPayload })
+  }
+
+  addNewUserRegistrationNotification (to: string[], user: UserModel) {
+    const text = `Hi,\n\n` +
+      `User ${user.username} just registered on ${WEBSERVER.HOST} PeerTube instance.\n\n` +
+      `Cheers,\n` +
+      `PeerTube.`
+
+    const emailPayload: EmailPayload = {
+      to,
+      subject: '[PeerTube] New user registration on ' + WEBSERVER.HOST,
       text
     }
 
@@ -258,10 +309,10 @@ class Emailer {
 
   addVideoBlacklistNotification (to: string[], videoBlacklist: VideoBlacklistModel) {
     const videoName = videoBlacklist.Video.name
-    const videoUrl = CONFIG.WEBSERVER.URL + videoBlacklist.Video.getWatchStaticPath()
+    const videoUrl = WEBSERVER.URL + videoBlacklist.Video.getWatchStaticPath()
 
     const reasonString = videoBlacklist.reason ? ` for the following reason: ${videoBlacklist.reason}` : ''
-    const blockedString = `Your video ${videoName} (${videoUrl} on ${CONFIG.WEBSERVER.HOST} has been blacklisted${reasonString}.`
+    const blockedString = `Your video ${videoName} (${videoUrl} on ${WEBSERVER.HOST} has been blacklisted${reasonString}.`
 
     const text = 'Hi,\n\n' +
       blockedString +
@@ -279,10 +330,10 @@ class Emailer {
   }
 
   addVideoUnblacklistNotification (to: string[], video: VideoModel) {
-    const videoUrl = CONFIG.WEBSERVER.URL + video.getWatchStaticPath()
+    const videoUrl = WEBSERVER.URL + video.getWatchStaticPath()
 
     const text = 'Hi,\n\n' +
-      `Your video ${video.name} (${videoUrl}) on ${CONFIG.WEBSERVER.HOST} has been unblacklisted.` +
+      `Your video ${video.name} (${videoUrl}) on ${WEBSERVER.HOST} has been unblacklisted.` +
       '\n\n' +
       'Cheers,\n' +
       `PeerTube.`
@@ -296,9 +347,9 @@ class Emailer {
     return JobQueue.Instance.createJob({ type: 'email', payload: emailPayload })
   }
 
-  addForgetPasswordEmailJob (to: string, resetPasswordUrl: string) {
+  addPasswordResetEmailJob (to: string, resetPasswordUrl: string) {
     const text = `Hi dear user,\n\n` +
-      `It seems you forgot your password on ${CONFIG.WEBSERVER.HOST}! ` +
+      `A reset password procedure for your account ${to} has been requested on ${WEBSERVER.HOST} ` +
       `Please follow this link to reset it: ${resetPasswordUrl}\n\n` +
       `If you are not the person who initiated this request, please ignore this email.\n\n` +
       `Cheers,\n` +
@@ -315,7 +366,7 @@ class Emailer {
 
   addVerifyEmailJob (to: string, verifyEmailUrl: string) {
     const text = `Welcome to PeerTube,\n\n` +
-      `To start using PeerTube on ${CONFIG.WEBSERVER.HOST} you must  verify your email! ` +
+      `To start using PeerTube on ${WEBSERVER.HOST} you must  verify your email! ` +
       `Please follow this link to verify this email belongs to you: ${verifyEmailUrl}\n\n` +
       `If you are not the person who initiated this request, please ignore this email.\n\n` +
       `Cheers,\n` +
@@ -333,7 +384,7 @@ class Emailer {
   addUserBlockJob (user: UserModel, blocked: boolean, reason?: string) {
     const reasonString = reason ? ` for the following reason: ${reason}` : ''
     const blockedWord = blocked ? 'blocked' : 'unblocked'
-    const blockedString = `Your account ${user.username} on ${CONFIG.WEBSERVER.HOST} has been ${blockedWord}${reasonString}.`
+    const blockedString = `Your account ${user.username} on ${WEBSERVER.HOST} has been ${blockedWord}${reasonString}.`
 
     const text = 'Hi,\n\n' +
       blockedString +
@@ -361,7 +412,8 @@ class Emailer {
       'PeerTube.'
 
     const emailPayload: EmailPayload = {
-      from: fromEmail,
+      fromDisplayName: fromEmail,
+      replyTo: fromEmail,
       to: [ CONFIG.ADMIN.EMAIL ],
       subject: '[PeerTube] Contact form submitted',
       text
@@ -370,16 +422,21 @@ class Emailer {
     return JobQueue.Instance.createJob({ type: 'email', payload: emailPayload })
   }
 
-  sendMail (to: string[], subject: string, text: string, from?: string) {
+  sendMail (options: EmailPayload) {
     if (!Emailer.isEnabled()) {
       throw new Error('Cannot send mail because SMTP is not configured.')
     }
 
+    const fromDisplayName = options.fromDisplayName
+      ? options.fromDisplayName
+      : WEBSERVER.HOST
+
     return this.transporter.sendMail({
-      from: from || CONFIG.SMTP.FROM_ADDRESS,
-      to: to.join(','),
-      subject,
-      text
+      from: `"${fromDisplayName}" <${CONFIG.SMTP.FROM_ADDRESS}>`,
+      replyTo: options.replyTo,
+      to: options.to.join(','),
+      subject: options.subject,
+      text: options.text
     })
   }
 
@@ -396,5 +453,6 @@ class Emailer {
 // ---------------------------------------------------------------------------
 
 export {
-  Emailer
+  Emailer,
+  SendEmailOptions
 }
