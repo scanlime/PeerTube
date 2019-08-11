@@ -6,10 +6,12 @@ import { JobQueue } from '../server/lib/job-queue'
 program
   .option('-v, --video [videoUUID]', 'Video UUID')
   .option('-r, --resolution [resolution]', 'Video resolution (integer)')
+  .option('--portrait', 'Video is in portrait mode')
+  .option('--hls', 'Generate HLS playlist')
   .parse(process.argv)
 
 if (program['video'] === undefined) {
-  console.error('All parameters are mandatory.')
+  console.error('Video ID is mandatory.')
   process.exit(-1)
 }
 
@@ -34,11 +36,9 @@ async function run () {
   const dataInput = {
     videoUUID: video.uuid,
     isNewVideo: false,
-    resolution: undefined
-  }
-
-  if (program.resolution !== undefined) {
-    dataInput.resolution = program.resolution
+    resolution: program.resolution,
+    isPortraitMode: program.portrait,
+    generateHlsPlaylist: program.hls
   }
 
   await JobQueue.Instance.init()
