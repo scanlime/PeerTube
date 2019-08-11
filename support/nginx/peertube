@@ -115,9 +115,10 @@ server {
   }
 
   # Bypass PeerTube for performance reasons. Could be removed
-  location ~ ^/static/(webseed|redundancy)/ {
-    # Clients usually have 4 simultaneous webseed connections, so the real limit is 3MB/s per client
-    limit_rate 800k;
+  location ~ ^/static/(webseed|redundancy|streaming-playlists)/ {
+
+    limit_rate 10000k;
+    limit_rate_after 4000k;
 
     if ($request_method = 'OPTIONS') {
       add_header 'Access-Control-Allow-Origin' '*';
@@ -142,6 +143,7 @@ server {
 
     rewrite ^/static/webseed/(.*)$ /videos/$1 break;
     rewrite ^/static/redundancy/(.*)$ /redundancy/$1 break;
+    rewrite ^/static/streaming-playlists/(.*)$ /streaming-playlists/$1 break;
 
     try_files $uri /;
   }
