@@ -65,7 +65,7 @@ async function transcodeOriginalVideofile (video: VideoModel, resolution: VideoR
     size: 0,
     videoId: video.id
   })
-  const videoOutputPath = join(videosDirectory, video.getVideoFilename(newVideoFile))
+  const videoOutputPath = join(CONFIG.STORAGE.VIDEOS_DIR, video.getVideoFilename(newVideoFile))
 
   const transcodeOptions = {
     inputPath: videoInputPath,
@@ -93,17 +93,7 @@ async function generateHlsPlaylist (video: VideoModel, resolution: VideoResoluti
   const baseHlsDirectory = join(HLS_STREAMING_PLAYLIST_DIRECTORY, video.uuid)
   await ensureDir(join(HLS_STREAMING_PLAYLIST_DIRECTORY, video.uuid))
 
-  const videosDirectory = CONFIG.STORAGE.VIDEOS_DIR
-  const extname = '.mp4'
-
-  const transcodedFile = new VideoFileModel({
-    resolution,
-    extname,
-    size: 0,
-    videoId: video.id
-  })
-
-  const videoInputPath = join(videosDirectory, video.getVideoFilename(transcodedFile))
+  const videoInputPath = join(CONFIG.STORAGE.VIDEOS_DIR, video.getVideoFilename(video.getOriginalFile()))
   const outputPath = join(baseHlsDirectory, VideoStreamingPlaylistModel.getHlsPlaylistFilename(resolution))
 
   const transcodeOptions = {
