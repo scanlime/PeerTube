@@ -31,6 +31,7 @@ import { isThemeNameValid } from '../../helpers/custom-validators/plugins'
 import { isThemeRegistered } from '../../lib/plugins/theme-utils'
 import { doesVideoExist } from '../../helpers/middlewares'
 import { UserRole } from '../../../shared/models/users'
+import { MUserDefault } from '@server/typings/models'
 
 const usersAddValidator = [
   body('username').custom(isUserUsernameValid).withMessage('Should have a valid username (lowercase alphanumeric characters)'),
@@ -38,7 +39,9 @@ const usersAddValidator = [
   body('email').isEmail().withMessage('Should have a valid email'),
   body('videoQuota').custom(isUserVideoQuotaValid).withMessage('Should have a valid user quota'),
   body('videoQuotaDaily').custom(isUserVideoQuotaDailyValid).withMessage('Should have a valid daily user quota'),
-  body('role').custom(isUserRoleValid).withMessage('Should have a valid role'),
+  body('role')
+    .customSanitizer(toIntOrNull)
+    .custom(isUserRoleValid).withMessage('Should have a valid role'),
   body('adminFlags').optional().custom(isUserAdminFlagsValid).withMessage('Should have a valid admin flags'),
 
   async (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -50,7 +53,7 @@ const usersAddValidator = [
     const authUser = res.locals.oauth.token.User
     if (authUser.role !== UserRole.ADMINISTRATOR && req.body.role !== UserRole.USER) {
       return res.status(403)
-        .json({ error: 'You can only create users (and not administrators or moderators' })
+        .json({ error: 'You can only create users (and not administrators or moderators)' })
     }
 
     return next()
@@ -160,7 +163,10 @@ const usersUpdateValidator = [
   body('emailVerified').optional().isBoolean().withMessage('Should have a valid email verified attribute'),
   body('videoQuota').optional().custom(isUserVideoQuotaValid).withMessage('Should have a valid user quota'),
   body('videoQuotaDaily').optional().custom(isUserVideoQuotaDailyValid).withMessage('Should have a valid daily user quota'),
-  body('role').optional().custom(isUserRoleValid).withMessage('Should have a valid role'),
+  body('role')
+    .optional()
+    .customSanitizer(toIntOrNull)
+    .custom(isUserRoleValid).withMessage('Should have a valid role'),
   body('adminFlags').optional().custom(isUserAdminFlagsValid).withMessage('Should have a valid admin flags'),
 
   async (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -457,7 +463,7 @@ async function checkUserNameOrEmailDoesNotAlreadyExist (username: string, email:
   return true
 }
 
-async function checkUserExist (finder: () => Bluebird<UserModel>, res: express.Response, abortResponse = true) {
+async function checkUserExist (finder: () => Bluebird<MUserDefault>, res: express.Response, abortResponse = true) {
   const user = await finder()
 
   if (!user) {
