@@ -74,7 +74,7 @@ storage:
   avatars: '/var/www/peertube/storage/avatars/'
   videos: '/var/www/peertube/storage/videos/'
   streaming_playlists: '/var/www/peertube/storage/streaming-playlists/'
-  redundancy: '/var/www/peertube/storage/videos/'
+  redundancy: '/var/www/peertube/storage/redundancy/'
   logs: '/var/www/peertube/storage/logs/'
   previews: '/var/www/peertube/storage/previews/'
   thumbnails: '/var/www/peertube/storage/thumbnails/'
