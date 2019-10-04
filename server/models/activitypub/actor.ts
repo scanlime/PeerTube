@@ -43,7 +43,6 @@ import {
   MActorFormattable,
   MActorFull,
   MActorHost,
-  MActorRedundancyAllowedOpt,
   MActorServer,
   MActorSummaryFormattable
 } from '../../typings/models'
@@ -175,8 +174,8 @@ export class ActorModel extends Model<ActorModel> {
   @Column(DataType.STRING(CONSTRAINTS_FIELDS.ACTORS.URL.max))
   inboxUrl: string
 
-  @AllowNull(false)
-  @Is('ActorOutboxUrl', value => throwIfNotValid(value, isActivityPubUrlValid, 'outbox url'))
+  @AllowNull(true)
+  @Is('ActorOutboxUrl', value => throwIfNotValid(value, isActivityPubUrlValid, 'outbox url', true))
   @Column(DataType.STRING(CONSTRAINTS_FIELDS.ACTORS.URL.max))
   outboxUrl: string
 
@@ -185,13 +184,13 @@ export class ActorModel extends Model<ActorModel> {
   @Column(DataType.STRING(CONSTRAINTS_FIELDS.ACTORS.URL.max))
   sharedInboxUrl: string
 
-  @AllowNull(false)
-  @Is('ActorFollowersUrl', value => throwIfNotValid(value, isActivityPubUrlValid, 'followers url'))
+  @AllowNull(true)
+  @Is('ActorFollowersUrl', value => throwIfNotValid(value, isActivityPubUrlValid, 'followers url', true))
   @Column(DataType.STRING(CONSTRAINTS_FIELDS.ACTORS.URL.max))
   followersUrl: string
 
-  @AllowNull(false)
-  @Is('ActorFollowingUrl', value => throwIfNotValid(value, isActivityPubUrlValid, 'following url'))
+  @AllowNull(true)
+  @Is('ActorFollowingUrl', value => throwIfNotValid(value, isActivityPubUrlValid, 'following url', true))
   @Column(DataType.STRING(CONSTRAINTS_FIELDS.ACTORS.URL.max))
   followingUrl: string
 
@@ -430,15 +429,8 @@ export class ActorModel extends Model<ActorModel> {
     })
   }
 
-  toActivityPubObject (this: MActorAP, name: string, type: 'Account' | 'Application' | 'VideoChannel') {
+  toActivityPubObject (this: MActorAP, name: string) {
     let activityPubType
-    if (type === 'Account') {
-      activityPubType = 'Person' as 'Person'
-    } else if (type === 'Application') {
-      activityPubType = 'Application' as 'Application'
-    } else { // VideoChannel
-      activityPubType = 'Group' as 'Group'
-    }
 
     let icon = undefined
     if (this.avatarId) {
@@ -451,7 +443,7 @@ export class ActorModel extends Model<ActorModel> {
     }
 
     const json = {
-      type: activityPubType,
+      type: this.type,
       id: this.url,
       following: this.getFollowingUrl(),
       followers: this.getFollowersUrl(),

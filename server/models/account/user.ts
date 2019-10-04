@@ -22,8 +22,10 @@ import {
 import { hasUserRight, USER_ROLE_LABELS, UserRight } from '../../../shared'
 import { User, UserRole } from '../../../shared/models/users'
 import {
+  isNoInstanceConfigWarningModal,
   isUserAdminFlagsValid,
   isUserAutoPlayVideoValid,
+  isUserAutoPlayNextVideoValid,
   isUserBlockedReasonValid,
   isUserBlockedValid,
   isUserEmailVerifiedValid,
@@ -35,7 +37,8 @@ import {
   isUserVideoQuotaDailyValid,
   isUserVideoQuotaValid,
   isUserVideosHistoryEnabledValid,
-  isUserWebTorrentEnabledValid
+  isUserWebTorrentEnabledValid,
+  isNoWelcomeModal
 } from '../../helpers/custom-validators/users'
 import { comparePassword, cryptPassword } from '../../helpers/peertube-crypto'
 import { OAuthTokenModel } from '../oauth/oauth-token'
@@ -158,6 +161,12 @@ export class UserModel extends Model<UserModel> {
   @Column
   autoPlayVideo: boolean
 
+  @AllowNull(false)
+  @Default(false)
+  @Is('UserAutoPlayNextVideo', value => throwIfNotValid(value, isUserAutoPlayNextVideoValid, 'auto play next video boolean'))
+  @Column
+  autoPlayNextVideo: boolean
+
   @AllowNull(true)
   @Default(null)
   @Is('UserVideoLanguages', value => throwIfNotValid(value, isUserVideoLanguages, 'video languages'))
@@ -202,6 +211,24 @@ export class UserModel extends Model<UserModel> {
   @Is('UserTheme', value => throwIfNotValid(value, isThemeNameValid, 'theme'))
   @Column
   theme: string
+
+  @AllowNull(false)
+  @Default(false)
+  @Is(
+    'UserNoInstanceConfigWarningModal',
+    value => throwIfNotValid(value, isNoInstanceConfigWarningModal, 'no instance config warning modal')
+  )
+  @Column
+  noInstanceConfigWarningModal: boolean
+
+  @AllowNull(false)
+  @Default(false)
+  @Is(
+    'UserNoInstanceConfigWarningModal',
+    value => throwIfNotValid(value, isNoWelcomeModal, 'no welcome modal')
+  )
+  @Column
+  noWelcomeModal: boolean
 
   @CreatedAt
   createdAt: Date
@@ -560,40 +587,53 @@ export class UserModel extends Model<UserModel> {
     return comparePassword(password, this.password)
   }
 
-  toSummaryJSON
-
   toFormattedJSON (this: MUserFormattable, parameters: { withAdminFlags?: boolean } = {}): User {
     const videoQuotaUsed = this.get('videoQuotaUsed')
     const videoQuotaUsedDaily = this.get('videoQuotaUsedDaily')
 
-    const json = {
+    const json: User = {
       id: this.id,
       username: this.username,
       email: this.email,
+      theme: getThemeOrDefault(this.theme, DEFAULT_USER_THEME_NAME),
+
       pendingEmail: this.pendingEmail,
       emailVerified: this.emailVerified,
+
       nsfwPolicy: this.nsfwPolicy,
       webTorrentEnabled: this.webTorrentEnabled,
       videosHistoryEnabled: this.videosHistoryEnabled,
       autoPlayVideo: this.autoPlayVideo,
+      autoPlayNextVideo: this.autoPlayNextVideo,
       videoLanguages: this.videoLanguages,
+
       role: this.role,
-      theme: getThemeOrDefault(this.theme, DEFAULT_USER_THEME_NAME),
       roleLabel: USER_ROLE_LABELS[ this.role ],
+
       videoQuota: this.videoQuota,
       videoQuotaDaily: this.videoQuotaDaily,
-      createdAt: this.createdAt,
+      videoQuotaUsed: videoQuotaUsed !== undefined
+        ? parseInt(videoQuotaUsed + '', 10)
+        : undefined,
+      videoQuotaUsedDaily: videoQuotaUsedDaily !== undefined
+        ? parseInt(videoQuotaUsedDaily + '', 10)
+        : undefined,
+
+      noInstanceConfigWarningModal: this.noInstanceConfigWarningModal,
+      noWelcomeModal: this.noWelcomeModal,
+
       blocked: this.blocked,
       blockedReason: this.blockedReason,
+
       account: this.Account.toFormattedJSON(),
-      notificationSettings: this.NotificationSetting ? this.NotificationSetting.toFormattedJSON() : undefined,
+
+      notificationSettings: this.NotificationSetting
+        ? this.NotificationSetting.toFormattedJSON()
+        : undefined,
+
       videoChannels: [],
-      videoQuotaUsed: videoQuotaUsed !== undefined
-            ? parseInt(videoQuotaUsed + '', 10)
-            : undefined,
-      videoQuotaUsedDaily: videoQuotaUsedDaily !== undefined
-            ? parseInt(videoQuotaUsedDaily + '', 10)
-            : undefined
+
+      createdAt: this.createdAt
     }
 
     if (parameters.withAdminFlags) {

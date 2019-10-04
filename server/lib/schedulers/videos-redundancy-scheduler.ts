@@ -261,7 +261,7 @@ export class VideosRedundancyScheduler extends AbstractScheduler {
   }
 
   private async purgeCacheIfNeeded (candidateToDuplicate: CandidateToDuplicate) {
-    while (this.isTooHeavy(candidateToDuplicate)) {
+    while (await this.isTooHeavy(candidateToDuplicate)) {
       const redundancy = candidateToDuplicate.redundancy
       const toDelete = await VideoRedundancyModel.loadOldestLocalExpired(redundancy.strategy, redundancy.minLifetime)
       if (!toDelete) return
@@ -293,9 +293,8 @@ export class VideosRedundancyScheduler extends AbstractScheduler {
     const fileReducer = (previous: number, current: MVideoFile) => previous + current.size
 
     const totalSize = files.reduce(fileReducer, 0)
-    if (playlists.length === 0) return totalSize
 
-    return totalSize * playlists.length
+    return totalSize + (totalSize * playlists.length)
   }
 
   private async loadAndRefreshVideo (videoUrl: string) {

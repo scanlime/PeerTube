@@ -6,10 +6,8 @@ import { RouterModule } from '@angular/router'
 import { MarkdownTextareaComponent } from '@app/shared/forms/markdown-textarea.component'
 import { HelpComponent } from '@app/shared/misc/help.component'
 import { InfiniteScrollerDirective } from '@app/shared/video/infinite-scroller.directive'
-
 import { BytesPipe, KeysPipe, NgPipesModule } from 'ngx-pipes'
 import { SharedModule as PrimeSharedModule } from 'primeng/components/common/shared'
-
 import { AUTH_INTERCEPTOR_PROVIDER } from './auth'
 import { ButtonComponent } from './buttons/button.component'
 import { DeleteButtonComponent } from './buttons/delete-button.component'
@@ -93,6 +91,8 @@ import { VideoDownloadComponent } from '@app/shared/video/modals/video-download.
 import { VideoReportComponent } from '@app/shared/video/modals/video-report.component'
 import { ClipboardModule } from 'ngx-clipboard'
 import { FollowService } from '@app/shared/instance/follow.service'
+import { MultiSelectModule } from 'primeng/multiselect'
+import { FeatureBooleanComponent } from '@app/shared/instance/feature-boolean.component'
 
 @NgModule({
   imports: [
@@ -113,7 +113,8 @@ import { FollowService } from '@app/shared/instance/follow.service'
 
     PrimeSharedModule,
     InputMaskModule,
-    NgPipesModule
+    NgPipesModule,
+    MultiSelectModule
   ],
 
   declarations: [
@@ -156,6 +157,7 @@ import { FollowService } from '@app/shared/instance/follow.service'
     SubscribeButtonComponent,
     RemoteSubscribeComponent,
     InstanceFeaturesTableComponent,
+    FeatureBooleanComponent,
     UserBanModalComponent,
     UserModerationDropdownComponent,
     TopMenuDropdownComponent,
@@ -186,6 +188,7 @@ import { FollowService } from '@app/shared/instance/follow.service'
     InputMaskModule,
     BytesPipe,
     KeysPipe,
+    MultiSelectModule,
 
     LoaderComponent,
     SmallLoaderComponent,

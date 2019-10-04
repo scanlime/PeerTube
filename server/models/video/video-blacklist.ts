@@ -1,5 +1,5 @@
 import { AllowNull, BelongsTo, Column, CreatedAt, DataType, Default, ForeignKey, Is, Model, Table, UpdatedAt } from 'sequelize-typescript'
-import { getSortOnModel, SortType, throwIfNotValid } from '../utils'
+import { getBlacklistSort, SortType, throwIfNotValid } from '../utils'
 import { VideoModel } from './video'
 import { ScopeNames as VideoChannelScopeNames, SummaryOptions, VideoChannelModel } from './video-channel'
 import { isVideoBlacklistReasonValid, isVideoBlacklistTypeValid } from '../../helpers/custom-validators/video-blacklist'
@@ -59,14 +59,13 @@ export class VideoBlacklistModel extends Model<VideoBlacklistModel> {
       return {
         offset: start,
         limit: count,
-        order: getSortOnModel(sort.sortModel, sort.sortValue)
+        order: getBlacklistSort(sort.sortModel, sort.sortValue)
       }
     }
 
     const countQuery = buildBaseQuery()
 
     const findQuery = buildBaseQuery()
-    findQuery.subQuery = false
     findQuery.include = [
       {
         model: VideoModel,

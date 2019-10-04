@@ -158,7 +158,19 @@ function getAbout (req: express.Request, res: express.Response) {
       name: CONFIG.INSTANCE.NAME,
       shortDescription: CONFIG.INSTANCE.SHORT_DESCRIPTION,
       description: CONFIG.INSTANCE.DESCRIPTION,
-      terms: CONFIG.INSTANCE.TERMS
+      terms: CONFIG.INSTANCE.TERMS,
+      codeOfConduct: CONFIG.INSTANCE.CODE_OF_CONDUCT,
+
+      hardwareInformation: CONFIG.INSTANCE.HARDWARE_INFORMATION,
+
+      creationReason: CONFIG.INSTANCE.CREATION_REASON,
+      moderationInformation: CONFIG.INSTANCE.MODERATION_INFORMATION,
+      administrator: CONFIG.INSTANCE.ADMINISTRATOR,
+      maintenanceLifetime: CONFIG.INSTANCE.MAINTENANCE_LIFETIME,
+      businessModel: CONFIG.INSTANCE.BUSINESS_MODEL,
+
+      languages: CONFIG.INSTANCE.LANGUAGES,
+      categories: CONFIG.INSTANCE.CATEGORIES
     }
   }
 
@@ -221,6 +233,18 @@ function customConfig (): CustomConfig {
       shortDescription: CONFIG.INSTANCE.SHORT_DESCRIPTION,
       description: CONFIG.INSTANCE.DESCRIPTION,
       terms: CONFIG.INSTANCE.TERMS,
+      codeOfConduct: CONFIG.INSTANCE.CODE_OF_CONDUCT,
+
+      creationReason: CONFIG.INSTANCE.CREATION_REASON,
+      moderationInformation: CONFIG.INSTANCE.MODERATION_INFORMATION,
+      administrator: CONFIG.INSTANCE.ADMINISTRATOR,
+      maintenanceLifetime: CONFIG.INSTANCE.MAINTENANCE_LIFETIME,
+      businessModel: CONFIG.INSTANCE.BUSINESS_MODEL,
+      hardwareInformation: CONFIG.INSTANCE.HARDWARE_INFORMATION,
+
+      languages: CONFIG.INSTANCE.LANGUAGES,
+      categories: CONFIG.INSTANCE.CATEGORIES,
+
       isNSFW: CONFIG.INSTANCE.IS_NSFW,
       defaultClientRoute: CONFIG.INSTANCE.DEFAULT_CLIENT_ROUTE,
       defaultNSFWPolicy: CONFIG.INSTANCE.DEFAULT_NSFW_POLICY,
@@ -299,6 +323,18 @@ function customConfig (): CustomConfig {
       instance: {
         enabled: CONFIG.FOLLOWERS.INSTANCE.ENABLED,
         manualApproval: CONFIG.FOLLOWERS.INSTANCE.MANUAL_APPROVAL
+      }
+    },
+    followings: {
+      instance: {
+        autoFollowBack: {
+          enabled: CONFIG.FOLLOWINGS.INSTANCE.AUTO_FOLLOW_BACK.ENABLED
+        },
+
+        autoFollowIndex: {
+          enabled: CONFIG.FOLLOWINGS.INSTANCE.AUTO_FOLLOW_INDEX.ENABLED,
+          indexUrl: CONFIG.FOLLOWINGS.INSTANCE.AUTO_FOLLOW_INDEX.INDEX_URL
+        }
       }
     }
   }
