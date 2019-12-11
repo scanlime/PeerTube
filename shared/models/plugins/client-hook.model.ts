@@ -1,9 +1,14 @@
 // Data from API hooks: {hookType}:api.{location}.{elementType}.{actionType}.{target}
+// Data in internal functions: {hookType}:{location}.{elementType}.{actionType}.{target}
 
 export const clientFilterHookObject = {
   // Filter params/result of the function that fetch videos of the trending page
   'filter:api.trending-videos.videos.list.params': true,
   'filter:api.trending-videos.videos.list.result': true,
+
+  // Filter params/result of the function that fetch videos of the trending page
+  'filter:api.most-liked-videos.videos.list.params': true,
+  'filter:api.most-liked-videos.videos.list.result': true,
 
   // Filter params/result of the function that fetch videos of the local page
   'filter:api.local-videos.videos.list.params': true,
@@ -34,7 +39,18 @@ export const clientFilterHookObject = {
   'filter:api.search.videos.list.result': true,
   // Filter params/result of the function that fetch video-channels according to the user search
   'filter:api.search.video-channels.list.params': true,
-  'filter:api.search.video-channels.list.result': true
+  'filter:api.search.video-channels.list.result': true,
+
+  // Filter form
+  'filter:api.signup.registration.create.params': true,
+
+  // Filter the options to create our player
+  'filter:internal.video-watch.player.build-options.params': true,
+  'filter:internal.video-watch.player.build-options.result': true,
+
+  // Filter our SVG icons content
+  'filter:internal.common.svg-icons.get-content.params': true,
+  'filter:internal.common.svg-icons.get-content.result': true
 }
 
 export type ClientFilterHookName = keyof typeof clientFilterHookObject
@@ -47,12 +63,17 @@ export const clientActionHookObject = {
   'action:video-watch.init': true,
   // Fired when the video watch page loaded the video
   'action:video-watch.video.loaded': true,
+  // Fired when the player finished loading
+  'action:video-watch.player.loaded': true,
 
   // Fired when the search page is being initialized
   'action:search.init': true,
 
   // Fired every time Angular URL changes
-  'action:router.navigation-end': true
+  'action:router.navigation-end': true,
+
+  // Fired when the registration page is being initialized
+  'action:signup.register.init': true
 }
 
 export type ClientActionHookName = keyof typeof clientActionHookObject

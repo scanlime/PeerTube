@@ -9,11 +9,14 @@ const oAuthServer = new OAuthServer({
   useErrorHandler: true,
   accessTokenLifetime: OAUTH_LIFETIME.ACCESS_TOKEN,
   refreshTokenLifetime: OAUTH_LIFETIME.REFRESH_TOKEN,
+  continueMiddleware: true,
   model: require('../lib/oauth-model')
 })
 
-function authenticate (req: express.Request, res: express.Response, next: express.NextFunction) {
-  oAuthServer.authenticate()(req, res, err => {
+function authenticate (req: express.Request, res: express.Response, next: express.NextFunction, authenticateInQuery = false) {
+  const options = authenticateInQuery ? { allowBearerTokensInQueryString: true } : {}
+
+  oAuthServer.authenticate(options)(req, res, err => {
     if (err) {
       logger.warn('Cannot authenticate.', { err })
 
@@ -50,16 +53,14 @@ function authenticateSocket (socket: Socket, next: (err?: any) => void) {
     })
 }
 
-function authenticatePromiseIfNeeded (req: express.Request, res: express.Response) {
+function authenticatePromiseIfNeeded (req: express.Request, res: express.Response, authenticateInQuery = false) {
   return new Promise(resolve => {
     // Already authenticated? (or tried to)
     if (res.locals.oauth && res.locals.oauth.token.User) return resolve()
 
     if (res.locals.authenticated === false) return res.sendStatus(401)
 
-    authenticate(req, res, () => {
-      return resolve()
-    })
+    authenticate(req, res, () => resolve(), authenticateInQuery)
   })
 }
 

@@ -163,31 +163,37 @@ async function updateActorInstance (actorInstance: ActorModel, attributes: Activ
   actorInstance.followingCount = followingCount
   actorInstance.inboxUrl = attributes.inbox
   actorInstance.outboxUrl = attributes.outbox
-  actorInstance.sharedInboxUrl = attributes.endpoints.sharedInbox
   actorInstance.followersUrl = attributes.followers
   actorInstance.followingUrl = attributes.following
+
+  if (attributes.endpoints && attributes.endpoints.sharedInbox) {
+    actorInstance.sharedInboxUrl = attributes.endpoints.sharedInbox
+  }
 }
 
 type AvatarInfo = { name: string, onDisk: boolean, fileUrl: string }
 async function updateActorAvatarInstance (actor: MActorDefault, info: AvatarInfo, t: Transaction) {
-  if (info.name !== undefined) {
-    if (actor.avatarId) {
-      try {
-        await actor.Avatar.destroy({ transaction: t })
-      } catch (err) {
-        logger.error('Cannot remove old avatar of actor %s.', actor.url, { err })
-      }
+  if (!info.name) return actor
+
+  if (actor.Avatar) {
+    // Don't update the avatar if the filename did not change
+    if (actor.Avatar.fileUrl === info.fileUrl) return actor
+
+    try {
+      await actor.Avatar.destroy({ transaction: t })
+    } catch (err) {
+      logger.error('Cannot remove old avatar of actor %s.', actor.url, { err })
     }
-
-    const avatar = await AvatarModel.create({
-      filename: info.name,
-      onDisk: info.onDisk,
-      fileUrl: info.fileUrl
-    }, { transaction: t })
-
-    actor.avatarId = avatar.id
-    actor.Avatar = avatar
   }
+
+  const avatar = await AvatarModel.create({
+    filename: info.name,
+    onDisk: info.onDisk,
+    fileUrl: info.fileUrl
+  }, { transaction: t })
+
+  actor.avatarId = avatar.id
+  actor.Avatar = avatar
 
   return actor
 }
@@ -437,9 +443,12 @@ async function fetchRemoteActor (actorUrl: string): Promise<{ statusCode?: numbe
     followingCount: followingCount,
     inboxUrl: actorJSON.inbox,
     outboxUrl: actorJSON.outbox,
-    sharedInboxUrl: actorJSON.endpoints.sharedInbox,
     followersUrl: actorJSON.followers,
-    followingUrl: actorJSON.following
+    followingUrl: actorJSON.following,
+
+    sharedInboxUrl: actorJSON.endpoints && actorJSON.endpoints.sharedInbox
+      ? actorJSON.endpoints.sharedInbox
+      : null
   })
 
   const avatarInfo = await getAvatarInfoIfExists(actorJSON)

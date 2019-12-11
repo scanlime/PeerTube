@@ -1,3 +1,6 @@
+import { registerTSPaths } from '../helpers/register-ts-paths'
+registerTSPaths()
+
 // FIXME: https://github.com/nodejs/node/pull/16853
 require('tls').DEFAULT_ECDH_CURVE = 'auto'
 
@@ -54,8 +57,8 @@ getServerCredentials(command)
       exitError('--tmpdir %s: directory does not exist or is not accessible', program[ 'tmpdir' ])
     }
 
-    removeEndSlashes(url)
-    removeEndSlashes(program[ 'targetUrl' ])
+    url = removeEndSlashes(url)
+    program[ 'targetUrl' ] = removeEndSlashes(program[ 'targetUrl' ])
 
     const user = { username, password }
 
@@ -327,9 +330,7 @@ function isNSFW (info: any) {
 }
 
 function removeEndSlashes (url: string) {
-  while (url.endsWith('/')) {
-    url.slice(0, -1)
-  }
+  return url.replace(/\/+$/, '')
 }
 
 async function promptPassword () {
@@ -372,6 +373,7 @@ function parseDate (dateAsStr: string): Date {
     exitError(`Invalid date passed: ${dateAsStr}. Expected format: YYYY-MM-DD. See help for usage.`);
   }
   const date = new Date(dateAsStr);
+  date.setHours(0, 0, 0);
   if (isNaN(date.getTime())) {
     exitError(`Invalid date passed: ${dateAsStr}. See help for usage.`);
   }

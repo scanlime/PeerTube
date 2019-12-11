@@ -37,6 +37,10 @@ export class EditCustomConfigComponent extends FormReactive implements OnInit {
 
     this.resolutions = [
       {
+        id: '0p',
+        label: this.i18n('Audio-only')
+      },
+      {
         id: '240p',
         label: this.i18n('240p')
       },
@@ -166,7 +170,13 @@ export class EditCustomConfigComponent extends FormReactive implements OnInit {
         threads: this.customConfigValidatorsService.TRANSCODING_THREADS,
         allowAdditionalExtensions: null,
         allowAudioFiles: null,
-        resolutions: {}
+        resolutions: {},
+        hls: {
+          enabled: null
+        },
+        webtorrent: {
+          enabled: null
+        }
       },
       autoBlacklist: {
         videos: {

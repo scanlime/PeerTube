@@ -12,6 +12,7 @@ import { ClientHook, ClientHookName, clientHookObject } from '@shared/models/plu
 import { PluginClientScope } from '@shared/models/plugins/plugin-client-scope.type'
 import { RegisterClientHookOptions } from '@shared/models/plugins/register-client-hook.model'
 import { HttpClient } from '@angular/common/http'
+import { AuthService } from '@app/core/auth'
 import { RestExtractor } from '@app/shared/rest'
 import { PluginType } from '@shared/models/plugins/plugin.type'
 import { PublicServerSetting } from '@shared/models/plugins/public-server.setting'
@@ -42,7 +43,8 @@ export class PluginService implements ClientHook {
   pluginsLoaded: { [ scope in PluginClientScope ]: ReplaySubject<boolean> } = {
     common: new ReplaySubject<boolean>(1),
     search: new ReplaySubject<boolean>(1),
-    'video-watch': new ReplaySubject<boolean>(1)
+    'video-watch': new ReplaySubject<boolean>(1),
+    signup: new ReplaySubject<boolean>(1)
   }
 
   translationsObservable: Observable<PluginTranslation>
@@ -57,6 +59,7 @@ export class PluginService implements ClientHook {
 
   constructor (
     private router: Router,
+    private authService: AuthService,
     private server: ServerService,
     private zone: NgZone,
     private authHttp: HttpClient,
@@ -263,6 +266,10 @@ export class PluginService implements ClientHook {
                      catchError(res => this.restExtractor.handleError(res))
                    )
                    .toPromise()
+      },
+
+      isLoggedIn: () => {
+        return this.authService.isLoggedIn()
       },
 
       translate: (value: string) => {

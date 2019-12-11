@@ -14,7 +14,7 @@ import { CONFIG, registerConfigChangedHandler } from './config'
 
 // ---------------------------------------------------------------------------
 
-const LAST_MIGRATION_VERSION = 440
+const LAST_MIGRATION_VERSION = 455
 
 // ---------------------------------------------------------------------------
 
@@ -49,8 +49,8 @@ const SORTABLE_COLUMNS = {
   VIDEO_COMMENT_THREADS: [ 'createdAt' ],
   VIDEO_RATES: [ 'createdAt' ],
   BLACKLISTS: [ 'id', 'name', 'duration', 'views', 'likes', 'dislikes', 'uuid', 'createdAt' ],
-  FOLLOWERS: [ 'createdAt' ],
-  FOLLOWING: [ 'createdAt' ],
+  FOLLOWERS: [ 'createdAt', 'state', 'score' ],
+  FOLLOWING: [ 'createdAt', 'redundancyAllowed', 'state' ],
 
   VIDEOS: [ 'name', 'duration', 'createdAt', 'publishedAt', 'views', 'likes', 'trending' ],
 
@@ -410,7 +410,8 @@ const MIMETYPES = {
   VIDEO_CAPTIONS: {
     MIMETYPE_EXT: {
       'text/vtt': '.vtt',
-      'application/x-subrip': '.srt'
+      'application/x-subrip': '.srt',
+      'text/plain': '.srt'
     }
   },
   TORRENT: {
@@ -428,6 +429,10 @@ const OVERVIEWS = {
     SAMPLE_THRESHOLD: 6,
     SAMPLES_COUNT: 2
   }
+}
+
+const VIDEO_CHANNELS = {
+  MAX_PER_USER: 20
 }
 
 // ---------------------------------------------------------------------------
@@ -458,13 +463,16 @@ const ACTIVITY_PUB = {
 const ACTIVITY_PUB_ACTOR_TYPES: { [ id: string ]: ActivityPubActorType } = {
   GROUP: 'Group',
   PERSON: 'Person',
-  APPLICATION: 'Application'
+  APPLICATION: 'Application',
+  ORGANIZATION: 'Organization',
+  SERVICE: 'Service'
 }
 
 const HTTP_SIGNATURE = {
   HEADER_NAME: 'signature',
   ALGORITHM: 'rsa-sha256',
-  HEADERS_TO_SIGN: [ '(request-target)', 'host', 'date', 'digest' ]
+  HEADERS_TO_SIGN: [ '(request-target)', 'host', 'date', 'digest' ],
+  CLOCK_SKEW_SECONDS: 1800
 }
 
 // ---------------------------------------------------------------------------
@@ -501,7 +509,8 @@ const STATIC_PATHS = {
 }
 const STATIC_DOWNLOAD_PATHS = {
   TORRENTS: '/download/torrents/',
-  VIDEOS: '/download/videos/'
+  VIDEOS: '/download/videos/',
+  HLS_VIDEOS: '/download/streaming-playlists/hls/videos/'
 }
 const LAZY_STATIC_PATHS = {
   AVATARS: '/lazy-static/avatars/',
@@ -575,7 +584,7 @@ const REDUNDANCY = {
 const ACCEPT_HEADERS = [ 'html', 'application/json' ].concat(ACTIVITY_PUB.POTENTIAL_ACCEPT_HEADERS)
 
 const ASSETS_PATH = {
-  DEFAULT_AUDIO_BACKGROUND: join(root(), 'server', 'assets', 'default-audio-background.jpg')
+  DEFAULT_AUDIO_BACKGROUND: join(root(), 'dist', 'server', 'assets', 'default-audio-background.jpg')
 }
 
 // ---------------------------------------------------------------------------
@@ -720,6 +729,7 @@ export {
   VIDEO_TRANSCODING_FPS,
   FFMPEG_NICE,
   VIDEO_ABUSE_STATES,
+  VIDEO_CHANNELS,
   LRU_CACHE,
   JOB_REQUEST_TIMEOUT,
   USER_PASSWORD_RESET_LIFETIME,
@@ -760,7 +770,9 @@ function buildVideoMimetypeExt () {
         'video/x-flv': '.flv',
         'video/x-matroska': '.mkv',
         'application/octet-stream': '.mkv',
-        'video/avi': '.avi'
+        'video/avi': '.avi',
+        'video/x-m4v': '.m4v',
+        'video/m4v': '.m4v'
       })
     }
 

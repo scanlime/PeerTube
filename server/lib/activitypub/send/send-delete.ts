@@ -53,16 +53,17 @@ async function sendDeleteVideoComment (videoComment: MCommentOwnerVideoReply, t:
     : videoComment.Video.VideoChannel.Account.Actor
 
   const threadParentComments = await VideoCommentModel.listThreadParentComments(videoComment, t)
+  const threadParentCommentsFiltered = threadParentComments.filter(c => !c.isDeleted())
 
   const actorsInvolvedInComment = await getActorsInvolvedInVideo(videoComment.Video, t)
   actorsInvolvedInComment.push(byActor) // Add the actor that commented the video
 
-  const audience = getVideoCommentAudience(videoComment, threadParentComments, actorsInvolvedInComment, isVideoOrigin)
+  const audience = getVideoCommentAudience(videoComment, threadParentCommentsFiltered, actorsInvolvedInComment, isVideoOrigin)
   const activity = buildDeleteActivity(url, videoComment.url, byActor, audience)
 
   // This was a reply, send it to the parent actors
   const actorsException = [ byActor ]
-  await broadcastToActors(activity, byActor, threadParentComments.map(c => c.Account.Actor), t, actorsException)
+  await broadcastToActors(activity, byActor, threadParentCommentsFiltered.map(c => c.Account.Actor), t, actorsException)
 
   // Broadcast to our followers
   await broadcastToFollowers(activity, byActor, [ byActor ], t)
@@ -71,7 +72,7 @@ async function sendDeleteVideoComment (videoComment: MCommentOwnerVideoReply, t:
   if (isVideoOrigin) return broadcastToFollowers(activity, byActor, actorsInvolvedInComment, t, actorsException)
 
   // Send to origin
-  t.afterCommit(() => unicastTo(activity, byActor, videoComment.Video.VideoChannel.Account.Actor.sharedInboxUrl))
+  t.afterCommit(() => unicastTo(activity, byActor, videoComment.Video.VideoChannel.Account.Actor.getSharedInbox()))
 }
 
 async function sendDeleteVideoPlaylist (videoPlaylist: MVideoPlaylistFullSummary, t: Transaction) {

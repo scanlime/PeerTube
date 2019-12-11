@@ -111,12 +111,16 @@ function updateCustomSubConfig (url: string, token: string, newConfig: DeepParti
       allowAudioFiles: true,
       threads: 1,
       resolutions: {
+        '0p': false,
         '240p': false,
         '360p': true,
         '480p': true,
         '720p': false,
         '1080p': false,
         '2160p': false
+      },
+      webtorrent: {
+        enabled: true
       },
       hls: {
         enabled: false

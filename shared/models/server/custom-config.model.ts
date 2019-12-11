@@ -69,10 +69,13 @@ export interface CustomConfig {
 
   transcoding: {
     enabled: boolean
+
     allowAdditionalExtensions: boolean
     allowAudioFiles: boolean
+
     threads: number
     resolutions: {
+      '0p': boolean
       '240p': boolean
       '360p': boolean
       '480p': boolean
@@ -80,6 +83,11 @@ export interface CustomConfig {
       '1080p': boolean
       '2160p': boolean
     }
+
+    webtorrent: {
+      enabled: boolean
+    }
+
     hls: {
       enabled: boolean
     }

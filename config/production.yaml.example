@@ -217,19 +217,25 @@ transcoding:
   allow_audio_files: true
   threads: 1
   resolutions: # Only created if the original video has a higher resolution, uses more storage!
+    0p: false # audio-only (creates mp4 without video stream, always created when enabled)
     240p: false
     360p: false
     480p: false
     720p: false
     1080p: false
     2160p: false
-  # /!\ EXPERIMENTAL /!\
-  # /!\ Requires ffmpeg >= 4
+
+  # Generate videos in a WebTorrent format (what we do since the first PeerTube release)
+  # If you also enabled the hls format, it will multiply videos storage by 2
+  webtorrent:
+    enabled: true
+
+  # /!\ Requires ffmpeg >= 4.1
   # Generate HLS playlists and fragmented MP4 files. Better playback than with WebTorrent:
   #     * Resolution change is smoother
   #     * Faster playback in particular with long videos
   #     * More stable playback (less bugs/infinite loading)
-  # /!\ Multiplies videos storage by 2 /!\
+  # If you also enabled the webtorrent format, it will multiply videos storage by 2
   hls:
     enabled: false
 

@@ -85,12 +85,16 @@ describe('Test config API validators', function () {
       allowAudioFiles: true,
       threads: 1,
       resolutions: {
+        '0p': false,
         '240p': false,
         '360p': true,
         '480p': true,
         '720p': false,
         '1080p': false,
         '2160p': false
+      },
+      webtorrent: {
+        enabled: true
       },
       hls: {
         enabled: false
@@ -223,6 +227,27 @@ describe('Test config API validators', function () {
           enabled: true,
           limit: 5,
           requiresEmailVerification: true
+        }
+      })
+
+      await makePutBodyRequest({
+        url: server.url,
+        path,
+        fields: newUpdateParams,
+        token: server.accessToken,
+        statusCodeExpected: 400
+      })
+    })
+
+    it('Should fail with a disabled webtorrent & hls transcoding', async function () {
+      const newUpdateParams = immutableAssign(updateParams, {
+        transcoding: {
+          hls: {
+            enabled: false
+          },
+          webtorrent: {
+            enabled: false
+          }
         }
       })
 

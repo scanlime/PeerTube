@@ -168,6 +168,7 @@ const CONFIG = {
     get ALLOW_AUDIO_FILES () { return config.get<boolean>('transcoding.allow_audio_files') },
     get THREADS () { return config.get<number>('transcoding.threads') },
     RESOLUTIONS: {
+      get '0p' () { return config.get<boolean>('transcoding.resolutions.0p') },
       get '240p' () { return config.get<boolean>('transcoding.resolutions.240p') },
       get '360p' () { return config.get<boolean>('transcoding.resolutions.360p') },
       get '480p' () { return config.get<boolean>('transcoding.resolutions.480p') },
@@ -177,6 +178,9 @@ const CONFIG = {
     },
     HLS: {
       get ENABLED () { return config.get<boolean>('transcoding.hls.enabled') }
+    },
+    WEBTORRENT: {
+      get ENABLED () { return config.get<boolean>('transcoding.webtorrent.enabled') }
     }
   },
   IMPORT: {

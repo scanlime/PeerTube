@@ -1,7 +1,7 @@
 import { Model, Sequelize } from 'sequelize-typescript'
 import * as validator from 'validator'
 import { Col } from 'sequelize/types/lib/utils'
-import { col, literal, OrderItem } from 'sequelize'
+import { literal, OrderItem } from 'sequelize'
 
 type SortType = { sortModel: string, sortValue: string }
 
@@ -56,6 +56,19 @@ function getBlacklistSort (model: any, value: string, lastSort: OrderItem = [ 'i
 
   if (model) return [ [ literal(`"${model}.${firstSort[ 0 ]}" ${firstSort[ 1 ]}`) ], lastSort ] as any[] // FIXME: typings
   return [ firstSort, lastSort ]
+}
+
+function getFollowsSort (value: string, lastSort: OrderItem = [ 'id', 'ASC' ]): OrderItem[] {
+  const { direction, field } = buildDirectionAndField(value)
+
+  if (field === 'redundancyAllowed') {
+    return [
+      [ 'ActorFollowing', 'Server', 'redundancyAllowed', direction ],
+      lastSort
+    ]
+  }
+
+  return getSort(value, lastSort)
 }
 
 function isOutdated (model: { createdAt: Date, updatedAt: Date }, refreshInterval: number) {
@@ -163,6 +176,7 @@ export {
   buildWhereIdOrUUID,
   isOutdated,
   parseAggregateResult,
+  getFollowsSort,
   createSafeIn
 }
 

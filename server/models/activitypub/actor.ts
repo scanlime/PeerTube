@@ -1,6 +1,5 @@
 import { values } from 'lodash'
 import { extname } from 'path'
-import * as Sequelize from 'sequelize'
 import {
   AllowNull,
   BelongsTo,
@@ -44,9 +43,11 @@ import {
   MActorFull,
   MActorHost,
   MActorServer,
-  MActorSummaryFormattable
+  MActorSummaryFormattable,
+  MActorWithInboxes
 } from '../../typings/models'
 import * as Bluebird from 'bluebird'
+import { Op, Transaction } from 'sequelize'
 
 enum ScopeNames {
   FULL = 'FULL'
@@ -114,7 +115,19 @@ export const unusedActorAttributesForAPI = [
     },
     {
       fields: [ 'preferredUsername', 'serverId' ],
-      unique: true
+      unique: true,
+      where: {
+        serverId: {
+          [Op.ne]: null
+        }
+      }
+    },
+    {
+      fields: [ 'preferredUsername' ],
+      unique: true,
+      where: {
+        serverId: null
+      }
     },
     {
       fields: [ 'inboxUrl', 'sharedInboxUrl' ]
@@ -179,8 +192,8 @@ export class ActorModel extends Model<ActorModel> {
   @Column(DataType.STRING(CONSTRAINTS_FIELDS.ACTORS.URL.max))
   outboxUrl: string
 
-  @AllowNull(false)
-  @Is('ActorSharedInboxUrl', value => throwIfNotValid(value, isActivityPubUrlValid, 'shared inbox url'))
+  @AllowNull(true)
+  @Is('ActorSharedInboxUrl', value => throwIfNotValid(value, isActivityPubUrlValid, 'shared inbox url', true))
   @Column(DataType.STRING(CONSTRAINTS_FIELDS.ACTORS.URL.max))
   sharedInboxUrl: string
 
@@ -271,7 +284,7 @@ export class ActorModel extends Model<ActorModel> {
     return ActorModel.scope(ScopeNames.FULL).findByPk(id)
   }
 
-  static loadFromAccountByVideoId (videoId: number, transaction: Sequelize.Transaction): Bluebird<MActor> {
+  static loadFromAccountByVideoId (videoId: number, transaction: Transaction): Bluebird<MActor> {
     const query = {
       include: [
         {
@@ -315,11 +328,11 @@ export class ActorModel extends Model<ActorModel> {
       .then(a => !!a)
   }
 
-  static listByFollowersUrls (followersUrls: string[], transaction?: Sequelize.Transaction): Bluebird<MActorFull[]> {
+  static listByFollowersUrls (followersUrls: string[], transaction?: Transaction): Bluebird<MActorFull[]> {
     const query = {
       where: {
         followersUrl: {
-          [ Sequelize.Op.in ]: followersUrls
+          [ Op.in ]: followersUrls
         }
       },
       transaction
@@ -328,7 +341,7 @@ export class ActorModel extends Model<ActorModel> {
     return ActorModel.scope(ScopeNames.FULL).findAll(query)
   }
 
-  static loadLocalByName (preferredUsername: string, transaction?: Sequelize.Transaction): Bluebird<MActorFull> {
+  static loadLocalByName (preferredUsername: string, transaction?: Transaction): Bluebird<MActorFull> {
     const query = {
       where: {
         preferredUsername,
@@ -359,7 +372,7 @@ export class ActorModel extends Model<ActorModel> {
     return ActorModel.scope(ScopeNames.FULL).findOne(query)
   }
 
-  static loadByUrl (url: string, transaction?: Sequelize.Transaction): Bluebird<MActorAccountChannelId> {
+  static loadByUrl (url: string, transaction?: Transaction): Bluebird<MActorAccountChannelId> {
     const query = {
       where: {
         url
@@ -382,7 +395,7 @@ export class ActorModel extends Model<ActorModel> {
     return ActorModel.unscoped().findOne(query)
   }
 
-  static loadByUrlAndPopulateAccountAndChannel (url: string, transaction?: Sequelize.Transaction): Bluebird<MActorFull> {
+  static loadByUrlAndPopulateAccountAndChannel (url: string, transaction?: Transaction): Bluebird<MActorFull> {
     const query = {
       where: {
         url
@@ -400,6 +413,10 @@ export class ActorModel extends Model<ActorModel> {
         id
       }
     })
+  }
+
+  getSharedInbox (this: MActorWithInboxes) {
+    return this.sharedInboxUrl || this.inboxUrl
   }
 
   toFormattedSummaryJSON (this: MActorSummaryFormattable) {
@@ -430,8 +447,6 @@ export class ActorModel extends Model<ActorModel> {
   }
 
   toActivityPubObject (this: MActorAP, name: string) {
-    let activityPubType
-
     let icon = undefined
     if (this.avatarId) {
       const extension = extname(this.Avatar.filename)
@@ -467,7 +482,7 @@ export class ActorModel extends Model<ActorModel> {
     return activityPubContextify(json)
   }
 
-  getFollowerSharedInboxUrls (t: Sequelize.Transaction) {
+  getFollowerSharedInboxUrls (t: Transaction) {
     const query = {
       attributes: [ 'sharedInboxUrl' ],
       include: [

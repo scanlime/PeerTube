@@ -72,6 +72,7 @@ function checkInitialConfig (server: ServerInfo, data: CustomConfig) {
   expect(data.transcoding.resolutions['720p']).to.be.true
   expect(data.transcoding.resolutions['1080p']).to.be.true
   expect(data.transcoding.resolutions['2160p']).to.be.true
+  expect(data.transcoding.webtorrent.enabled).to.be.true
   expect(data.transcoding.hls.enabled).to.be.true
 
   expect(data.import.videos.http.enabled).to.be.true
@@ -140,6 +141,7 @@ function checkUpdatedConfig (data: CustomConfig) {
   expect(data.transcoding.resolutions['1080p']).to.be.false
   expect(data.transcoding.resolutions['2160p']).to.be.false
   expect(data.transcoding.hls.enabled).to.be.false
+  expect(data.transcoding.webtorrent.enabled).to.be.true
 
   expect(data.import.videos.http.enabled).to.be.false
   expect(data.import.videos.torrent.enabled).to.be.false
@@ -272,12 +274,16 @@ describe('Test config', function () {
         allowAudioFiles: true,
         threads: 1,
         resolutions: {
+          '0p': false,
           '240p': false,
           '360p': true,
           '480p': true,
           '720p': false,
           '1080p': false,
           '2160p': false
+        },
+        webtorrent: {
+          enabled: true
         },
         hls: {
           enabled: false

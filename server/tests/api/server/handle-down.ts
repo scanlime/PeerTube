@@ -174,7 +174,7 @@ describe('Test handle downs', function () {
     await wait(11000)
 
     // Only server 3 is still a follower of server 1
-    const res = await getFollowersListPaginationAndSort(servers[0].url, 0, 2, 'createdAt')
+    const res = await getFollowersListPaginationAndSort({ url: servers[ 0 ].url, start: 0, count: 2, sort: 'createdAt' })
     expect(res.body.data).to.be.an('array')
     expect(res.body.data).to.have.lengthOf(1)
     expect(res.body.data[0].follower.host).to.equal('localhost:' + servers[2].port)
@@ -184,7 +184,14 @@ describe('Test handle downs', function () {
     const states: JobState[] = [ 'waiting', 'active' ]
 
     for (const state of states) {
-      const res = await getJobsListPaginationAndSort(servers[ 0 ].url, servers[ 0 ].accessToken, state,0, 50, '-createdAt')
+      const res = await getJobsListPaginationAndSort({
+        url: servers[ 0 ].url,
+        accessToken: servers[ 0 ].accessToken,
+        state: state,
+        start: 0,
+        count: 50,
+        sort: '-createdAt'
+      })
       expect(res.body.data).to.have.length(0)
     }
   })
@@ -202,7 +209,7 @@ describe('Test handle downs', function () {
 
     await waitJobs(servers)
 
-    const res = await getFollowersListPaginationAndSort(servers[0].url, 0, 2, 'createdAt')
+    const res = await getFollowersListPaginationAndSort({ url: servers[ 0 ].url, start: 0, count: 2, sort: 'createdAt' })
     expect(res.body.data).to.be.an('array')
     expect(res.body.data).to.have.lengthOf(2)
   })

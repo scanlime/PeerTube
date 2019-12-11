@@ -1,12 +1,11 @@
-require('module-alias/register')
+import { registerTSPaths } from './server/helpers/register-ts-paths'
+
+registerTSPaths()
 
 // FIXME: https://github.com/nodejs/node/pull/16853
-import { PluginManager } from './server/lib/plugins/plugin-manager'
-
 require('tls').DEFAULT_ECDH_CURVE = 'auto'
 
 import { isTestInstance } from './server/helpers/core-utils'
-
 if (isTestInstance()) {
   require('source-map-support').install()
 }
@@ -121,6 +120,7 @@ import { PeerTubeSocket } from './server/lib/peertube-socket'
 import { updateStreamingPlaylistsInfohashesIfNeeded } from './server/lib/hls'
 import { PluginsCheckScheduler } from './server/lib/schedulers/plugins-check-scheduler'
 import { Hooks } from './server/lib/plugins/hooks'
+import { PluginManager } from './server/lib/plugins/plugin-manager'
 
 // ----------- Command line -----------
 

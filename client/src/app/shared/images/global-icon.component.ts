@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, ElementRef, Input, OnInit } from '@angular/core'
+import { HooksService } from '@app/core/plugins/hooks.service'
 
 const icons = {
   'add': require('!!raw-loader?!../../../assets/images/global/add.svg'),
@@ -26,7 +27,7 @@ const icons = {
   'validate': require('!!raw-loader?!../../../assets/images/global/validate.svg'),
   'tick': require('!!raw-loader?!../../../assets/images/global/tick.svg'),
   'dislike': require('!!raw-loader?!../../../assets/images/video/dislike.svg'),
-  'heart': require('!!raw-loader?!../../../assets/images/video/heart.svg'),
+  'support': require('!!raw-loader?!../../../assets/images/video/support.svg'),
   'like': require('!!raw-loader?!../../../assets/images/video/like.svg'),
   'more-horizontal': require('!!raw-loader?!../../../assets/images/global/more-horizontal.svg'),
   'more-vertical': require('!!raw-loader?!../../../assets/images/global/more-vertical.svg'),
@@ -60,11 +61,24 @@ export type GlobalIconName = keyof typeof icons
 export class GlobalIconComponent implements OnInit {
   @Input() iconName: GlobalIconName
 
-  constructor (private el: ElementRef) {}
+  constructor (
+    private el: ElementRef,
+    private hooks: HooksService
+  ) { }
 
-  ngOnInit () {
+  async ngOnInit () {
     const nativeElement = this.el.nativeElement
 
-    nativeElement.innerHTML = icons[this.iconName]
+    nativeElement.innerHTML = await this.hooks.wrapFun(
+      this.getSVGContent.bind(this),
+      { name: this.iconName },
+      'common',
+      'filter:internal.common.svg-icons.get-content.params',
+      'filter:internal.common.svg-icons.get-content.result'
+    )
+  }
+
+  private getSVGContent (options: { name: string }) {
+    return icons[options.name]
   }
 }

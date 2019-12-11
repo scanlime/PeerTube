@@ -61,6 +61,7 @@ import {
 } from '@ng-bootstrap/ng-bootstrap'
 import { RemoteSubscribeComponent, SubscribeButtonComponent, UserSubscriptionService } from '@app/shared/user-subscription'
 import { InstanceFeaturesTableComponent } from '@app/shared/instance/instance-features-table.component'
+import { InstanceStatisticsComponent } from '@app/shared/instance/instance-statistics.component'
 import { OverviewService } from '@app/shared/overview'
 import { UserBanModalComponent } from '@app/shared/moderation'
 import { UserModerationDropdownComponent } from '@app/shared/moderation/user-moderation-dropdown.component'
@@ -72,6 +73,7 @@ import { UserNotificationsComponent } from '@app/shared/users/user-notifications
 import { InstanceService } from '@app/shared/instance/instance.service'
 import { HtmlRendererService, LinkifierService, MarkdownService } from '@app/shared/renderer'
 import { ConfirmComponent } from '@app/shared/confirm/confirm.component'
+import { DateToggleComponent } from '@app/shared/date/date-toggle.component'
 import { SmallLoaderComponent } from '@app/shared/misc/small-loader.component'
 import { VideoPlaylistService } from '@app/shared/video-playlist/video-playlist.service'
 import { PreviewUploadComponent } from '@app/shared/images/preview-upload.component'
@@ -93,6 +95,7 @@ import { ClipboardModule } from 'ngx-clipboard'
 import { FollowService } from '@app/shared/instance/follow.service'
 import { MultiSelectModule } from 'primeng/multiselect'
 import { FeatureBooleanComponent } from '@app/shared/instance/feature-boolean.component'
+import { InputReadonlyCopyComponent } from '@app/shared/forms/input-readonly-copy.component'
 
 @NgModule({
   imports: [
@@ -153,16 +156,19 @@ import { FeatureBooleanComponent } from '@app/shared/instance/feature-boolean.co
     ReactiveFileComponent,
     PeertubeCheckboxComponent,
     TimestampInputComponent,
+    InputReadonlyCopyComponent,
 
     SubscribeButtonComponent,
     RemoteSubscribeComponent,
     InstanceFeaturesTableComponent,
+    InstanceStatisticsComponent,
     FeatureBooleanComponent,
     UserBanModalComponent,
     UserModerationDropdownComponent,
     TopMenuDropdownComponent,
     UserNotificationsComponent,
     ConfirmComponent,
+    DateToggleComponent,
 
     GlobalIconComponent,
     PreviewUploadComponent
@@ -216,6 +222,7 @@ import { FeatureBooleanComponent } from '@app/shared/instance/feature-boolean.co
     InfiniteScrollerDirective,
     TextareaAutoResizeDirective,
     HelpComponent,
+    InputReadonlyCopyComponent,
 
     ReactiveFileComponent,
     PeertubeCheckboxComponent,
@@ -224,11 +231,13 @@ import { FeatureBooleanComponent } from '@app/shared/instance/feature-boolean.co
     SubscribeButtonComponent,
     RemoteSubscribeComponent,
     InstanceFeaturesTableComponent,
+    InstanceStatisticsComponent,
     UserBanModalComponent,
     UserModerationDropdownComponent,
     TopMenuDropdownComponent,
     UserNotificationsComponent,
     ConfirmComponent,
+    DateToggleComponent,
 
     GlobalIconComponent,
     PreviewUploadComponent,

@@ -29,7 +29,10 @@ export const serverFilterHookObject = {
 
   // Filter result used to check if we need to auto blacklist a video
   // (fired when a local or remote video is created or updated)
-  'filter:video.auto-blacklist.result': true
+  'filter:video.auto-blacklist.result': true,
+
+  // Filter result used to check if a user can register on the instance
+  'filter:api.user.signup.allowed.result': true
 }
 
 export type ServerFilterHookName = keyof typeof serverFilterHookObject
@@ -52,7 +55,23 @@ export const serverActionHookObject = {
   // Fired when a reply to a thread is created
   'action:api.video-comment-reply.created': true,
   // Fired when a comment (thread or reply) is deleted
-  'action:api.video-comment.deleted': true
+  'action:api.video-comment.deleted': true,
+
+  // Fired when a user is blocked (banned)
+  'action:api.user.blocked': true,
+  // Fired when a user is unblocked (unbanned)
+  'action:api.user.unblocked': true,
+  // Fired when a user registered on the instance
+  'action:api.user.registered': true,
+  // Fired when an admin/moderator created a user
+  'action:api.user.created': true,
+  // Fired when a user is removed by an admin/moderator
+  'action:api.user.deleted': true,
+  // Fired when a user is updated by an admin/moderator
+  'action:api.user.updated': true,
+
+   // Fired when a user got a new oauth2 token
+  'action:api.user.oauth2-got-token': true
 }
 
 export type ServerActionHookName = keyof typeof serverActionHookObject

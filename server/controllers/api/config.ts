@@ -17,6 +17,7 @@ import { objectConverter } from '../../helpers/core-utils'
 import { CONFIG, reloadConfig } from '../../initializers/config'
 import { PluginManager } from '../../lib/plugins/plugin-manager'
 import { getThemeOrDefault } from '../../lib/plugins/theme-utils'
+import { Hooks } from '@server/lib/plugins/hooks'
 
 const configRouter = express.Router()
 
@@ -47,7 +48,12 @@ configRouter.delete('/custom',
 let serverCommit: string
 
 async function getConfig (req: express.Request, res: express.Response) {
-  const allowed = await isSignupAllowed()
+  const { allowed } = await Hooks.wrapPromiseFun(
+    isSignupAllowed,
+    {},
+    'filter:api.user.signup.allowed.result'
+  )
+
   const allowedForCurrentIP = isSignupAllowedForCurrentIP(req.ip)
   const defaultTheme = getThemeOrDefault(CONFIG.THEME.DEFAULT, DEFAULT_THEME_NAME)
 
@@ -88,6 +94,9 @@ async function getConfig (req: express.Request, res: express.Response) {
     transcoding: {
       hls: {
         enabled: CONFIG.TRANSCODING.HLS.ENABLED
+      },
+      webtorrent: {
+        enabled: CONFIG.TRANSCODING.WEBTORRENT.ENABLED
       },
       enabledResolutions: getEnabledResolutions()
     },
@@ -291,12 +300,16 @@ function customConfig (): CustomConfig {
       allowAudioFiles: CONFIG.TRANSCODING.ALLOW_AUDIO_FILES,
       threads: CONFIG.TRANSCODING.THREADS,
       resolutions: {
+        '0p': CONFIG.TRANSCODING.RESOLUTIONS[ '0p' ],
         '240p': CONFIG.TRANSCODING.RESOLUTIONS[ '240p' ],
         '360p': CONFIG.TRANSCODING.RESOLUTIONS[ '360p' ],
         '480p': CONFIG.TRANSCODING.RESOLUTIONS[ '480p' ],
         '720p': CONFIG.TRANSCODING.RESOLUTIONS[ '720p' ],
         '1080p': CONFIG.TRANSCODING.RESOLUTIONS[ '1080p' ],
         '2160p': CONFIG.TRANSCODING.RESOLUTIONS[ '2160p' ]
+      },
+      webtorrent: {
+        enabled: CONFIG.TRANSCODING.WEBTORRENT.ENABLED
       },
       hls: {
         enabled: CONFIG.TRANSCODING.HLS.ENABLED
@@ -344,6 +357,7 @@ function convertCustomConfigBody (body: CustomConfig) {
   function keyConverter (k: string) {
     // Transcoding resolutions exception
     if (/^\d{3,4}p$/.exec(k)) return k
+    if (k === '0p') return k
 
     return snakeCase(k)
   }

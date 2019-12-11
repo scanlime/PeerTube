@@ -9,7 +9,15 @@ async function register ({ registerHook, registerSetting, settingsManager, stora
 
     'action:api.video-thread.created',
     'action:api.video-comment-reply.created',
-    'action:api.video-comment.deleted'
+    'action:api.video-comment.deleted',
+
+    'action:api.user.blocked',
+    'action:api.user.unblocked',
+    'action:api.user.registered',
+    'action:api.user.created',
+    'action:api.user.deleted',
+    'action:api.user.updated',
+    'action:api.user.oauth2-got-token'
   ]
 
   for (const h of actionHooks) {
@@ -84,6 +92,17 @@ async function register ({ registerHook, registerSetting, settingsManager, stora
       if (video.name.includes('please blacklist me')) return true
 
       return false
+    }
+  })
+
+  registerHook({
+    target: 'filter:api.user.signup.allowed.result',
+    handler: (result, params) => {
+      if (params && params.body.email.includes('jma')) {
+        return { allowed: false, errorMessage: 'No jma' }
+      }
+
+      return result
     }
   })
 }

@@ -21,7 +21,7 @@ function checkMissedConfig () {
     'signup.enabled', 'signup.limit', 'signup.requires_email_verification',
     'signup.filters.cidr.whitelist', 'signup.filters.cidr.blacklist',
     'redundancy.videos.strategies', 'redundancy.videos.check_interval',
-    'transcoding.enabled', 'transcoding.threads', 'transcoding.allow_additional_extensions',
+    'transcoding.enabled', 'transcoding.threads', 'transcoding.allow_additional_extensions', 'transcoding.hls.enabled',
     'import.videos.http.enabled', 'import.videos.torrent.enabled', 'auto_blacklist.videos.of_users.enabled',
     'trending.videos.interval_days',
     'instance.name', 'instance.short_description', 'instance.description', 'instance.terms', 'instance.default_client_route',
@@ -69,12 +69,12 @@ function checkMissedConfig () {
 // Check the available codecs
 // We get CONFIG by param to not import it in this file (import orders)
 async function checkFFmpeg (CONFIG: { TRANSCODING: { ENABLED: boolean } }) {
+  if (CONFIG.TRANSCODING.ENABLED === false) return undefined
+
   const Ffmpeg = require('fluent-ffmpeg')
   const getAvailableCodecsPromise = promisify0(Ffmpeg.getAvailableCodecs)
   const codecs = await getAvailableCodecsPromise()
   const canEncode = [ 'libx264' ]
-
-  if (CONFIG.TRANSCODING.ENABLED === false) return undefined
 
   for (const codec of canEncode) {
     if (codecs[codec] === undefined) {

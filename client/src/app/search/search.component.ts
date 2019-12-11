@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit } from '@angular/core'
 import { ActivatedRoute, Router } from '@angular/router'
 import { AuthService, Notifier } from '@app/core'
-import { forkJoin, Subscription } from 'rxjs'
+import { forkJoin, of, Subscription } from 'rxjs'
 import { SearchService } from '@app/search/search.service'
 import { ComponentPagination } from '@app/shared/rest/component-pagination.model'
 import { I18n } from '@ngx-translate/i18n-polyfill'
@@ -11,7 +11,6 @@ import { VideoChannel } from '@app/shared/video-channel/video-channel.model'
 import { immutableAssign } from '@app/shared/misc/utils'
 import { Video } from '@app/shared/video/video.model'
 import { HooksService } from '@app/core/plugins/hooks.service'
-import { PluginService } from '@app/core/plugins/plugin.service'
 
 @Component({
   selector: 'my-search',
@@ -44,8 +43,7 @@ export class SearchComponent implements OnInit, OnDestroy {
     private notifier: Notifier,
     private searchService: SearchService,
     private authService: AuthService,
-    private hooks: HooksService,
-    private pluginService: PluginService
+    private hooks: HooksService
   ) { }
 
   get user () {
@@ -186,6 +184,8 @@ export class SearchComponent implements OnInit, OnDestroy {
   }
 
   private getVideoChannelObs () {
+    if (!this.currentSearch) return of({ data: [], total: 0 })
+
     const params = {
       search: this.currentSearch,
       componentPagination: immutableAssign(this.pagination, { itemsPerPage: this.channelsPerPage })
