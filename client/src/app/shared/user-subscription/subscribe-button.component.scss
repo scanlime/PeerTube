@@ -13,6 +13,20 @@
     font-size: 15px;
   }
 
+  &.big {
+    height: 35px;
+
+    button .extra-text {
+      span:first-child {
+        line-height: 80%;
+      }
+    
+      span:not(:first-child) {
+        font-size: 75%;
+      }
+    }
+  }
+
   // Unlogged
   & > .dropdown > .dropdown-toggle span {
     padding-right: 3px;
@@ -55,6 +69,15 @@
     button {
       cursor: pointer;
     }
+
+    .dropdown-item-neutral {
+      cursor: default;
+
+      &:hover,
+      &:focus {
+        background-color: inherit;
+      }
+    }
   }
 
   .dropdown-header {
@@ -67,5 +90,19 @@
 
   input {
     @include peertube-input-text(100%);
+  }
+}
+
+.extra-text {
+  display: flex;
+  flex-direction: column;
+
+  span:first-child {
+    line-height: 75%;
+  }
+
+  span:not(:first-child) {
+    font-size: 60%;
+    text-align: left;
   }
 }

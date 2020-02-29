@@ -6,6 +6,7 @@ import { peertubeTruncate, root } from './core-utils'
 import { ensureDir, remove, writeFile } from 'fs-extra'
 import * as request from 'request'
 import { createWriteStream } from 'fs'
+import { CONFIG } from '@server/initializers/config'
 
 export type YoutubeDLInfo = {
   name?: string
@@ -23,19 +24,23 @@ const processOptions = {
 }
 
 function getYoutubeDLInfo (url: string, opts?: string[]): Promise<YoutubeDLInfo> {
-  return new Promise<YoutubeDLInfo>(async (res, rej) => {
-    const args = opts || [ '-j', '--flat-playlist' ]
+  return new Promise<YoutubeDLInfo>((res, rej) => {
+    let args = opts || [ '-j', '--flat-playlist' ]
+    args = wrapWithProxyOptions(args)
 
-    const youtubeDL = await safeGetYoutubeDL()
-    youtubeDL.getInfo(url, args, processOptions, (err, info) => {
-      if (err) return rej(err)
-      if (info.is_live === true) return rej(new Error('Cannot download a live streaming.'))
+    safeGetYoutubeDL()
+      .then(youtubeDL => {
+        youtubeDL.getInfo(url, args, processOptions, (err, info) => {
+          if (err) return rej(err)
+          if (info.is_live === true) return rej(new Error('Cannot download a live streaming.'))
 
-      const obj = buildVideoInfo(normalizeObject(info))
-      if (obj.name && obj.name.length < CONSTRAINTS_FIELDS.VIDEOS.NAME.min) obj.name += ' video'
+          const obj = buildVideoInfo(normalizeObject(info))
+          if (obj.name && obj.name.length < CONSTRAINTS_FIELDS.VIDEOS.NAME.min) obj.name += ' video'
 
-      return res(obj)
-    })
+          return res(obj)
+        })
+      })
+      .catch(err => rej(err))
   })
 }
 
@@ -45,33 +50,41 @@ function downloadYoutubeDLVideo (url: string, timeout: number) {
 
   logger.info('Importing youtubeDL video %s', url)
 
-  const options = [ '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best', '-o', path ]
+  let options = [ '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best', '-o', path ]
+  options = wrapWithProxyOptions(options)
 
   if (process.env.FFMPEG_PATH) {
-    options.push('--ffmpeg-location')
-    options.push(process.env.FFMPEG_PATH)
+    options = options.concat([ '--ffmpeg-location', process.env.FFMPEG_PATH ])
   }
 
-  return new Promise<string>(async (res, rej) => {
-    const youtubeDL = await safeGetYoutubeDL()
-    youtubeDL.exec(url, options, processOptions, err => {
-      clearTimeout(timer)
+  return new Promise<string>((res, rej) => {
+    safeGetYoutubeDL()
+      .then(youtubeDL => {
+        youtubeDL.exec(url, options, processOptions, err => {
+          clearTimeout(timer)
 
-      if (err) {
-        remove(path)
-          .catch(err => logger.error('Cannot delete path on YoutubeDL error.', { err }))
+          if (err) {
+            remove(path)
+              .catch(err => logger.error('Cannot delete path on YoutubeDL error.', { err }))
 
-        return rej(err)
-      }
+            return rej(err)
+          }
 
-      return res(path)
-    })
+          return res(path)
+        })
 
-    timer = setTimeout(async () => {
-      await remove(path)
+        timer = setTimeout(() => {
+          const err = new Error('YoutubeDL download timeout.')
 
-      return rej(new Error('YoutubeDL download timeout.'))
-    }, timeout)
+          remove(path)
+            .finally(() => rej(err))
+            .catch(err => {
+              logger.error('Cannot remove %s in youtubeDL timeout.', path, { err })
+              return rej(err)
+            })
+        }, timeout)
+      })
+      .catch(err => rej(err))
   })
 }
 
@@ -101,7 +114,7 @@ async function updateYoutubeDLBinary () {
 
       const url = result.headers.location
       const downloadFile = request.get(url)
-      const newVersion = /yt-dl\.org\/downloads\/(\d{4}\.\d\d\.\d\d(\.\d)?)\/youtube-dl/.exec(url)[ 1 ]
+      const newVersion = /yt-dl\.org\/downloads\/(\d{4}\.\d\d\.\d\d(\.\d)?)\/youtube-dl/.exec(url)[1]
 
       downloadFile.on('response', result => {
         if (result.statusCode !== 200) {
@@ -244,7 +257,7 @@ function getTags (tags: any) {
 function getLicence (licence: string) {
   if (!licence) return undefined
 
-  if (licence.indexOf('Creative Commons Attribution') !== -1) return 1
+  if (licence.includes('Creative Commons Attribution')) return 1
 
   return undefined
 }
@@ -263,4 +276,14 @@ function getCategory (categories: string[]) {
   }
 
   return undefined
+}
+
+function wrapWithProxyOptions (options: string[]) {
+  if (CONFIG.IMPORT.VIDEOS.HTTP.PROXY.ENABLED) {
+    logger.debug('Using proxy for YoutubeDL')
+
+    return [ '--proxy', CONFIG.IMPORT.VIDEOS.HTTP.PROXY.URL ].concat(options)
+  }
+
+  return options
 }

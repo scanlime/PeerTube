@@ -1,6 +1,6 @@
 import { IConfig } from 'config'
 import { dirname, join } from 'path'
-import { VideosRedundancy } from '../../shared/models'
+import { VideosRedundancyStrategy } from '../../shared/models'
 // Do not use barrels, remain constants as independent as possible
 import { buildPath, parseBytes, parseDurationToMs, root } from '../helpers/core-utils'
 import { NSFWPolicyType } from '../../shared/models/videos/nsfw-policy.type'
@@ -93,7 +93,12 @@ const CONFIG = {
   TRUST_PROXY: config.get<string[]>('trust_proxy'),
   LOG: {
     LEVEL: config.get<string>('log.level'),
-    ROTATION: config.get<boolean>('log.rotation.enabled')
+    ROTATION: {
+      ENABLED: config.get<boolean>('log.rotation.enabled'),
+      MAX_FILE_SIZE: bytes.parse(config.get<string>('log.rotation.maxFileSize')),
+      MAX_FILES: config.get<number>('log.rotation.maxFiles')
+    },
+    ANONYMIZE_IP: config.get<boolean>('log.anonymizeIP')
   },
   SEARCH: {
     REMOTE_URI: {
@@ -186,7 +191,11 @@ const CONFIG = {
   IMPORT: {
     VIDEOS: {
       HTTP: {
-        get ENABLED () { return config.get<boolean>('import.videos.http.enabled') }
+        get ENABLED () { return config.get<boolean>('import.videos.http.enabled') },
+        PROXY: {
+          get ENABLED () { return config.get<boolean>('import.videos.http.proxy.enabled') },
+          get URL () { return config.get<string>('import.videos.http.proxy.url') }
+        }
       },
       TORRENT: {
         get ENABLED () { return config.get<boolean>('import.videos.torrent.enabled') }
@@ -275,11 +284,16 @@ function registerConfigChangedHandler (fun: Function) {
   configChangedHandlers.push(fun)
 }
 
+function isEmailEnabled () {
+  return !!CONFIG.SMTP.HOSTNAME && !!CONFIG.SMTP.PORT
+}
+
 // ---------------------------------------------------------------------------
 
 export {
   CONFIG,
-  registerConfigChangedHandler
+  registerConfigChangedHandler,
+  isEmailEnabled
 }
 
 // ---------------------------------------------------------------------------
@@ -292,10 +306,10 @@ function getLocalConfigFilePath () {
   if (process.env.NODE_ENV) filename += `-${process.env.NODE_ENV}`
   if (process.env.NODE_APP_INSTANCE) filename += `-${process.env.NODE_APP_INSTANCE}`
 
-  return join(dirname(configSources[ 0 ].name), filename + '.json')
+  return join(dirname(configSources[0].name), filename + '.json')
 }
 
-function buildVideosRedundancy (objs: any[]): VideosRedundancy[] {
+function buildVideosRedundancy (objs: any[]): VideosRedundancyStrategy[] {
   if (!objs) return []
 
   if (!Array.isArray(objs)) return objs
@@ -321,7 +335,7 @@ export function reloadConfig () {
 
   function purge () {
     for (const fileName in require.cache) {
-      if (-1 === fileName.indexOf(directory())) {
+      if (fileName.includes(directory()) === false) {
         continue
       }
 

@@ -30,7 +30,7 @@ import { buildServerIdsFollowedBy, buildTrigramSearchIndex, createSimilarityAttr
 import { VideoModel } from './video'
 import { CONSTRAINTS_FIELDS, WEBSERVER } from '../../initializers/constants'
 import { ServerModel } from '../server/server'
-import { FindOptions, ModelIndexesOptions, Op } from 'sequelize'
+import { FindOptions, Op } from 'sequelize'
 import { AvatarModel } from '../avatar/avatar'
 import { VideoPlaylistModel } from './video-playlist'
 import * as Bluebird from 'bluebird'
@@ -42,18 +42,6 @@ import {
   MChannelFormattable,
   MChannelSummaryFormattable
 } from '../../typings/models/video'
-
-// FIXME: Define indexes here because there is an issue with TS and Sequelize.literal when called directly in the annotation
-const indexes: ModelIndexesOptions[] = [
-  buildTrigramSearchIndex('video_channel_name_trigram', 'name'),
-
-  {
-    fields: [ 'accountId' ]
-  },
-  {
-    fields: [ 'actorId' ]
-  }
-]
 
 export enum ScopeNames {
   FOR_API = 'FOR_API',
@@ -133,7 +121,7 @@ export type SummaryOptions = {
               },
               {
                 serverId: {
-                  [ Op.in ]: Sequelize.literal(inQueryInstanceFollow)
+                  [Op.in]: Sequelize.literal(inQueryInstanceFollow)
                 }
               }
             ]
@@ -176,7 +164,16 @@ export type SummaryOptions = {
 }))
 @Table({
   tableName: 'videoChannel',
-  indexes
+  indexes: [
+    buildTrigramSearchIndex('video_channel_name_trigram', 'name'),
+
+    {
+      fields: [ 'accountId' ]
+    },
+    {
+      fields: [ 'actorId' ]
+    }
+  ]
 })
 export class VideoChannelModel extends Model<VideoChannelModel> {
 
@@ -249,7 +246,7 @@ export class VideoChannelModel extends Model<VideoChannelModel> {
   @BeforeDestroy
   static async sendDeleteIfOwned (instance: VideoChannelModel, options) {
     if (!instance.Actor) {
-      instance.Actor = await instance.$get('Actor', { transaction: options.transaction }) as ActorModel
+      instance.Actor = await instance.$get('Actor', { transaction: options.transaction })
     }
 
     if (instance.Actor.isOwned()) {
@@ -351,9 +348,9 @@ export class VideoChannelModel extends Model<VideoChannelModel> {
   }
 
   static listByAccount (options: {
-    accountId: number,
-    start: number,
-    count: number,
+    accountId: number
+    start: number
+    count: number
     sort: string
   }) {
     const query = {

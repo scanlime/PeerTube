@@ -1,18 +1,18 @@
-import { Component, ElementRef, Input, OnChanges, OnDestroy, OnInit, SimpleChanges, ViewChild } from '@angular/core'
+import { Component, ElementRef, EventEmitter, Input, OnChanges, OnDestroy, OnInit, Output, SimpleChanges, ViewChild } from '@angular/core'
 import { ActivatedRoute } from '@angular/router'
 import { ConfirmService, Notifier } from '@app/core'
 import { Subject, Subscription } from 'rxjs'
-import { VideoCommentThreadTree } from '../../../../../../shared/models/videos/video-comment.model'
 import { AuthService } from '../../../core/auth'
 import { ComponentPagination, hasMoreItems } from '../../../shared/rest/component-pagination.model'
 import { User } from '../../../shared/users'
-import { VideoSortField } from '../../../shared/video/sort-field.type'
+import { CommentSortField } from '../../../shared/video/sort-field.type'
 import { VideoDetails } from '../../../shared/video/video-details.model'
 import { VideoComment } from './video-comment.model'
 import { VideoCommentService } from './video-comment.service'
 import { I18n } from '@ngx-translate/i18n-polyfill'
 import { Syndication } from '@app/shared/video/syndication.model'
 import { HooksService } from '@app/core/plugins/hooks.service'
+import { VideoCommentThreadTree } from '@app/videos/+video-watch/comment/video-comment-thread-tree.model'
 
 @Component({
   selector: 'my-video-comments',
@@ -20,13 +20,15 @@ import { HooksService } from '@app/core/plugins/hooks.service'
   styleUrls: ['./video-comments.component.scss']
 })
 export class VideoCommentsComponent implements OnInit, OnChanges, OnDestroy {
-  @ViewChild('commentHighlightBlock', { static: false }) commentHighlightBlock: ElementRef
+  @ViewChild('commentHighlightBlock') commentHighlightBlock: ElementRef
   @Input() video: VideoDetails
   @Input() user: User
 
+  @Output() timestampClicked = new EventEmitter<number>()
+
   comments: VideoComment[] = []
   highlightedThread: VideoComment
-  sort: VideoSortField = '-createdAt'
+  sort: CommentSortField = '-createdAt'
   componentPagination: ComponentPagination = {
     currentPage: 1,
     itemsPerPage: 10,
@@ -148,6 +150,17 @@ export class VideoCommentsComponent implements OnInit, OnChanges, OnDestroy {
 
   onThreadCreated (commentTree: VideoCommentThreadTree) {
     this.viewReplies(commentTree.comment.id)
+  }
+
+  handleSortChange (sort: CommentSortField) {
+    if (this.sort === sort) return
+
+    this.sort = sort
+    this.resetVideo()
+  }
+
+  handleTimestampClicked (timestamp: number) {
+    this.timestampClicked.emit(timestamp)
   }
 
   async onWantedToDelete (commentToDelete: VideoComment) {

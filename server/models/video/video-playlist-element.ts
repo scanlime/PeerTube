@@ -19,7 +19,7 @@ import { getSort, throwIfNotValid } from '../utils'
 import { isActivityPubUrlValid } from '../../helpers/custom-validators/activitypub/misc'
 import { CONSTRAINTS_FIELDS } from '../../initializers/constants'
 import { PlaylistElementObject } from '../../../shared/models/activitypub/objects/playlist-element-object'
-import * as validator from 'validator'
+import validator from 'validator'
 import { AggregateOptions, Op, ScopeOptions, Sequelize, Transaction } from 'sequelize'
 import { VideoPlaylistElement, VideoPlaylistElementType } from '../../../shared/models/videos/playlist/video-playlist-element.model'
 import { AccountModel } from '../account/account'
@@ -120,10 +120,10 @@ export class VideoPlaylistElementModel extends Model<VideoPlaylistElementModel> 
   }
 
   static listForApi (options: {
-    start: number,
-    count: number,
-    videoPlaylistId: number,
-    serverAccount: AccountModel,
+    start: number
+    count: number
+    videoPlaylistId: number
+    serverAccount: AccountModel
     user?: MUserAccountId
   }) {
     const accountIds = [ options.serverAccount.id ]

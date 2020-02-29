@@ -119,8 +119,6 @@ async function initDatabaseModels (silent: boolean) {
   await createFunctions()
 
   if (!silent) logger.info('Database %s is ready.', dbname)
-
-  return
 }
 
 // ---------------------------------------------------------------------------
@@ -163,7 +161,7 @@ async function checkPostgresExtension (extension: string) {
   }
 }
 
-async function createFunctions () {
+function createFunctions () {
   const query = `CREATE OR REPLACE FUNCTION immutable_unaccent(text)
   RETURNS text AS
 $func$

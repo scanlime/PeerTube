@@ -1,7 +1,7 @@
 <div class="top-buttons">
   <div class="history-switch">
     <p-inputSwitch [(ngModel)]="videosHistoryEnabled" (ngModelChange)="onVideosHistoryChange()"></p-inputSwitch>
-    <label i18n>Enable video history</label>
+    <label i18n>Video history</label>
   </div>
 
   <button class="delete-history" (click)="deleteHistory()" i18n>
@@ -11,7 +11,7 @@
 </div>
 
 
-<div class="no-history" i18n *ngIf="pagination.totalItems === 0">You don't have videos history yet.</div>
+<div class="no-history" i18n *ngIf="pagination.totalItems === 0">You don't have any video history yet.</div>
 
 <div myInfiniteScroller (nearOfBottom)="onNearOfBottom()" [autoInit]="true" [dataObservable]="onDataSubject.asObservable()" class="videos">
   <div class="video" *ngFor="let video of videos">

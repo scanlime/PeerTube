@@ -1,4 +1,4 @@
-import * as validator from 'validator'
+import validator from 'validator'
 import { ACTIVITY_PUB } from '../../../initializers/constants'
 import { exists, isArray, isDateValid } from '../misc'
 import { isActivityPubUrlValid } from './misc'
@@ -48,8 +48,6 @@ function normalizeComment (comment: any) {
     if (typeof comment.url === 'object') comment.url = comment.url.href || comment.url.url
     else comment.url = comment.id
   }
-
-  return
 }
 
 function isCommentTypeValid (comment: any): boolean {

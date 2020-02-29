@@ -16,9 +16,10 @@ import {
   MVideoRedundancyFileVideo,
   MVideoRedundancyStreamingPlaylistVideo
 } from '../../../typings/models'
+import { ContextType } from '@server/helpers/activitypub'
 
 async function sendCreateVideo (video: MVideoAP, t: Transaction) {
-  if (video.privacy === VideoPrivacy.PRIVATE) return undefined
+  if (!video.hasPrivacyForFederation()) return undefined
 
   logger.info('Creating job to send video creation of %s.', video.url)
 
@@ -42,7 +43,8 @@ async function sendCreateCacheFile (
     byActor,
     video,
     url: fileRedundancy.url,
-    object: fileRedundancy.toActivityPubObject()
+    object: fileRedundancy.toActivityPubObject(),
+    contextType: 'CacheFile'
   })
 }
 
@@ -130,11 +132,12 @@ export {
 // ---------------------------------------------------------------------------
 
 async function sendVideoRelatedCreateActivity (options: {
-  byActor: MActorLight,
-  video: MVideoAccountLight,
-  url: string,
-  object: any,
+  byActor: MActorLight
+  video: MVideoAccountLight
+  url: string
+  object: any
   transaction?: Transaction
+  contextType?: ContextType
 }) {
   const activityBuilder = (audience: ActivityAudience) => {
     return buildCreateActivity(options.url, options.byActor, options.object, audience)

@@ -45,7 +45,8 @@ import { ActivityIconObject } from '../../../shared/models/activitypub/objects'
 import { FindOptions, literal, Op, ScopeOptions, Transaction, WhereOptions } from 'sequelize'
 import * as Bluebird from 'bluebird'
 import {
-  MVideoPlaylistAccountThumbnail, MVideoPlaylistAP,
+  MVideoPlaylistAccountThumbnail,
+  MVideoPlaylistAP,
   MVideoPlaylistFormattable,
   MVideoPlaylistFull,
   MVideoPlaylistFullSummary,
@@ -67,11 +68,12 @@ type AvailableForListOptions = {
   type?: VideoPlaylistType
   accountId?: number
   videoChannelId?: number
-  privateAndUnlisted?: boolean
+  listMyPlaylists?: boolean
+  search?: string
 }
 
 @Scopes(() => ({
-  [ ScopeNames.WITH_THUMBNAIL ]: {
+  [ScopeNames.WITH_THUMBNAIL]: {
     include: [
       {
         model: ThumbnailModel,
@@ -79,7 +81,7 @@ type AvailableForListOptions = {
       }
     ]
   },
-  [ ScopeNames.WITH_VIDEOS_LENGTH ]: {
+  [ScopeNames.WITH_VIDEOS_LENGTH]: {
     attributes: {
       include: [
         [
@@ -89,7 +91,7 @@ type AvailableForListOptions = {
       ]
     }
   } as FindOptions,
-  [ ScopeNames.WITH_ACCOUNT ]: {
+  [ScopeNames.WITH_ACCOUNT]: {
     include: [
       {
         model: AccountModel,
@@ -97,7 +99,7 @@ type AvailableForListOptions = {
       }
     ]
   },
-  [ ScopeNames.WITH_ACCOUNT_AND_CHANNEL_SUMMARY ]: {
+  [ScopeNames.WITH_ACCOUNT_AND_CHANNEL_SUMMARY]: {
     include: [
       {
         model: AccountModel.scope(AccountScopeNames.SUMMARY),
@@ -109,7 +111,7 @@ type AvailableForListOptions = {
       }
     ]
   },
-  [ ScopeNames.WITH_ACCOUNT_AND_CHANNEL ]: {
+  [ScopeNames.WITH_ACCOUNT_AND_CHANNEL]: {
     include: [
       {
         model: AccountModel,
@@ -121,28 +123,32 @@ type AvailableForListOptions = {
       }
     ]
   },
-  [ ScopeNames.AVAILABLE_FOR_LIST ]: (options: AvailableForListOptions) => {
-    // Only list local playlists OR playlists that are on an instance followed by actorId
-    const inQueryInstanceFollow = buildServerIdsFollowedBy(options.followerActorId)
-    const whereActor = {
-      [ Op.or ]: [
-        {
-          serverId: null
-        },
-        {
-          serverId: {
-            [ Op.in ]: literal(inQueryInstanceFollow)
-          }
-        }
-      ]
-    }
+  [ScopeNames.AVAILABLE_FOR_LIST]: (options: AvailableForListOptions) => {
+
+    let whereActor: WhereOptions = {}
 
     const whereAnd: WhereOptions[] = []
 
-    if (options.privateAndUnlisted !== true) {
+    if (options.listMyPlaylists !== true) {
       whereAnd.push({
         privacy: VideoPlaylistPrivacy.PUBLIC
       })
+
+      // Only list local playlists OR playlists that are on an instance followed by actorId
+      const inQueryInstanceFollow = buildServerIdsFollowedBy(options.followerActorId)
+
+      whereActor = {
+        [Op.or]: [
+          {
+            serverId: null
+          },
+          {
+            serverId: {
+              [Op.in]: literal(inQueryInstanceFollow)
+            }
+          }
+        ]
+      }
     }
 
     if (options.accountId) {
@@ -160,6 +166,14 @@ type AvailableForListOptions = {
     if (options.type) {
       whereAnd.push({
         type: options.type
+      })
+    }
+
+    if (options.search) {
+      whereAnd.push({
+        name: {
+          [Op.iLike]: '%' + options.search + '%'
+        }
       })
     }
 
@@ -285,13 +299,14 @@ export class VideoPlaylistModel extends Model<VideoPlaylistModel> {
 
   static listForApi (options: {
     followerActorId: number
-    start: number,
-    count: number,
-    sort: string,
-    type?: VideoPlaylistType,
-    accountId?: number,
-    videoChannelId?: number,
-    privateAndUnlisted?: boolean
+    start: number
+    count: number
+    sort: string
+    type?: VideoPlaylistType
+    accountId?: number
+    videoChannelId?: number
+    listMyPlaylists?: boolean
+    search?: string
   }) {
     const query = {
       offset: options.start,
@@ -308,7 +323,8 @@ export class VideoPlaylistModel extends Model<VideoPlaylistModel> {
             followerActorId: options.followerActorId,
             accountId: options.accountId,
             videoChannelId: options.videoChannelId,
-            privateAndUnlisted: options.privateAndUnlisted
+            listMyPlaylists: options.listMyPlaylists,
+            search: options.search
           } as AvailableForListOptions
         ]
       },
@@ -353,7 +369,7 @@ export class VideoPlaylistModel extends Model<VideoPlaylistModel> {
           model: VideoPlaylistElementModel.unscoped(),
           where: {
             videoId: {
-              [Op.in]: videoIds // FIXME: sequelize ANY seems broken
+              [Op.in]: videoIds
             }
           },
           required: true

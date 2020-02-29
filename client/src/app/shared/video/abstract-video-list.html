@@ -4,9 +4,17 @@
       <div placement="bottom" [ngbTooltip]="titleTooltip" container="body">
         {{ titlePage }}
       </div>
+      <my-feed *ngIf="titlePage" [syndicationItems]="syndicationItems"></my-feed>
     </div>
 
-    <my-feed *ngIf="titlePage" [syndicationItems]="syndicationItems"></my-feed>
+    <div class="action-block" *ngIf="actions.length > 0">
+      <a [routerLink]="action.routerLink" routerLinkActive="active" *ngFor="let action of actions">
+        <button class="btn">
+          <my-global-icon [iconName]="action.iconName"></my-global-icon>
+          <span>{{ action.label }}</span>
+        </button>
+      </a>
+    </div>
 
     <div class="moderation-block" *ngIf="displayModerationBlock">
       <my-peertube-checkbox
@@ -17,7 +25,7 @@
     </div>
   </div>
 
-  <div class="no-results" i18n *ngIf="pagination.totalItems === 0">No results.</div>
+  <div class="no-results" i18n *ngIf="hasDoneFirstQuery && videos.length === 0">No results.</div>
   <div
     myInfiniteScroller (nearOfBottom)="onNearOfBottom()" [autoInit]="true" [dataObservable]="onDataSubject.asObservable()"
     class="videos"

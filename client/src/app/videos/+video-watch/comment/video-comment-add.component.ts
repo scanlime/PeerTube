@@ -25,7 +25,8 @@ export class VideoCommentAddComponent extends FormReactive implements OnInit {
   @Input() parentComments: VideoComment[]
   @Input() focusOnInit = false
 
-  @Output() commentCreated = new EventEmitter<VideoCommentCreate>()
+  @Output() commentCreated = new EventEmitter<VideoComment>()
+  @Output() cancel = new EventEmitter()
 
   @ViewChild('visitorModal', { static: true }) visitorModal: NgbModal
   @ViewChild('textarea', { static: true }) textareaElement: ElementRef
@@ -95,7 +96,7 @@ export class VideoCommentAddComponent extends FormReactive implements OnInit {
     this.addingComment = true
 
     const commentCreate: VideoCommentCreate = this.form.value
-    let obs: Observable<any>
+    let obs: Observable<VideoComment>
 
     if (this.parentComment) {
       obs = this.addCommentReply(commentCreate)
@@ -134,6 +135,10 @@ export class VideoCommentAddComponent extends FormReactive implements OnInit {
   gotoLogin () {
     this.hideVisitorModal()
     this.router.navigate([ '/login' ])
+  }
+
+  cancelCommentReply () {
+    this.cancel.emit(null)
   }
 
   private addCommentReply (commentCreate: VideoCommentCreate) {

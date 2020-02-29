@@ -8,6 +8,13 @@
   font-family: 'Glyphicons Halflings';
   text-decoration: none !important;
   color: var(--mainForegroundColor) !important;
+  font-display: swap;
+}
+
+my-edit-button,
+my-delete-button,
+my-button {
+  height: max-content;
 }
 
 // data table customizations
@@ -37,7 +44,7 @@ p-table {
   td {
     padding-left: 15px !important;
 
-    &:not(.action-cell) {
+    &:not(.action-cell):not(.expand-cell) {
       overflow: hidden !important;
       text-overflow: ellipsis !important;
       white-space: nowrap !important;
@@ -267,6 +274,15 @@ p-multiselect {
     //  left: -2px !important;
     //}
   }
+
+  .ui-multiselect-panel .ui-multiselect-items .ui-multiselect-item.ui-state-highlight {
+    background-color: var(--mainColorLighter);
+  }
+
+  .ui-inputtext:enabled:focus:not(.ui-state-error) {
+    border-color: var(--mainColorLighter) !important;
+    box-shadow: none;
+  }
 }
 
 // PrimeNG calendar tweaks
@@ -324,6 +340,10 @@ p-calendar .ui-datepicker {
   }
 }
 
+p-tablecheckbox:hover div .ui-chkbox-box {
+  box-shadow: 0 0 0 .1rem rgba(87, 85, 217, .2);
+}
+
 .ui-chkbox {
 
   &, .ui-chkbox-box {
@@ -363,38 +383,59 @@ p-calendar .ui-datepicker {
 }
 
 p-inputswitch {
+  height: 26px;
+
   .ui-inputswitch-checked .ui-inputswitch-slider {
     background-color: var(--mainColor) !important;
+  }
+
+  &.small {
+    height: 20px;
+
+    .ui-inputswitch {
+      width: 2.5em !important;
+      height: 1.45em !important;
+
+      .ui-inputswitch-slider::before {
+        height: 1em !important;
+        width: 1em !important;
+      }
+    }
+
+    .ui-inputswitch-checked .ui-inputswitch-slider::before {
+      transform: translateX(1em) !important;
+    }
   }
 }
 
 p-toast {
   .ui-toast {
-    // Modal is 10005
-    z-index: 10010 !important;
+    z-index: z(notification) !important;
   }
 
   .ui-toast-message {
     font-family: $main-fonts;
+    background-color: var(--mainBackgroundColor) !important;
+    border-radius: 5px;
+    box-sizing: border-box;
+    border: 1px solid #EBEEF5 !important;
+    box-shadow: 0 2px 12px 0 rgba(0, 0 , 0, .1);
+    overflow: hidden;
 
-    &.ui-toast-message-success {
-      color: #fff !important;
-      background-color: #8BC34A !important;
+    &.ui-toast-message-success .glyphicon {
+      color: #8BC34A !important;
     }
 
-    &.ui-toast-message-error {
-      color: #fff !important;
-      background-color: #F44336 !important;
+    &.ui-toast-message-error .glyphicon {
+      color: #F44336 !important;
     }
 
-    &.ui-toast-message-info {
-      color: #fff !important;
-      background-color: #03A9F4 !important;
+    &.ui-toast-message-warn .glyphicon {
+      color: #F1680D !important;
     }
 
-    &.ui-toast-message-info {
-      color: #fff !important;
-      background-color: #03A9F4 !important;
+    &.ui-toast-message-info .glyphicon {
+      color: #03A9F4 !important;
     }
 
     .notification-block {

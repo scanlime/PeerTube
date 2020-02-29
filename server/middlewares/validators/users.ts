@@ -14,6 +14,7 @@ import {
   isUserDisplayNameValid,
   isUserNSFWPolicyValid,
   isUserPasswordValid,
+  isUserPasswordValidOrEmpty,
   isUserRoleValid,
   isUserUsernameValid,
   isUserVideoLanguages,
@@ -36,11 +37,10 @@ import { doesVideoExist } from '../../helpers/middlewares'
 import { UserRole } from '../../../shared/models/users'
 import { MUserDefault } from '@server/typings/models'
 import { Hooks } from '@server/lib/plugins/hooks'
-import { isLocalVideoAccepted } from '@server/lib/moderation'
 
 const usersAddValidator = [
   body('username').custom(isUserUsernameValid).withMessage('Should have a valid username (lowercase alphanumeric characters)'),
-  body('password').custom(isUserPasswordValid).withMessage('Should have a valid password'),
+  body('password').custom(isUserPasswordValidOrEmpty).withMessage('Should have a valid password'),
   body('email').isEmail().withMessage('Should have a valid email'),
   body('videoQuota').custom(isUserVideoQuotaValid).withMessage('Should have a valid user quota'),
   body('videoQuotaDaily').custom(isUserVideoQuotaDailyValid).withMessage('Should have a valid daily user quota'),
@@ -149,7 +149,7 @@ const usersBlockingValidator = [
 ]
 
 const deleteMeValidator = [
-  async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const user = res.locals.oauth.token.User
     if (user.username === 'root') {
       return res.status(400)
@@ -303,7 +303,7 @@ const ensureUserRegistrationAllowed = [
 ]
 
 const ensureUserRegistrationAllowedForIP = [
-  async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const allowed = isSignupAllowedForCurrentIP(req.ip)
 
     if (allowed === false) {
@@ -410,7 +410,7 @@ const userAutocompleteValidator = [
 ]
 
 const ensureAuthUserOwnsAccountValidator = [
-  async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const user = res.locals.oauth.token.User
 
     if (res.locals.account.id !== user.Account.id) {

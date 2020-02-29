@@ -1,13 +1,12 @@
 import * as Sequelize from 'sequelize'
-import * as uuidv4 from 'uuid/v4'
+import { v4 as uuidv4 } from 'uuid'
 import { VideoChannelCreate } from '../../shared/models'
 import { VideoChannelModel } from '../models/video/video-channel'
 import { buildActorInstance, federateVideoIfNeeded, getVideoChannelActivityPubUrl } from './activitypub'
 import { VideoModel } from '../models/video/video'
 import { MAccountId, MChannelDefault, MChannelId } from '../typings/models'
 
-type CustomVideoChannelModelAccount <T extends MAccountId> = MChannelDefault &
-  { Account?: T }
+type CustomVideoChannelModelAccount <T extends MAccountId> = MChannelDefault & { Account?: T }
 
 async function createLocalVideoChannel <T extends MAccountId> (
   videoChannelInfo: VideoChannelCreate,

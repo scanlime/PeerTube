@@ -11,7 +11,7 @@ import * as memoizee from 'memoizee'
 const overviewsRouter = express.Router()
 
 overviewsRouter.get('/videos',
-  asyncMiddleware(cacheRoute(ROUTE_CACHE_LIFETIME.OVERVIEWS.VIDEOS)),
+  asyncMiddleware(cacheRoute()(ROUTE_CACHE_LIFETIME.OVERVIEWS.VIDEOS)),
   asyncMiddleware(getVideosOverview)
 )
 
@@ -24,7 +24,7 @@ export { overviewsRouter }
 const buildSamples = memoizee(async function () {
   const [ categories, channels, tags ] = await Promise.all([
     VideoModel.getRandomFieldSamples('category', OVERVIEWS.VIDEOS.SAMPLE_THRESHOLD, OVERVIEWS.VIDEOS.SAMPLES_COUNT),
-    VideoModel.getRandomFieldSamples('channelId', OVERVIEWS.VIDEOS.SAMPLE_THRESHOLD ,OVERVIEWS.VIDEOS.SAMPLES_COUNT),
+    VideoModel.getRandomFieldSamples('channelId', OVERVIEWS.VIDEOS.SAMPLE_THRESHOLD, OVERVIEWS.VIDEOS.SAMPLES_COUNT),
     TagModel.getRandomSamples(OVERVIEWS.VIDEOS.SAMPLE_THRESHOLD, OVERVIEWS.VIDEOS.SAMPLES_COUNT)
   ])
 
@@ -98,10 +98,11 @@ async function getVideos (
     sort: '-createdAt',
     includeLocalVideos: true,
     nsfw: buildNSFWFilter(res),
-    withFiles: false
+    withFiles: false,
+    countVideos: false
   }, where)
 
-  const { data } = await VideoModel.listForApi(query, false)
+  const { data } = await VideoModel.listForApi(query)
 
   return data.map(d => d.toFormattedJSON())
 }

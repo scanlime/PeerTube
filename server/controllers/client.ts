@@ -6,6 +6,7 @@ import { asyncMiddleware, embedCSP } from '../middlewares'
 import { buildFileLocale, getCompleteLocale, is18nLocale, LOCALE_FILES } from '../../shared/models/i18n/i18n'
 import { ClientHtml } from '../lib/client-html'
 import { logger } from '../helpers/logger'
+import { CONFIG } from '@server/initializers/config'
 
 const clientsRouter = express.Router()
 
@@ -19,9 +20,13 @@ clientsRouter.use('/videos/watch/:id', asyncMiddleware(generateWatchHtmlPage))
 clientsRouter.use('/accounts/:nameWithHost', asyncMiddleware(generateAccountHtmlPage))
 clientsRouter.use('/video-channels/:nameWithHost', asyncMiddleware(generateVideoChannelHtmlPage))
 
+const embedCSPMiddleware = CONFIG.CSP.ENABLED
+  ? embedCSP
+  : (req: express.Request, res: express.Response, next: express.NextFunction) => next()
+
 clientsRouter.use(
   '/videos/embed',
-  embedCSP,
+  embedCSPMiddleware,
   (req: express.Request, res: express.Response) => {
     res.removeHeader('X-Frame-Options')
     res.sendFile(embedPath)
@@ -67,11 +72,11 @@ export {
 
 // ---------------------------------------------------------------------------
 
-async function serveServerTranslations (req: express.Request, res: express.Response) {
+function serveServerTranslations (req: express.Request, res: express.Response) {
   const locale = req.params.locale
   const file = req.params.file
 
-  if (is18nLocale(locale) && LOCALE_FILES.indexOf(file) !== -1) {
+  if (is18nLocale(locale) && LOCALE_FILES.includes(file)) {
     const completeLocale = getCompleteLocale(locale)
     const completeFileLocale = buildFileLocale(completeLocale)
 

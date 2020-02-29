@@ -4,6 +4,7 @@ import { UserRole } from './user-role'
 import { NSFWPolicyType } from '../videos/nsfw-policy.type'
 import { UserNotificationSetting } from './user-notification-setting.model'
 import { UserAdminFlag } from './user-flag.model'
+import { VideoPlaylistType } from '@shared/models'
 
 export interface User {
   id: number
@@ -18,6 +19,7 @@ export interface User {
 
   autoPlayVideo: boolean
   autoPlayNextVideo: boolean
+  autoPlayNextVideoPlaylist: boolean
   webTorrentEnabled: boolean
   videosHistoryEnabled: boolean
   videoLanguages: string[]
@@ -43,4 +45,14 @@ export interface User {
   noWelcomeModal: boolean
 
   createdAt: Date
+}
+
+export interface MyUserSpecialPlaylist {
+  id: number
+  name: string
+  type: VideoPlaylistType
+}
+
+export interface MyUser extends User {
+  specialPlaylists: MyUserSpecialPlaylist[]
 }

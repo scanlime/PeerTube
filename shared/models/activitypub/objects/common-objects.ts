@@ -1,14 +1,15 @@
 export interface ActivityIdentifierObject {
   identifier: string
   name: string
+  url?: string
 }
 
 export interface ActivityIconObject {
   type: 'Image'
   url: string
-  mediaType: 'image/jpeg'
-  width: number
-  height: number
+  mediaType: 'image/jpeg' | 'image/png'
+  width?: number
+  height?: number
 }
 
 export type ActivityVideoUrlObject = {
@@ -71,19 +72,21 @@ export interface ActivityMentionObject {
   name: string
 }
 
-export type ActivityTagObject = ActivityPlaylistSegmentHashesObject |
-  ActivityPlaylistInfohashesObject |
-  ActivityVideoUrlObject |
-  ActivityHashTagObject |
-  ActivityMentionObject |
-  ActivityBitTorrentUrlObject |
-  ActivityMagnetUrlObject
+export type ActivityTagObject =
+  ActivityPlaylistSegmentHashesObject
+  | ActivityPlaylistInfohashesObject
+  | ActivityVideoUrlObject
+  | ActivityHashTagObject
+  | ActivityMentionObject
+  | ActivityBitTorrentUrlObject
+  | ActivityMagnetUrlObject
 
-export type ActivityUrlObject = ActivityVideoUrlObject |
-  ActivityPlaylistUrlObject |
-  ActivityBitTorrentUrlObject |
-  ActivityMagnetUrlObject |
-  ActivityHtmlUrlObject
+export type ActivityUrlObject =
+  ActivityVideoUrlObject
+  | ActivityPlaylistUrlObject
+  | ActivityBitTorrentUrlObject
+  | ActivityMagnetUrlObject
+  | ActivityHtmlUrlObject
 
 export interface ActivityPubAttributedTo {
   type: 'Group' | 'Person'

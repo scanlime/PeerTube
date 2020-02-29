@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: PeerTube
-  version: 2.0.0
+  version: 2.1.1
   contact:
     name: PeerTube Community
     url: 'https://joinpeertube.org'
@@ -13,6 +13,7 @@ info:
     altText: PeerTube Project Homepage
   description: |
     # Introduction
+
     The PeerTube API is built on HTTP(S). Our API is RESTful. It has predictable
     resource URLs. It returns HTTP response codes to indicate errors. It also
     accepts and returns JSON in the HTTP body. You can use your favorite
@@ -22,11 +23,13 @@ info:
     which generates a client SDK in the language of your choice.
 
     # Authentication
+
     When you sign up for an account, you are given the possibility to generate
     sessions, and authenticate using this session token. One session token can
     currently be used at a time.
 
     # Errors
+
     The API uses standard HTTP status codes to indicate the success or failure
     of the API call. The body of the response will be JSON in the following
     format.
@@ -76,6 +79,10 @@ tags:
     description: >
       Operations dealing with comments to a video. Comments are organized in
       threads.
+  - name: Video Playlist
+    description: >
+      Operations dealing with playlists of videos. Playlists are bound to users
+      and/or channels.
   - name: Video Channel
     description: >
       Operations dealing with creation, modification and video listing of a
@@ -973,6 +980,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VideoUploadResponse'
+        '403':
+          description: 'The user video quota is exceeded with this video.'
+        '408':
+          description: 'Upload has timed out'
+        '422':
+          description: 'Invalid input file.'
       requestBody:
         content:
           multipart/form-data:
@@ -1288,7 +1301,7 @@ paths:
                   format: binary
             encoding:
               captionfile:
-                contentType: text/vtt, application/x-subrip
+                contentType: text/vtt, application/x-subrip, text/plain
       responses:
         '204':
           $ref: '#/paths/~1users~1me/put/responses/204'
@@ -1390,6 +1403,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VideoListResponse'
+  /video-playlists:
+    get:
+      summary: Get list of video playlists
+      tags:
+        - Video Playlist
+      parameters:
+        - $ref: '#/components/parameters/start'
+        - $ref: '#/components/parameters/count'
+        - $ref: '#/components/parameters/sort'
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VideoPlaylist'
   '/accounts/{name}/video-channels':
     get:
       summary: Get video channels of an account by its name
@@ -1445,7 +1476,7 @@ paths:
         - $ref: '#/components/parameters/idOrUUID'
         - $ref: '#/components/parameters/start'
         - $ref: '#/components/parameters/count'
-        - $ref: '#/components/parameters/sort'
+        - $ref: '#/components/parameters/commentsSort'
       responses:
         '200':
           description: successful operation
@@ -1606,6 +1637,16 @@ components:
         - -views
         - -likes
         - -match
+    commentsSort:
+      name: sort
+      in: query
+      required: false
+      description: Sort comments by criteria
+      schema:
+        type: string
+        enum:
+        - -createdAt
+        - -totalReplies
     blacklistsSort:
       name: sort
       in: query
@@ -2160,6 +2201,53 @@ components:
               type: number
             uuid:
               type: string
+    VideoPlaylist:
+      properties:
+        id:
+          type: number
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        description:
+          type: string
+        uuid:
+          type: string
+        displayName:
+          type: string
+        isLocal:
+          type: boolean
+        videoLength:
+          type: number
+        thumbnailPath:
+          type: string
+        privacy:
+          type: object
+          properties:
+            id:
+              type: number
+            label:
+              type: string
+        type:
+          type: object
+          properties:
+            id:
+              type: number
+            label:
+              type: string
+        ownerAccount:
+          type: object
+          properties:
+            id:
+              type: number
+            name:
+              type: string
+            displayName:
+              type: string
+            url:
+              type: string
+            host:
+              type: string
     VideoComment:
       properties:
         id:
@@ -2178,6 +2266,8 @@ components:
           type: string
         updatedAt:
           type: string
+        totalRepliesFromVideoAuthor:
+          type: number
         totalReplies:
           type: number
         account:
@@ -2297,6 +2387,16 @@ components:
                   type: string
                 css:
                   type: string
+        search:
+          type: object
+          properties:
+            remoteUri:
+              type: object
+              properties:
+                users:
+                  type: boolean
+                anonymous:
+                  type: boolean
         plugin:
           type: object
           properties:
@@ -2338,6 +2438,11 @@ components:
           type: object
           properties:
             hls:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+            webtorrent:
               type: object
               properties:
                 enabled:
@@ -2445,6 +2550,17 @@ components:
           properties:
             enabled:
               type: boolean
+        followings:
+          type: object
+          properties:
+            instance:
+              type: object
+              properties:
+                autoFollowIndex:
+                  type: object
+                  properties:
+                    indexUrl:
+                      type: string
     ServerConfigAbout:
       properties:
         instance:
@@ -2691,7 +2807,7 @@ components:
           description: 'The user username '
         password:
           type: string
-          description: 'The user password '
+          description: 'The user password. If the smtp server is configured, you can leave empty and an email will be sent '
         email:
           type: string
           description: 'The user email '

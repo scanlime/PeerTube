@@ -6,7 +6,7 @@ import { isActivityPubUrlValid } from '../../helpers/custom-validators/activityp
 import { CONSTRAINTS_FIELDS, WEBSERVER } from '../../initializers/constants'
 import { AccountModel } from '../account/account'
 import { ActorModel } from '../activitypub/actor'
-import { buildBlockedAccountSQL, buildLocalAccountIdsIn, getSort, throwIfNotValid } from '../utils'
+import { buildBlockedAccountSQL, buildLocalAccountIdsIn, getCommentSort, throwIfNotValid } from '../utils'
 import { VideoModel } from './video'
 import { VideoChannelModel } from './video-channel'
 import { getServerActor } from '../../helpers/utils'
@@ -56,6 +56,19 @@ enum ScopeNames {
               ')'
             ),
             'totalReplies'
+          ],
+          [
+            Sequelize.literal(
+              '(' +
+                'SELECT COUNT("replies"."id") ' +
+                'FROM "videoComment" AS "replies" ' +
+                'INNER JOIN "video" ON "video"."id" = "replies"."videoId" ' +
+                'INNER JOIN "videoChannel" ON "videoChannel"."id" = "video"."channelId" ' +
+                'WHERE "replies"."originCommentId" = "VideoCommentModel"."id" ' +
+                'AND "replies"."accountId" = "videoChannel"."accountId"' +
+              ')'
+            ),
+            'totalRepliesFromVideoAuthor'
           ]
         ]
       }
@@ -244,10 +257,10 @@ export class VideoCommentModel extends Model<VideoCommentModel> {
   }
 
   static async listThreadsForApi (parameters: {
-    videoId: number,
-    start: number,
-    count: number,
-    sort: string,
+    videoId: number
+    start: number
+    count: number
+    sort: string
     user?: MUserAccountId
   }) {
     const { videoId, start, count, sort, user } = parameters
@@ -259,7 +272,7 @@ export class VideoCommentModel extends Model<VideoCommentModel> {
     const query = {
       offset: start,
       limit: count,
-      order: getSort(sort),
+      order: getCommentSort(sort),
       where: {
         videoId,
         inReplyToCommentId: null,
@@ -287,8 +300,8 @@ export class VideoCommentModel extends Model<VideoCommentModel> {
   }
 
   static async listThreadCommentsForApi (parameters: {
-    videoId: number,
-    threadId: number,
+    videoId: number
+    threadId: number
     user?: MUserAccountId
   }) {
     const { videoId, threadId, user } = parameters
@@ -301,7 +314,7 @@ export class VideoCommentModel extends Model<VideoCommentModel> {
       order: [ [ 'createdAt', 'ASC' ], [ 'updatedAt', 'ASC' ] ] as Order,
       where: {
         videoId,
-        [ Op.or ]: [
+        [Op.or]: [
           { id: threadId },
           { originCommentId: threadId }
         ],
@@ -333,7 +346,7 @@ export class VideoCommentModel extends Model<VideoCommentModel> {
       order: [ [ 'createdAt', order ] ] as Order,
       where: {
         id: {
-          [ Op.in ]: Sequelize.literal('(' +
+          [Op.in]: Sequelize.literal('(' +
             'WITH RECURSIVE children (id, "inReplyToCommentId") AS ( ' +
               `SELECT id, "inReplyToCommentId" FROM "videoComment" WHERE id = ${comment.id} ` +
               'UNION ' +
@@ -342,7 +355,7 @@ export class VideoCommentModel extends Model<VideoCommentModel> {
             ') ' +
             'SELECT id FROM children' +
           ')'),
-          [ Op.ne ]: comment.id
+          [Op.ne]: comment.id
         }
       },
       transaction: t
@@ -448,7 +461,7 @@ export class VideoCommentModel extends Model<VideoCommentModel> {
   }
 
   isDeleted () {
-    return null !== this.deletedAt
+    return this.deletedAt !== null
   }
 
   extractMentions () {
@@ -501,6 +514,7 @@ export class VideoCommentModel extends Model<VideoCommentModel> {
       updatedAt: this.updatedAt,
       deletedAt: this.deletedAt,
       isDeleted: this.isDeleted(),
+      totalRepliesFromVideoAuthor: this.get('totalRepliesFromVideoAuthor') || 0,
       totalReplies: this.get('totalReplies') || 0,
       account: this.Account ? this.Account.toFormattedJSON() : null
     } as VideoComment

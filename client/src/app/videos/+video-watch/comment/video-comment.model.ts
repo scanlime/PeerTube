@@ -1,5 +1,5 @@
 import { Account as AccountInterface } from '../../../../../../shared/models/actors'
-import { VideoComment as VideoCommentServerModel } from '../../../../../../shared/models/videos/video-comment.model'
+import { VideoComment as VideoCommentServerModel, VideoCommentCreate } from '../../../../../../shared/models/videos/video-comment.model'
 import { Actor } from '@app/shared/actor/actor.model'
 import { getAbsoluteAPIUrl } from '@app/shared/misc/utils'
 
@@ -15,6 +15,7 @@ export class VideoComment implements VideoCommentServerModel {
   deletedAt: Date | string
   isDeleted: boolean
   account: AccountInterface
+  totalRepliesFromVideoAuthor: number
   totalReplies: number
   by: string
   accountAvatarUrl: string
@@ -33,6 +34,7 @@ export class VideoComment implements VideoCommentServerModel {
     this.deletedAt = hash.deletedAt ? new Date(hash.deletedAt.toString()) : null
     this.isDeleted = hash.isDeleted
     this.account = hash.account
+    this.totalRepliesFromVideoAuthor = hash.totalRepliesFromVideoAuthor
     this.totalReplies = hash.totalReplies
 
     if (this.account) {

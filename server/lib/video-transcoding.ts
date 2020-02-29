@@ -105,7 +105,7 @@ async function mergeAudioVideofile (video: MVideoWithAllFiles, resolution: Video
   const transcodeDirectory = CONFIG.STORAGE.TMP_DIR
   const newExtname = '.mp4'
 
-  const inputVideoFile = video.getMaxQualityFile()
+  const inputVideoFile = video.getMinQualityFile()
 
   const audioInputPath = getVideoFilePath(video, inputVideoFile)
   const videoTranscodedPath = join(transcodeDirectory, video.id + '-transcoded' + newExtname)
@@ -206,7 +206,7 @@ async function generateHlsPlaylist (video: MVideoWithFile, resolution: VideoReso
   await createTorrentAndSetInfoHash(videoStreamingPlaylist, newVideoFile)
 
   await newVideoFile.save()
-  videoStreamingPlaylist.VideoFiles = await videoStreamingPlaylist.$get('VideoFiles') as VideoFileModel[]
+  videoStreamingPlaylist.VideoFiles = await videoStreamingPlaylist.$get('VideoFiles')
 
   video.setHLSPlaylist(videoStreamingPlaylist)
 

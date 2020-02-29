@@ -1,4 +1,4 @@
-/* tslint:disable:no-unused-expression */
+/* eslint-disable @typescript-eslint/no-unused-expressions,@typescript-eslint/require-await */
 
 import * as chai from 'chai'
 import { keyBy } from 'lodash'
@@ -318,6 +318,15 @@ describe('Test a single server', function () {
 
     const videos = res.body.data
     expect(res.body.total).to.equal(6)
+    expect(videos.length).to.equal(1)
+    expect(videos[0].name).to.equal(videosListBase[5].name)
+  })
+
+  it('Should not have the total field', async function () {
+    const res = await getVideosListPagination(server.url, 5, 6, 'name', true)
+
+    const videos = res.body.data
+    expect(res.body.total).to.not.exist
     expect(videos.length).to.equal(1)
     expect(videos[0].name).to.equal(videosListBase[5].name)
   })

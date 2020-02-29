@@ -1,5 +1,5 @@
 import 'multer'
-import * as validator from 'validator'
+import validator from 'validator'
 import { CONSTRAINTS_FIELDS, MIMETYPES, VIDEO_IMPORT_STATES } from '../../initializers/constants'
 import { exists, isFileValid } from './misc'
 import * as express from 'express'
@@ -20,7 +20,7 @@ function isVideoImportTargetUrlValid (url: string) {
 }
 
 function isVideoImportStateValid (value: any) {
-  return exists(value) && VIDEO_IMPORT_STATES[ value ] !== undefined
+  return exists(value) && VIDEO_IMPORT_STATES[value] !== undefined
 }
 
 const videoTorrentImportTypes = Object.keys(MIMETYPES.TORRENT.MIMETYPE_EXT).map(m => `(${m})`)

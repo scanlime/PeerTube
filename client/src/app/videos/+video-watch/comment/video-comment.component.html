@@ -1,16 +1,18 @@
 <div class="root-comment">
   <div class="left">
-    <img
-      *ngIf="!comment.isDeleted"
-      class="comment-avatar"
-      [src]="comment.accountAvatarUrl"
-      alt="Avatar"
-    />
+    <a *ngIf="!comment.isDeleted" [href]="comment.account.url" target="_blank" rel="noopener noreferrer">
+      <img
+        class="comment-avatar"
+        [src]="comment.accountAvatarUrl"
+        (error)="switchToDefaultAvatar($event)"
+        alt="Avatar"
+      />
+    </a>
 
     <div class="vertical-border"></div>
   </div>
 
-  <div class="right">
+  <div class="right" [ngClass]="{ 'mb-3': firstInThread }">
     <span *ngIf="comment.isDeleted" class="comment-avatar"></span>
 
     <div class="comment">
@@ -18,15 +20,27 @@
         <div *ngIf="highlightedComment === true" class="highlighted-comment" i18n>Highlighted comment</div>
 
         <div class="comment-account-date">
-          <a [href]="comment.account.url" target="_blank" rel="noopener noreferrer" class="comment-account">{{ comment.by }}</a>
+          <a [href]="comment.account.url" target="_blank" rel="noopener noreferrer" class="comment-account">
+            <span class="comment-account-name" [ngClass]="{ 'video-author': video.account.id === comment.account.id }">{{ comment.account.displayName }}</span>
+            <span class="comment-account-fid ml-1">{{ comment.by }}</span>
+          </a>
           <a [routerLink]="['/videos/watch', video.uuid, { 'threadId': comment.threadId }]"
-             class="comment-date">{{ comment.createdAt | myFromNow }}</a>
+             class="comment-date" [title]="comment.createdAt">{{ comment.createdAt | myFromNow }}</a>
         </div>
-        <div class="comment-html" [innerHTML]="sanitizedCommentHTML"></div>
+        <div
+          class="comment-html"
+          [innerHTML]="sanitizedCommentHTML"
+          (timestampClicked)="handleTimestampClicked($event)"
+          timestampRouteTransformer
+        ></div>
 
         <div class="comment-actions">
           <div *ngIf="isUserLoggedIn()" (click)="onWantToReply()" class="comment-action-reply" i18n>Reply</div>
           <div *ngIf="isRemovableByUser()" (click)="onWantToDelete()" class="comment-action-delete" i18n>Delete</div>
+
+          <my-user-moderation-dropdown
+            buttonSize="small" [account]="commentAccount" [user]="commentUser" i18n-label label="Options" placement="bottom-left auto"
+          ></my-user-moderation-dropdown>
         </div>
       </ng-container>
 
@@ -50,6 +64,7 @@
         [parentComments]="newParentComments"
         [focusOnInit]="true"
         (commentCreated)="onCommentReplyCreated($event)"
+        (cancel)="onResetReply()"
       ></my-video-comment-add>
 
       <div *ngIf="commentTree" class="children">
@@ -63,9 +78,12 @@
             (wantedToReply)="onWantToReply($event)"
             (wantedToDelete)="onWantToDelete($event)"
             (resetReply)="onResetReply()"
+            (timestampClicked)="handleTimestampClicked($event)"
           ></my-video-comment>
         </div>
       </div>
+
+      <ng-content></ng-content>
     </div>
   </div>
 </div>

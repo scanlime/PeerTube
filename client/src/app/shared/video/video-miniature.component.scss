@@ -3,7 +3,7 @@
 @import '_miniature';
 
 $more-button-width: 41px;
-$more-margin-right: 10px;
+$more-margin-right: 15px;
 
 .video-miniature {
   width: $video-miniature-width;
@@ -64,7 +64,6 @@ $more-margin-right: 10px;
 
     .video-actions {
       margin-top: 3px;
-      margin-right: $more-margin-right;
       width: $more-button-width;
       height: 30px;
 
@@ -75,10 +74,14 @@ $more-margin-right: 10px;
       ::ng-deep .playlist-dropdown.show + my-action-dropdown .dropdown-root {
         opacity: 1;
       }
-    }
 
-    &:hover .video-actions ::ng-deep .dropdown-root {
-      opacity: 1;
+      ::ng-deep .more-icon {
+        opacity: .6;
+
+        &:hover {
+          opacity: 1;
+        }
+      }
     }
 
     @media screen and (max-width: $small-view) {
@@ -97,11 +100,17 @@ $more-margin-right: 10px;
     }
   }
 
+  &:hover ::ng-deep .video-thumbnail .video-thumbnail-actions-overlay,
+  &:hover .video-bottom .video-actions ::ng-deep .dropdown-root {
+    opacity: 1;
+  }
+
   &.display-as-row {
     flex-direction: row;
     margin-bottom: 0;
     height: auto;
-    width: 100%;
+    display: flex;
+    flex-grow: 1;
 
     my-video-thumbnail {
       margin-right: 10px;

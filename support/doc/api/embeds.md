@@ -10,7 +10,8 @@ For instance, the playground URL for the above embed URL is `https://my-instance
 
 ## Quick Start
 
-Given an existing PeerTube embed `<iframe>`, one can use the PeerTube Embed API to control it by first including the library. You can include it via Yarn with:
+Given an existing PeerTube embed `<iframe>` **with API enabled** (`https://my-instance.example.com/videos/embed/52a10666-3a18-4e73-93da-e8d3c12c305a?api=1`),
+one can use the PeerTube Embed API to control it by first including the library. You can include it via Yarn with:
 
 ```
 yarn add @peertube/embed-api
@@ -21,6 +22,24 @@ Now just use the `PeerTubePlayer` class exported by the module:
 ```typescript
 import { PeerTubePlayer } from '@peertube/embed-api'
 
+...
+```
+
+Or use the minified build from NPM CDN in your HTML file:
+
+```
+<script src="https://unpkg.com/@peertube/embed-api@0.0.1/build/player.min.js"></script>
+
+<script>
+  const PeerTubePlayer = window['PeerTubePlayer']
+
+  ...
+</script>
+```
+
+Then you can instantiate the player:
+
+```typescript
 let player = new PeerTubePlayer(document.querySelector('iframe'))
 await player.ready // wait for the player to be ready
 
@@ -56,7 +75,7 @@ Get the available resolutions. A `PeerTubeResolution` looks like:
 {
     "id": 3,
     "label": "720p",
-    "src": "//src-url-here",
+    "height": "720",
     "active": true
 }
 ```
@@ -87,6 +106,7 @@ Set the playback volume. Value should be between `0` and `1`.
 ## `getVolume(): Promise<number>`
 
 Get the playback volume. Returns a value between `0` and `1`.
+
 # Events
 
 You can subscribe to events by using `addEventListener()`. See above for details.
@@ -120,3 +140,7 @@ Fired when playback transitions between states, such as `pausing` and `playing`.
 ## Event `resolutionUpdate`
 
 Fired when the available resolutions have changed, or when the currently selected resolution has changed. Listener should call `getResolutions()` to get the updated information.
+
+## Event `volumeChange`
+
+Fired when the player volume changed.

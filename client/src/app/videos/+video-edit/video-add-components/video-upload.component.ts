@@ -27,7 +27,7 @@ import { scrollToTop } from '@app/shared/misc/utils'
 export class VideoUploadComponent extends VideoSend implements OnInit, OnDestroy, CanComponentDeactivate {
   @Output() firstStepDone = new EventEmitter<string>()
   @Output() firstStepError = new EventEmitter<void>()
-  @ViewChild('videofileInput', { static: false }) videofileInput: ElementRef<HTMLInputElement>
+  @ViewChild('videofileInput') videofileInput: ElementRef<HTMLInputElement>
 
   // So that it can be accessed in the template
   readonly SPECIAL_SCHEDULED_PRIVACY = VideoEdit.SPECIAL_SCHEDULED_PRIVACY
@@ -70,7 +70,7 @@ export class VideoUploadComponent extends VideoSend implements OnInit, OnDestroy
   }
 
   get videoExtensions () {
-    return this.serverService.getConfig().video.file.extensions.join(',')
+    return this.serverConfig.video.file.extensions.join(',')
   }
 
   ngOnInit () {
@@ -155,7 +155,7 @@ export class VideoUploadComponent extends VideoSend implements OnInit, OnDestroy
     }
 
     const privacy = this.firstStepPrivacyId.toString()
-    const nsfw = this.serverService.getConfig().instance.isNSFW
+    const nsfw = this.serverConfig.instance.isNSFW
     const waitTranscoding = true
     const commentsEnabled = true
     const downloadEnabled = true
@@ -293,6 +293,8 @@ export class VideoUploadComponent extends VideoSend implements OnInit, OnDestroy
   }
 
   private isAudioFile (filename: string) {
-    return filename.endsWith('.mp3') || filename.endsWith('.flac') || filename.endsWith('.ogg')
+    const extensions = [ '.mp3', '.flac', '.ogg', '.wma', '.wav' ]
+
+    return extensions.some(e => filename.endsWith(e))
   }
 }

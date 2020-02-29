@@ -1,8 +1,6 @@
 import { Component, ElementRef, Input, ViewChild } from '@angular/core'
-import { Notifier } from '@app/core'
 import { VideoDetails } from '../../../shared/video/video-details.model'
 import { buildVideoEmbed, buildVideoLink } from '../../../../assets/player/utils'
-import { I18n } from '@ngx-translate/i18n-polyfill'
 import { NgbModal, NgbTabChangeEvent } from '@ng-bootstrap/ng-bootstrap'
 import { VideoCaption } from '@shared/models'
 import { VideoPlaylist } from '@app/shared/video-playlist/video-playlist.model'
@@ -74,7 +72,7 @@ export class VideoShareComponent {
       controls: true
     }
 
-    this.modalService.open(this.modal)
+    this.modalService.open(this.modal, { centered: true })
   }
 
   getVideoIframeCode () {

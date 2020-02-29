@@ -2,7 +2,7 @@
   <div class="col-md-12 col-xl-6">
 
     <div class="about-instance-title">
-      <div i18n class="title">About {{ instanceName }} instance</div>
+      <div i18n class="title">About {{ instanceName }}</div>
 
       <div i18n *ngIf="isContactFormEnabled" (click)="openContactModal()" role="button" class="contact-admin">Contact administrator</div>
     </div>
@@ -20,7 +20,7 @@
     </div>
 
     <div i18n class="middle-title" *ngIf="html.administrator || maintenanceLifetime || businessModel">
-      Administrators & sustainability
+      ADMINISTRATORS & SUSTAINABILITY
     </div>
 
     <div class="block administrator" *ngIf="html.administrator">
@@ -42,13 +42,13 @@
     </div>
 
     <div class="block business-model" *ngIf="businessModel">
-      <div i18n class="section-title">How we will pay this instance</div>
+      <div i18n class="section-title">How we will pay for this instance</div>
 
       <p>{{ businessModel }}</p>
     </div>
 
     <div i18n class="middle-title" *ngIf="html.description">
-      Information
+      INFORMATION
     </div>
 
     <div class="block description">
@@ -58,7 +58,7 @@
     </div>
 
     <div i18n class="middle-title" *ngIf="html.moderationInformation || html.codeOfConduct || html.terms">
-      Moderation
+      MODERATION
     </div>
 
     <div class="block moderation-information" *ngIf="html.moderationInformation">
@@ -80,10 +80,10 @@
     </div>
 
     <div i18n class="middle-title" *ngIf="html.hardwareInformation">
-      Other information
+      OTHER INFORMATION
     </div>
 
-    <div class="block hardware-information">
+    <div class="block hardware-information" *ngIf="html.hardwareInformation">
       <div i18n class="section-title">Hardware information</div>
 
       <div [innerHTML]="html.hardwareInformation"></div>
@@ -96,8 +96,8 @@
   </div>
 
   <div class="col">
-    <div i18n class="middle-title">
-      Statistics
+    <div id="statistics" i18n class="middle-title">
+      STATISTICS
     </div>
     <my-instance-statistics></my-instance-statistics>
   </div>

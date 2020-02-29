@@ -1,12 +1,26 @@
 import { join } from 'path'
-import { AfterDestroy, AllowNull, BelongsTo, Column, CreatedAt, Default, ForeignKey, Model, Table, UpdatedAt } from 'sequelize-typescript'
-import { LAZY_STATIC_PATHS, STATIC_PATHS, WEBSERVER } from '../../initializers/constants'
+import {
+  AfterDestroy,
+  AllowNull,
+  BelongsTo,
+  Column,
+  CreatedAt,
+  DataType,
+  Default,
+  ForeignKey,
+  Model,
+  Table,
+  UpdatedAt
+} from 'sequelize-typescript'
+import { CONSTRAINTS_FIELDS, LAZY_STATIC_PATHS, STATIC_PATHS, WEBSERVER } from '../../initializers/constants'
 import { logger } from '../../helpers/logger'
 import { remove } from 'fs-extra'
 import { CONFIG } from '../../initializers/config'
 import { VideoModel } from './video'
 import { VideoPlaylistModel } from './video-playlist'
 import { ThumbnailType } from '../../../shared/models/videos/thumbnail.type'
+import { MVideoAccountLight } from '@server/typings/models'
+import { buildRemoteVideoBaseUrl } from '@server/helpers/activitypub'
 
 @Table({
   tableName: 'thumbnail',
@@ -41,7 +55,7 @@ export class ThumbnailModel extends Model<ThumbnailModel> {
   type: ThumbnailType
 
   @AllowNull(true)
-  @Column
+  @Column(DataType.STRING(CONSTRAINTS_FIELDS.COMMONS.URL.max))
   fileUrl: string
 
   @AllowNull(true)
@@ -78,7 +92,7 @@ export class ThumbnailModel extends Model<ThumbnailModel> {
   @UpdatedAt
   updatedAt: Date
 
-  private static types: { [ id in ThumbnailType ]: { label: string, directory: string, staticPath: string } } = {
+  private static readonly types: { [ id in ThumbnailType ]: { label: string, directory: string, staticPath: string } } = {
     [ThumbnailType.MINIATURE]: {
       label: 'miniature',
       directory: CONFIG.STORAGE.THUMBNAILS_DIR,
@@ -114,11 +128,14 @@ export class ThumbnailModel extends Model<ThumbnailModel> {
     return videoUUID + '.jpg'
   }
 
-  getFileUrl () {
+  getFileUrl (video: MVideoAccountLight) {
+    const staticPath = ThumbnailModel.types[this.type].staticPath + this.filename
+
+    if (video.isOwned()) return WEBSERVER.URL + staticPath
     if (this.fileUrl) return this.fileUrl
 
-    const staticPath = ThumbnailModel.types[this.type].staticPath
-    return WEBSERVER.URL + staticPath + this.filename
+    // Fallback if we don't have a file URL
+    return buildRemoteVideoBaseUrl(video, staticPath)
   }
 
   getPath () {

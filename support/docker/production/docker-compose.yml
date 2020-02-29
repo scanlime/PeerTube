@@ -5,7 +5,10 @@ services:
   reverse-proxy:
     image: traefik:v1.7
     network_mode: "host"
-    command: --docker # Tells Træfik to listen to docker
+    command:
+      - "--docker" # Tells Træfik to listen to docker
+      - "--acme.email=${TRAEFIK_ACME_EMAIL}" # Let's Encrypt ACME email
+      - "--acme.domains=${TRAEFIK_ACME_DOMAINS}" # Let's Encrypt ACME domain list
     ports:
       - "80:80"     # The HTTP port
       - "443:443"   # The HTTPS port
@@ -23,8 +26,8 @@ services:
     # If you don't want to use the official image and build one from sources
     # build:
     #   context: .
-    #   dockerfile: ./support/docker/production/Dockerfile.stretch
-    image: chocobozzz/peertube:production-stretch
+    #   dockerfile: ./support/docker/production/Dockerfile.buster
+    image: chocobozzz/peertube:production-buster
     env_file:
       - .env
     # Traefik labels are suggested as an example for people using Traefik,

@@ -39,7 +39,7 @@ meRouter.get('/me',
 )
 meRouter.delete('/me',
   authenticate,
-  asyncMiddleware(deleteMeValidator),
+  deleteMeValidator,
   asyncMiddleware(deleteMe)
 )
 
@@ -99,7 +99,8 @@ async function getUserVideos (req: express.Request, res: express.Response) {
     user.Account.id,
     req.query.start as number,
     req.query.count as number,
-    req.query.sort as VideoSortField
+    req.query.sort as VideoSortField,
+    req.query.search as string
   )
 
   const additionalAttributes = {
@@ -125,14 +126,13 @@ async function getUserVideoImports (req: express.Request, res: express.Response)
 
 async function getUserInformation (req: express.Request, res: express.Response) {
   // We did not load channels in res.locals.user
-  const user = await UserModel.loadByUsernameAndPopulateChannels(res.locals.oauth.token.user.username)
+  const user = await UserModel.loadForMeAPI(res.locals.oauth.token.user.username)
 
-  return res.json(user.toFormattedJSON())
+  return res.json(user.toMeFormattedJSON())
 }
 
 async function getUserVideoQuotaUsed (req: express.Request, res: express.Response) {
-  // We did not load channels in res.locals.user
-  const user = await UserModel.loadByUsernameAndPopulateChannels(res.locals.oauth.token.user.username)
+  const user = res.locals.oauth.token.user
   const videoQuotaUsed = await UserModel.getOriginalVideoFileTotalFromUser(user)
   const videoQuotaUsedDaily = await UserModel.getOriginalVideoFileTotalDailyFromUser(user)
 
@@ -176,6 +176,7 @@ async function updateMe (req: express.Request, res: express.Response) {
   if (body.webTorrentEnabled !== undefined) user.webTorrentEnabled = body.webTorrentEnabled
   if (body.autoPlayVideo !== undefined) user.autoPlayVideo = body.autoPlayVideo
   if (body.autoPlayNextVideo !== undefined) user.autoPlayNextVideo = body.autoPlayNextVideo
+  if (body.autoPlayNextVideoPlaylist !== undefined) user.autoPlayNextVideoPlaylist = body.autoPlayNextVideoPlaylist
   if (body.videosHistoryEnabled !== undefined) user.videosHistoryEnabled = body.videosHistoryEnabled
   if (body.videoLanguages !== undefined) user.videoLanguages = body.videoLanguages
   if (body.theme !== undefined) user.theme = body.theme
@@ -213,7 +214,7 @@ async function updateMe (req: express.Request, res: express.Response) {
 }
 
 async function updateMyAvatar (req: express.Request, res: express.Response) {
-  const avatarPhysicalFile = req.files[ 'avatarfile' ][ 0 ]
+  const avatarPhysicalFile = req.files['avatarfile'][0]
   const user = res.locals.oauth.token.user
 
   const userAccount = await AccountModel.load(user.Account.id)

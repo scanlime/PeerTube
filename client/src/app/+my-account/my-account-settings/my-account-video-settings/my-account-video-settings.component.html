@@ -28,12 +28,14 @@
 
     <div>
       <p-multiSelect
-        inputId="videoLanguages" [options]="languageItems" formControlName="videoLanguages" showToggleAll="true"
+        inputId="videoLanguages" [options]="languageItems" formControlName="videoLanguages" [showToggleAll]="true"
         [defaultLabel]="getDefaultVideoLanguageLabel()" [selectedItemsLabel]="getSelectedVideoLanguageLabel()"
         emptyFilterMessage="No results found" i18n-emptyFilterMessage
       ></p-multiSelect>
     </div>
   </div>
+
+  <ng-content select="inner-title"></ng-content>
 
   <div class="form-group">
     <my-peertube-checkbox
@@ -56,5 +58,5 @@
     ></my-peertube-checkbox>
   </div>
 
-  <input type="submit" i18n-value value="Save" [disabled]="!form.valid">
+  <input *ngIf="!reactiveUpdate" type="submit" i18n-value value="Save" [disabled]="!form.valid">
 </form>

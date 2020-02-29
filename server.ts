@@ -1,9 +1,5 @@
 import { registerTSPaths } from './server/helpers/register-ts-paths'
-
 registerTSPaths()
-
-// FIXME: https://github.com/nodejs/node/pull/16853
-require('tls').DEFAULT_ECDH_CURVE = 'auto'
 
 import { isTestInstance } from './server/helpers/core-utils'
 if (isTestInstance()) {
@@ -142,7 +138,7 @@ if (isTestInstance()) {
 
 // For the logger
 morgan.token('remote-addr', req => {
-  if (req.get('DNT') === '1') {
+  if (CONFIG.LOG.ANONYMIZE_IP === true || req.get('DNT') === '1') {
     return anonymize(req.ip, 16, 16)
   }
 

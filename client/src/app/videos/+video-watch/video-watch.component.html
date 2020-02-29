@@ -43,7 +43,7 @@
             <h1 class="video-info-name">{{ video.name }}</h1>
 
             <div i18n class="video-info-date-views">
-              Published <my-date-toggle [date]="video.publishedAt"></my-date-toggle> <span class="views"> - {{ video.views | myNumberFormatter }} views</span>
+              Published <my-date-toggle [date]="video.publishedAt"></my-date-toggle> <span class="views"> • {{ video.views | myNumberFormatter }} views</span>
             </div>
           </div>
 
@@ -54,7 +54,7 @@
 
             <div class="video-info-first-row-bottom">
               <div i18n class="d-none d-md-block video-info-date-views">
-                Published <my-date-toggle [date]="video.publishedAt"></my-date-toggle> <span class="views"> - {{ video.views | myNumberFormatter }} views</span>
+                Published <my-date-toggle [date]="video.publishedAt"></my-date-toggle> <span class="views"> • {{ video.views | myNumberFormatter }} views</span>
               </div>
 
               <div class="video-actions-rates">
@@ -62,7 +62,8 @@
                   <div
                     [ngbPopover]="getRatePopoverText()" [ngClass]="{ 'activated': userRating === 'like' }" (click)="setLike()"
                     class="action-button action-button-like" role="button" [attr.aria-pressed]="userRating === 'like'"
-                    i18n-title title="Like this video"
+                    [ngbTooltip]="tooltipLike"
+                    placement="bottom auto"
                   >
                     <my-global-icon iconName="like"></my-global-icon>
                     <span *ngIf="video.likes" class="count">{{ video.likes }}</span>
@@ -71,49 +72,61 @@
                   <div
                     [ngbPopover]="getRatePopoverText()" [ngClass]="{ 'activated': userRating === 'dislike' }" (click)="setDislike()"
                     class="action-button action-button-dislike" role="button" [attr.aria-pressed]="userRating === 'dislike'"
-                    i18n-title title="Dislike this video"
+                    [ngbTooltip]="tooltipDislike"
+                    placement="bottom auto"
                   >
                     <my-global-icon iconName="dislike"></my-global-icon>
                     <span *ngIf="video.dislikes" class="count">{{ video.dislikes }}</span>
                   </div>
-  
-                  <div *ngIf="video.support" (click)="showSupportModal()" class="action-button">
-                    <my-global-icon iconName="heart"></my-global-icon>
-                    <span class="icon-text" i18n>Support</span>
+
+                  <div *ngIf="video.support" (click)="showSupportModal()" class="action-button action-button-support"
+                    [ngbTooltip]="tooltipSupport"
+                    placement="bottom auto"
+                  >
+                    <my-global-icon iconName="support"></my-global-icon>
+                    <span class="icon-text" i18n>SUPPORT</span>
                   </div>
-  
+
                   <div (click)="showShareModal()" class="action-button" role="button">
                     <my-global-icon iconName="share"></my-global-icon>
-                    <span class="icon-text" i18n>Share</span>
+                    <span class="icon-text" i18n>SHARE</span>
                   </div>
-  
+
                   <div
                     class="action-dropdown" ngbDropdown placement="top" role="button" autoClose="outside"
                      *ngIf="isUserLoggedIn()" (openChange)="addContent.openChange($event)"
+                     [ngbTooltip]="tooltipSaveToPlaylist"
+                     placement="bottom auto"
                   >
                     <div class="action-button action-button-save" ngbDropdownToggle role="button">
                       <my-global-icon iconName="playlist-add"></my-global-icon>
-                      <span class="icon-text" i18n>Save</span>
+                      <span class="icon-text" i18n>SAVE</span>
                     </div>
-  
+
                     <div ngbDropdownMenu>
                       <my-video-add-to-playlist #addContent [video]="video"></my-video-add-to-playlist>
                     </div>
                   </div>
-  
+
                   <my-video-actions-dropdown
-                    placement="top" buttonDirection="horizontal" [buttonStyled]="true" [video]="video"
+                    placement="bottom auto" buttonDirection="horizontal" [buttonStyled]="true" [video]="video" [videoCaptions]="videoCaptions"
                     (videoRemoved)="onVideoRemoved()" (modalOpened)="onModalOpened()"
                   ></my-video-actions-dropdown>
                 </div>
-  
-                <div
-                  class="video-info-likes-dislikes-bar"
-                  *ngIf="video.likes !== 0 || video.dislikes !== 0"
-                  [ngbTooltip]="likesBarTooltipText"
-                  placement="bottom"
-                >
-                  <div class="likes-bar" [ngStyle]="{ 'width.%': video.likesPercent }"></div>
+
+                <div class="video-info-likes-dislikes-bar-outer-container">
+                  <div
+                    class="video-info-likes-dislikes-bar-inner-container"
+                    *ngIf="video.likes !== 0 || video.dislikes !== 0"
+                    [ngbTooltip]="likesBarTooltipText"
+                    placement="bottom"
+                  >
+                    <div
+                      class="video-info-likes-dislikes-bar"
+                    >
+                      <div class="likes-bar" [ngClass]="{ 'liked': userRating !== 'none' }" [ngStyle]="{ 'width.%': video.likesPercent }"></div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -129,28 +142,33 @@
           </div>
 
 
-          <div class="pt-3 border-top video-info-channel">
-            <a [routerLink]="[ '/video-channels', video.byVideoChannel ]" i18n-title title="Go the channel page">
-              {{ video.channel.displayName }}
+          <div class="pt-3 border-top video-info-channel d-flex">
+            <div class="video-info-channel-left d-flex">
+              <avatar-channel [video]="video"></avatar-channel>
 
-              <img [src]="video.videoChannelAvatarUrl" alt="Video channel avatar" />
-            </a>
+              <div class="video-info-channel-left-links ml-1">
+                <a [routerLink]="[ '/video-channels', video.byVideoChannel ]" i18n-title title="Go the channel page">
+                  {{ video.channel.displayName }}
+                </a>
+                <a [routerLink]="[ '/accounts', video.byAccount ]" i18n-title title="Go to the account page">
+                  <span i18n>By {{ video.byAccount }}</span>
+                </a>
+              </div>
+            </div>
 
-            <my-subscribe-button #subscribeButton [videoChannel]="video.channel" size="small"></my-subscribe-button>
-          </div>
-
-          <div class="video-info-by">
-            <a [routerLink]="[ '/accounts', video.byAccount ]" i18n-title title="Go to the account page">
-              <span i18n>By {{ video.byAccount }}</span>
-              <img [src]="video.accountAvatarUrl" alt="Account avatar" />
-            </a>
+            <my-subscribe-button #subscribeButton [videoChannels]="[video.channel]" size="small"></my-subscribe-button>
           </div>
         </div>
 
       </div>
 
       <div class="video-info-description">
-        <div class="video-info-description-html" [innerHTML]="videoHTMLDescription"></div>
+        <div
+          class="video-info-description-html"
+          [innerHTML]="videoHTMLDescription"
+          (timestampClicked)="handleTimestampClicked($event)"
+          timestampRouteTransformer
+        ></div>
 
         <div class="video-info-description-more" *ngIf="completeDescriptionShown === false && video.description?.length >= 250" (click)="showMoreDescription()">
           <ng-container i18n>Show more</ng-container>
@@ -164,10 +182,15 @@
         </div>
       </div>
 
-      <div class="video-attributes">
+      <div class="video-attributes mb-3">
         <div class="video-attribute">
           <span i18n class="video-attribute-label">Privacy</span>
           <span class="video-attribute-value">{{ video.privacy.label }}</span>
+        </div>
+
+        <div *ngIf="video.isLocal === false" class="video-attribute">
+          <span i18n class="video-attribute-label">Origin instance</span>
+          <a class="video-attribute-value" target="_blank" rel="noopener noreferrer" [href]="video.originInstanceUrl">{{ video.originInstanceHost }}</a>
         </div>
 
         <div *ngIf="!!video.originallyPublishedAt" class="video-attribute">
@@ -209,29 +232,43 @@
             class="video-attribute-value" [routerLink]="[ '/search' ]" [queryParams]="{ tagsOneOf: [ tag ] }"
           >{{ tag }}</a>
         </div>
+
+        <div class="video-attribute">
+          <span i18n class="video-attribute-label">Duration</span>
+          <span class="video-attribute-value">{{ video.duration | myVideoDurationFormatter }}</span>
+        </div>
       </div>
 
-      <my-video-comments [video]="video" [user]="user"></my-video-comments>
+      <my-video-comments
+        class="border-top"
+        [video]="video"
+        [user]="user"
+        (timestampClicked)="handleTimestampClicked($event)"
+      ></my-video-comments>
     </div>
 
     <my-recommended-videos
         [inputRecommendation]="{ uuid: video.uuid, tags: video.tags }"
         [user]="user"
+        [playlist]="playlist"
         (gotRecommendations)="onRecommendations($event)"
     ></my-recommended-videos>
   </div>
 
   <div class="row privacy-concerns" *ngIf="hasAlreadyAcceptedPrivacyConcern === false">
     <div class="privacy-concerns-text">
-      <strong i18n>Friendly Reminder: </strong>
-      <ng-container i18n>
-        the sharing system used for this video implies that some technical information about your system (such as a public IP address) can be sent to other peers.
-      </ng-container>
+      <span i18n class="mr-2">
+        <strong>Help your peers</strong>
+        and activate the sharing system to improve the experience for everyone.
+      </span>
       <a i18n i18n-title title="Get more information" target="_blank" rel="noopener noreferrer" href="/about/peertube">More information</a>
     </div>
 
-    <div i18n class="privacy-concerns-okay" (click)="acceptedPrivacyConcern()">
-      OK
+    <div i18n class="privacy-concerns-button" (click)="declinedPrivacyConcern()">
+      No thanks
+    </div>
+    <div i18n class="privacy-concerns-button privacy-concerns-okay" (click)="acceptedPrivacyConcern()">
+      Activate
     </div>
   </div>
 </div>

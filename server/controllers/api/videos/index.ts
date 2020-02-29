@@ -48,7 +48,7 @@ import { videoCommentRouter } from './comment'
 import { rateVideoRouter } from './rate'
 import { ownershipVideoRouter } from './ownership'
 import { VideoFilter } from '../../../../shared/models/videos/video-query.type'
-import { buildNSFWFilter, createReqFiles } from '../../../helpers/express-utils'
+import { buildNSFWFilter, createReqFiles, getCountVideos } from '../../../helpers/express-utils'
 import { ScheduleVideoUpdateModel } from '../../../models/video/schedule-video-update'
 import { videoCaptionsRouter } from './captions'
 import { videoImportsRouter } from './import'
@@ -135,7 +135,7 @@ videosRouter.get('/:id',
   asyncMiddleware(getVideo)
 )
 videosRouter.post('/:id/views',
-  asyncMiddleware(videosGetValidator),
+  asyncMiddleware(videosCustomGetValidator('only-immutable-attributes')),
   asyncMiddleware(viewVideo)
 )
 
@@ -307,7 +307,7 @@ async function addVideo (req: express.Request, res: express.Response) {
       }
     }
 
-    await JobQueue.Instance.createJob({ type: 'video-transcoding', payload: dataInput })
+    await JobQueue.Instance.createJobWithPromise({ type: 'video-transcoding', payload: dataInput })
   }
 
   Hooks.runAction('action:api.video.uploaded', { video: videoCreated })
@@ -326,9 +326,8 @@ async function updateVideo (req: express.Request, res: express.Response) {
   const oldVideoAuditView = new VideoAuditView(videoInstance.toFormattedDetailsJSON())
   const videoInfoToUpdate: VideoUpdate = req.body
 
-  const wasPrivateVideo = videoInstance.privacy === VideoPrivacy.PRIVATE
-  const wasNotPrivateVideo = videoInstance.privacy !== VideoPrivacy.PRIVATE
-  const wasUnlistedVideo = videoInstance.privacy === VideoPrivacy.UNLISTED
+  const wasConfidentialVideo = videoInstance.isConfidential()
+  const hadPrivacyForFederation = videoInstance.hasPrivacyForFederation()
 
   // Process thumbnail or create it from the video
   const thumbnailModel = req.files && req.files['thumbnailfile']
@@ -359,17 +358,15 @@ async function updateVideo (req: express.Request, res: express.Response) {
         videoInstance.originallyPublishedAt = new Date(videoInfoToUpdate.originallyPublishedAt)
       }
 
+      let isNewVideo = false
       if (videoInfoToUpdate.privacy !== undefined) {
+        isNewVideo = videoInstance.isNewVideo(videoInfoToUpdate.privacy)
+
         const newPrivacy = parseInt(videoInfoToUpdate.privacy.toString(), 10)
-        videoInstance.privacy = newPrivacy
+        videoInstance.setPrivacy(newPrivacy)
 
-        // The video was private, and is not anymore -> publish it
-        if (wasPrivateVideo === true && newPrivacy !== VideoPrivacy.PRIVATE) {
-          videoInstance.publishedAt = new Date()
-        }
-
-        // The video was not private, but now it is -> we need to unfederate it
-        if (wasNotPrivateVideo === true && newPrivacy === VideoPrivacy.PRIVATE) {
+        // Unfederate the video if the new privacy is not compatible with federation
+        if (hadPrivacyForFederation && !videoInstance.hasPrivacyForFederation()) {
           await VideoModel.sendDelete(videoInstance, { transaction: t })
         }
       }
@@ -392,7 +389,7 @@ async function updateVideo (req: express.Request, res: express.Response) {
         await videoInstanceUpdated.$set('VideoChannel', res.locals.videoChannel, { transaction: t })
         videoInstanceUpdated.VideoChannel = res.locals.videoChannel
 
-        if (wasPrivateVideo === false) await changeVideoChannelShare(videoInstanceUpdated, oldVideoChannel, t)
+        if (hadPrivacyForFederation === true) await changeVideoChannelShare(videoInstanceUpdated, oldVideoChannel, t)
       }
 
       // Schedule an update in the future?
@@ -414,7 +411,6 @@ async function updateVideo (req: express.Request, res: express.Response) {
         transaction: t
       })
 
-      const isNewVideo = wasPrivateVideo && videoInstanceUpdated.privacy !== VideoPrivacy.PRIVATE
       await federateVideoIfNeeded(videoInstanceUpdated, isNewVideo, t)
 
       auditLogger.update(
@@ -427,7 +423,7 @@ async function updateVideo (req: express.Request, res: express.Response) {
       return videoInstanceUpdated
     })
 
-    if (wasUnlistedVideo || wasPrivateVideo) {
+    if (wasConfidentialVideo) {
       Notifier.Instance.notifyOnNewVideoIfNeeded(videoInstanceUpdated)
     }
 
@@ -456,14 +452,13 @@ async function getVideo (req: express.Request, res: express.Response) {
 
   if (video.isOutdated()) {
     JobQueue.Instance.createJob({ type: 'activitypub-refresher', payload: { type: 'video', url: video.url } })
-      .catch(err => logger.error('Cannot create AP refresher job for video %s.', video.url, { err }))
   }
 
   return res.json(video.toFormattedDetailsJSON())
 }
 
 async function viewVideo (req: express.Request, res: express.Response) {
-  const videoInstance = res.locals.videoAll
+  const videoInstance = res.locals.onlyImmutableVideo
 
   const ip = req.ip
   const exists = await Redis.Instance.doesVideoIPViewExist(ip, videoInstance.uuid)
@@ -499,6 +494,8 @@ async function getVideoDescription (req: express.Request, res: express.Response)
 }
 
 async function listVideos (req: express.Request, res: express.Response) {
+  const countVideos = getCountVideos(req)
+
   const apiOptions = await Hooks.wrapObject({
     start: req.query.start,
     count: req.query.count,
@@ -512,7 +509,8 @@ async function listVideos (req: express.Request, res: express.Response) {
     nsfw: buildNSFWFilter(res, req.query.nsfw),
     filter: req.query.filter as VideoFilter,
     withFiles: false,
-    user: res.locals.oauth ? res.locals.oauth.token.User : undefined
+    user: res.locals.oauth ? res.locals.oauth.token.User : undefined,
+    countVideos
   }, 'filter:api.videos.list.params')
 
   const resultList = await Hooks.wrapPromiseFun(

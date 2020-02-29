@@ -2,6 +2,7 @@ import { Component, forwardRef, Input, OnInit } from '@angular/core'
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms'
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser'
 import { ServerService } from '@app/core'
+import { ServerConfig } from '@shared/models'
 
 @Component({
   selector: 'my-preview-upload',
@@ -24,7 +25,8 @@ export class PreviewUploadComponent implements OnInit, ControlValueAccessor {
   imageSrc: SafeResourceUrl
   allowedExtensionsMessage = ''
 
-  private file: File
+  private serverConfig: ServerConfig
+  private file: Blob
 
   constructor (
     private sanitizer: DomSanitizer,
@@ -32,18 +34,22 @@ export class PreviewUploadComponent implements OnInit, ControlValueAccessor {
   ) {}
 
   get videoImageExtensions () {
-    return this.serverService.getConfig().video.image.extensions
+    return this.serverConfig.video.image.extensions
   }
 
   get maxVideoImageSize () {
-    return this.serverService.getConfig().video.image.size.max
+    return this.serverConfig.video.image.size.max
   }
 
   ngOnInit () {
+    this.serverConfig = this.serverService.getTmpConfig()
+    this.serverService.getConfig()
+      .subscribe(config => this.serverConfig = config)
+
     this.allowedExtensionsMessage = this.videoImageExtensions.join(', ')
   }
 
-  onFileChanged (file: File) {
+  onFileChanged (file: Blob) {
     this.file = file
 
     this.propagateChange(this.file)

@@ -1,11 +1,23 @@
-import { ChangeDetectionStrategy, Component, EventEmitter, Inject, Input, LOCALE_ID, OnInit, Output } from '@angular/core'
+import {
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
+  Component,
+  EventEmitter,
+  Inject,
+  Input,
+  LOCALE_ID,
+  OnInit,
+  Output
+} from '@angular/core'
 import { User } from '../users'
 import { Video } from './video.model'
-import { ServerService } from '@app/core'
-import { VideoPrivacy, VideoState } from '../../../../../shared'
+import { AuthService, ServerService } from '@app/core'
+import { ServerConfig, VideoPlaylistType, VideoPrivacy, VideoState } from '../../../../../shared'
 import { I18n } from '@ngx-translate/i18n-polyfill'
 import { VideoActionsDisplayType } from '@app/shared/video/video-actions-dropdown.component'
 import { ScreenService } from '@app/shared/misc/screen.service'
+import { VideoPlaylistService } from '@app/shared/video-playlist/video-playlist.service'
+import { switchMap } from 'rxjs/operators'
 
 export type OwnerDisplayType = 'account' | 'videoChannel' | 'auto'
 export type MiniatureDisplayOptions = {
@@ -52,9 +64,20 @@ export class VideoMiniatureComponent implements OnInit {
     update: true,
     blacklist: true,
     delete: true,
-    report: true
+    report: true,
+    duplicate: false
   }
   showActions = false
+  serverConfig: ServerConfig
+
+  addToWatchLaterText: string
+  addedToWatchLaterText: string
+  inWatchLaterPlaylist: boolean
+
+  watchLaterPlaylist: {
+    id: number
+    playlistElementId?: number
+  }
 
   private ownerDisplayTypeChosen: 'account' | 'videoChannel'
 
@@ -62,14 +85,23 @@ export class VideoMiniatureComponent implements OnInit {
     private screenService: ScreenService,
     private serverService: ServerService,
     private i18n: I18n,
+    private authService: AuthService,
+    private videoPlaylistService: VideoPlaylistService,
+    private cd: ChangeDetectorRef,
     @Inject(LOCALE_ID) private localeId: string
-  ) { }
+  ) {
+
+  }
 
   get isVideoBlur () {
-    return this.video.isVideoNSFWForUser(this.user, this.serverService.getConfig())
+    return this.video.isVideoNSFWForUser(this.user, this.serverConfig)
   }
 
   ngOnInit () {
+    this.serverConfig = this.serverService.getTmpConfig()
+    this.serverService.getConfig()
+        .subscribe(config => this.serverConfig = config)
+
     this.setUpBy()
 
     // We rely on mouseenter to lazy load actions
@@ -123,6 +155,8 @@ export class VideoMiniatureComponent implements OnInit {
 
   loadActions () {
     if (this.displayVideoActions) this.showActions = true
+
+    this.loadWatchLater()
   }
 
   onVideoBlacklisted () {
@@ -135,6 +169,38 @@ export class VideoMiniatureComponent implements OnInit {
 
   onVideoRemoved () {
     this.videoRemoved.emit()
+  }
+
+  isUserLoggedIn () {
+    return this.authService.isLoggedIn()
+  }
+
+  onWatchLaterClick (currentState: boolean) {
+    if (currentState === true) this.removeFromWatchLater()
+    else this.addToWatchLater()
+
+    this.inWatchLaterPlaylist = !currentState
+  }
+
+  addToWatchLater () {
+    const body = { videoId: this.video.id }
+
+    this.videoPlaylistService.addVideoInPlaylist(this.watchLaterPlaylist.id, body).subscribe(
+      res => {
+        this.watchLaterPlaylist.playlistElementId = res.videoPlaylistElement.id
+      }
+    )
+  }
+
+  removeFromWatchLater () {
+    this.videoPlaylistService.removeVideoFromPlaylist(this.watchLaterPlaylist.id, this.watchLaterPlaylist.playlistElementId, this.video.id)
+        .subscribe(
+          _ => { /* empty */ }
+        )
+  }
+
+  isWatchLaterPlaylistDisplayed () {
+    return this.isUserLoggedIn() && this.inWatchLaterPlaylist !== undefined
   }
 
   private setUpBy () {
@@ -153,5 +219,30 @@ export class VideoMiniatureComponent implements OnInit {
     } else {
       this.ownerDisplayTypeChosen = 'videoChannel'
     }
+  }
+
+  private loadWatchLater () {
+    if (!this.isUserLoggedIn() || this.inWatchLaterPlaylist !== undefined) return
+
+    this.authService.userInformationLoaded
+        .pipe(switchMap(() => this.videoPlaylistService.listenToVideoPlaylistChange(this.video.id)))
+        .subscribe(existResult => {
+          const watchLaterPlaylist = this.authService.getUser().specialPlaylists.find(p => p.type === VideoPlaylistType.WATCH_LATER)
+          const existsInWatchLater = existResult.find(r => r.playlistId === watchLaterPlaylist.id)
+          this.inWatchLaterPlaylist = false
+
+          this.watchLaterPlaylist = {
+            id: watchLaterPlaylist.id
+          }
+
+          if (existsInWatchLater) {
+            this.inWatchLaterPlaylist = true
+            this.watchLaterPlaylist.playlistElementId = existsInWatchLater.playlistElementId
+          }
+
+          this.cd.markForCheck()
+        })
+
+    this.videoPlaylistService.runPlaylistCheck(this.video.id)
   }
 }

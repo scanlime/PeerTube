@@ -1,4 +1,4 @@
-import * as validator from 'validator'
+import validator from 'validator'
 import { ACTIVITY_PUB, CONSTRAINTS_FIELDS } from '../../../initializers/constants'
 import { peertubeTruncate } from '../../core-utils'
 import { exists, isArray, isBooleanValid, isDateValid, isUUIDValid } from '../misc'
@@ -51,11 +51,16 @@ function sanitizeAndCheckVideoTorrentObject (video: any) {
     logger.debug('Video has invalid captions', { video })
     return false
   }
+  if (!setValidRemoteIcon(video)) {
+    logger.debug('Video has invalid icons', { video })
+    return false
+  }
 
   // Default attributes
   if (!isVideoStateValid(video.state)) video.state = VideoState.PUBLISHED
   if (!isBooleanValid(video.waitTranscoding)) video.waitTranscoding = false
   if (!isBooleanValid(video.downloadEnabled)) video.downloadEnabled = true
+  if (!isBooleanValid(video.commentsEnabled)) video.commentsEnabled = false
 
   return isActivityPubUrlValid(video.id) &&
     isVideoNameValid(video.name) &&
@@ -72,7 +77,6 @@ function sanitizeAndCheckVideoTorrentObject (video: any) {
     isDateValid(video.updated) &&
     (!video.originallyPublishedAt || isDateValid(video.originallyPublishedAt)) &&
     (!video.content || isRemoteVideoContentValid(video.mediaType, video.content)) &&
-    isRemoteVideoIconValid(video.icon) &&
     video.url.length !== 0 &&
     video.attributedTo.length !== 0
 }
@@ -80,19 +84,19 @@ function sanitizeAndCheckVideoTorrentObject (video: any) {
 function isRemoteVideoUrlValid (url: any) {
   return url.type === 'Link' &&
     (
-      ACTIVITY_PUB.URL_MIME_TYPES.VIDEO.indexOf(url.mediaType) !== -1 &&
+      ACTIVITY_PUB.URL_MIME_TYPES.VIDEO.includes(url.mediaType) &&
       isActivityPubUrlValid(url.href) &&
       validator.isInt(url.height + '', { min: 0 }) &&
       validator.isInt(url.size + '', { min: 0 }) &&
       (!url.fps || validator.isInt(url.fps + '', { min: -1 }))
     ) ||
     (
-      ACTIVITY_PUB.URL_MIME_TYPES.TORRENT.indexOf(url.mediaType) !== -1 &&
+      ACTIVITY_PUB.URL_MIME_TYPES.TORRENT.includes(url.mediaType) &&
       isActivityPubUrlValid(url.href) &&
       validator.isInt(url.height + '', { min: 0 })
     ) ||
     (
-      ACTIVITY_PUB.URL_MIME_TYPES.MAGNET.indexOf(url.mediaType) !== -1 &&
+      ACTIVITY_PUB.URL_MIME_TYPES.MAGNET.includes(url.mediaType) &&
       validator.isLength(url.href, { min: 5 }) &&
       validator.isInt(url.height + '', { min: 0 })
     ) ||
@@ -131,6 +135,8 @@ function setValidRemoteCaptions (video: any) {
   if (Array.isArray(video.subtitleLanguage) === false) return false
 
   video.subtitleLanguage = video.subtitleLanguage.filter(caption => {
+    if (!isActivityPubUrlValid(caption.url)) caption.url = null
+
     return isRemoteStringIdentifierValid(caption)
   })
 
@@ -149,12 +155,19 @@ function isRemoteVideoContentValid (mediaType: string, content: string) {
   return mediaType === 'text/markdown' && isVideoTruncatedDescriptionValid(content)
 }
 
-function isRemoteVideoIconValid (icon: any) {
-  return icon.type === 'Image' &&
-    isActivityPubUrlValid(icon.url) &&
-    icon.mediaType === 'image/jpeg' &&
-    validator.isInt(icon.width + '', { min: 0 }) &&
-    validator.isInt(icon.height + '', { min: 0 })
+function setValidRemoteIcon (video: any) {
+  if (video.icon && !isArray(video.icon)) video.icon = [ video.icon ]
+  if (!video.icon) video.icon = []
+
+  video.icon = video.icon.filter(icon => {
+    return icon.type === 'Image' &&
+      isActivityPubUrlValid(icon.url) &&
+      icon.mediaType === 'image/jpeg' &&
+      validator.isInt(icon.width + '', { min: 0 }) &&
+      validator.isInt(icon.height + '', { min: 0 })
+  })
+
+  return video.icon.length !== 0
 }
 
 function setValidRemoteVideoUrls (video: any) {

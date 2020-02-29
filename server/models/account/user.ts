@@ -1,4 +1,4 @@
-import { FindOptions, literal, Op, QueryTypes } from 'sequelize'
+import { FindOptions, literal, Op, QueryTypes, where, fn, col, WhereOptions } from 'sequelize'
 import {
   AfterDestroy,
   AfterUpdate,
@@ -19,13 +19,15 @@ import {
   Table,
   UpdatedAt
 } from 'sequelize-typescript'
-import { hasUserRight, USER_ROLE_LABELS, UserRight } from '../../../shared'
+import { hasUserRight, MyUser, USER_ROLE_LABELS, UserRight, VideoPlaylistType, VideoPrivacy } from '../../../shared'
 import { User, UserRole } from '../../../shared/models/users'
 import {
   isNoInstanceConfigWarningModal,
+  isNoWelcomeModal,
   isUserAdminFlagsValid,
-  isUserAutoPlayVideoValid,
+  isUserAutoPlayNextVideoPlaylistValid,
   isUserAutoPlayNextVideoValid,
+  isUserAutoPlayVideoValid,
   isUserBlockedReasonValid,
   isUserBlockedValid,
   isUserEmailVerifiedValid,
@@ -37,17 +39,17 @@ import {
   isUserVideoQuotaDailyValid,
   isUserVideoQuotaValid,
   isUserVideosHistoryEnabledValid,
-  isUserWebTorrentEnabledValid,
-  isNoWelcomeModal
+  isUserWebTorrentEnabledValid
 } from '../../helpers/custom-validators/users'
 import { comparePassword, cryptPassword } from '../../helpers/peertube-crypto'
 import { OAuthTokenModel } from '../oauth/oauth-token'
 import { getSort, throwIfNotValid } from '../utils'
 import { VideoChannelModel } from '../video/video-channel'
+import { VideoPlaylistModel } from '../video/video-playlist'
 import { AccountModel } from './account'
 import { NSFWPolicyType } from '../../../shared/models/videos/nsfw-policy.type'
 import { values } from 'lodash'
-import { DEFAULT_THEME_NAME, DEFAULT_USER_THEME_NAME, NSFW_POLICY_TYPES } from '../../initializers/constants'
+import { DEFAULT_USER_THEME_NAME, NSFW_POLICY_TYPES } from '../../initializers/constants'
 import { clearCacheByUserId } from '../../lib/oauth-model'
 import { UserNotificationSettingModel } from './user-notification-setting'
 import { VideoModel } from '../video/video'
@@ -59,15 +61,17 @@ import { isThemeNameValid } from '../../helpers/custom-validators/plugins'
 import { getThemeOrDefault } from '../../lib/plugins/theme-utils'
 import * as Bluebird from 'bluebird'
 import {
+  MMyUserFormattable,
   MUserDefault,
   MUserFormattable,
   MUserId,
   MUserNotifSettingChannelDefault,
-  MUserWithNotificationSetting
+  MUserWithNotificationSetting,
+  MVideoFullLight
 } from '@server/typings/models'
 
 enum ScopeNames {
-  WITH_VIDEO_CHANNEL = 'WITH_VIDEO_CHANNEL'
+  FOR_ME_API = 'FOR_ME_API'
 }
 
 @DefaultScope(() => ({
@@ -83,12 +87,25 @@ enum ScopeNames {
   ]
 }))
 @Scopes(() => ({
-  [ScopeNames.WITH_VIDEO_CHANNEL]: {
+  [ScopeNames.FOR_ME_API]: {
     include: [
       {
         model: AccountModel,
-        required: true,
-        include: [ VideoChannelModel ]
+        include: [
+          {
+            model: VideoChannelModel
+          },
+          {
+            attributes: [ 'id', 'name', 'type' ],
+            model: VideoPlaylistModel.unscoped(),
+            required: true,
+            where: {
+              type: {
+                [Op.ne]: VideoPlaylistType.REGULAR
+              }
+            }
+          }
+        ]
       },
       {
         model: UserNotificationSettingModel,
@@ -167,6 +184,15 @@ export class UserModel extends Model<UserModel> {
   @Column
   autoPlayNextVideo: boolean
 
+  @AllowNull(false)
+  @Default(true)
+  @Is(
+    'UserAutoPlayNextVideoPlaylist',
+    value => throwIfNotValid(value, isUserAutoPlayNextVideoPlaylistValid, 'auto play next video for playlists boolean')
+  )
+  @Column
+  autoPlayNextVideoPlaylist: boolean
+
   @AllowNull(true)
   @Default(null)
   @Is('UserVideoLanguages', value => throwIfNotValid(value, isUserVideoLanguages, 'video languages'))
@@ -207,7 +233,7 @@ export class UserModel extends Model<UserModel> {
   videoQuotaDaily: number
 
   @AllowNull(false)
-  @Default(DEFAULT_THEME_NAME)
+  @Default(DEFAULT_USER_THEME_NAME)
   @Is('UserTheme', value => throwIfNotValid(value, isThemeNameValid, 'theme'))
   @Column
   theme: string
@@ -285,7 +311,8 @@ export class UserModel extends Model<UserModel> {
   }
 
   static listForApi (start: number, count: number, sort: string, search?: string) {
-    let where = undefined
+    let where: WhereOptions
+
     if (search) {
       where = {
         [Op.or]: [
@@ -296,7 +323,7 @@ export class UserModel extends Model<UserModel> {
           },
           {
             username: {
-              [ Op.iLike ]: '%' + search + '%'
+              [Op.iLike]: '%' + search + '%'
             }
           }
         ]
@@ -309,14 +336,14 @@ export class UserModel extends Model<UserModel> {
           [
             literal(
               '(' +
-                'SELECT COALESCE(SUM("size"), 0) ' +
-                'FROM (' +
-                  'SELECT MAX("videoFile"."size") AS "size" FROM "videoFile" ' +
-                  'INNER JOIN "video" ON "videoFile"."videoId" = "video"."id" ' +
-                  'INNER JOIN "videoChannel" ON "videoChannel"."id" = "video"."channelId" ' +
-                  'INNER JOIN "account" ON "videoChannel"."accountId" = "account"."id" ' +
-                  'WHERE "account"."userId" = "UserModel"."id" GROUP BY "video"."id"' +
-                ') t' +
+              'SELECT COALESCE(SUM("size"), 0) ' +
+              'FROM (' +
+              'SELECT MAX("videoFile"."size") AS "size" FROM "videoFile" ' +
+              'INNER JOIN "video" ON "videoFile"."videoId" = "video"."id" ' +
+              'INNER JOIN "videoChannel" ON "videoChannel"."id" = "video"."channelId" ' +
+              'INNER JOIN "account" ON "videoChannel"."accountId" = "account"."id" ' +
+              'WHERE "account"."userId" = "UserModel"."id" GROUP BY "video"."id"' +
+              ') t' +
               ')'
             ),
             'videoQuotaUsed'
@@ -330,18 +357,18 @@ export class UserModel extends Model<UserModel> {
     }
 
     return UserModel.findAndCountAll(query)
-      .then(({ rows, count }) => {
-        return {
-          data: rows,
-          total: count
-        }
-      })
+                    .then(({ rows, count }) => {
+                      return {
+                        data: rows,
+                        total: count
+                      }
+                    })
   }
 
   static listWithRight (right: UserRight): Bluebird<MUserDefault[]> {
     const roles = Object.keys(USER_ROLE_LABELS)
-      .map(k => parseInt(k, 10) as UserRole)
-      .filter(role => hasUserRight(role, right))
+                        .map(k => parseInt(k, 10) as UserRole)
+                        .filter(role => hasUserRight(role, right))
 
     const query = {
       where: {
@@ -367,7 +394,7 @@ export class UserModel extends Model<UserModel> {
           required: true,
           include: [
             {
-              attributes: [ ],
+              attributes: [],
               model: ActorModel.unscoped(),
               required: true,
               where: {
@@ -375,7 +402,7 @@ export class UserModel extends Model<UserModel> {
               },
               include: [
                 {
-                  attributes: [ ],
+                  attributes: [],
                   as: 'ActorFollowings',
                   model: ActorFollowModel.unscoped(),
                   required: true,
@@ -410,21 +437,21 @@ export class UserModel extends Model<UserModel> {
   static loadByUsername (username: string): Bluebird<MUserDefault> {
     const query = {
       where: {
-        username: { [ Op.iLike ]: username }
+        username: { [Op.iLike]: username }
       }
     }
 
     return UserModel.findOne(query)
   }
 
-  static loadByUsernameAndPopulateChannels (username: string): Bluebird<MUserNotifSettingChannelDefault> {
+  static loadForMeAPI (username: string): Bluebird<MUserNotifSettingChannelDefault> {
     const query = {
       where: {
-        username: { [ Op.iLike ]: username }
+        username: { [Op.iLike]: username }
       }
     }
 
-    return UserModel.scope(ScopeNames.WITH_VIDEO_CHANNEL).findOne(query)
+    return UserModel.scope(ScopeNames.FOR_ME_API).findOne(query)
   }
 
   static loadByEmail (email: string): Bluebird<MUserDefault> {
@@ -442,7 +469,11 @@ export class UserModel extends Model<UserModel> {
 
     const query = {
       where: {
-        [ Op.or ]: [ { username: { [ Op.iLike ]: username } }, { email } ]
+        [Op.or]: [
+          where(fn('lower', col('username')), fn('lower', username)),
+
+          { email }
+        ]
       }
     }
 
@@ -565,7 +596,7 @@ export class UserModel extends Model<UserModel> {
     const query = {
       where: {
         username: {
-          [ Op.like ]: `%${search}%`
+          [Op.like]: `%${search}%`
         }
       },
       limit: 10
@@ -573,6 +604,22 @@ export class UserModel extends Model<UserModel> {
 
     return UserModel.findAll(query)
                     .then(u => u.map(u => u.username))
+  }
+
+  canGetVideo (video: MVideoFullLight) {
+    const videoUserId = video.VideoChannel.Account.userId
+
+    if (video.isBlacklisted()) {
+      return videoUserId === this.id || this.hasRight(UserRight.MANAGE_VIDEO_BLACKLIST)
+    }
+
+    if (video.privacy === VideoPrivacy.PRIVATE) {
+      return video.VideoChannel && videoUserId === this.id || this.hasRight(UserRight.MANAGE_VIDEO_BLACKLIST)
+    }
+
+    if (video.privacy === VideoPrivacy.INTERNAL) return true
+
+    return false
   }
 
   hasRight (right: UserRight) {
@@ -605,10 +652,11 @@ export class UserModel extends Model<UserModel> {
       videosHistoryEnabled: this.videosHistoryEnabled,
       autoPlayVideo: this.autoPlayVideo,
       autoPlayNextVideo: this.autoPlayNextVideo,
+      autoPlayNextVideoPlaylist: this.autoPlayNextVideoPlaylist,
       videoLanguages: this.videoLanguages,
 
       role: this.role,
-      roleLabel: USER_ROLE_LABELS[ this.role ],
+      roleLabel: USER_ROLE_LABELS[this.role],
 
       videoQuota: this.videoQuota,
       videoQuotaDaily: this.videoQuotaDaily,
@@ -642,16 +690,25 @@ export class UserModel extends Model<UserModel> {
 
     if (Array.isArray(this.Account.VideoChannels) === true) {
       json.videoChannels = this.Account.VideoChannels
-        .map(c => c.toFormattedJSON())
-        .sort((v1, v2) => {
-          if (v1.createdAt < v2.createdAt) return -1
-          if (v1.createdAt === v2.createdAt) return 0
+                               .map(c => c.toFormattedJSON())
+                               .sort((v1, v2) => {
+                                 if (v1.createdAt < v2.createdAt) return -1
+                                 if (v1.createdAt === v2.createdAt) return 0
 
-          return 1
-        })
+                                 return 1
+                               })
     }
 
     return json
+  }
+
+  toMeFormattedJSON (this: MMyUserFormattable): MyUser {
+    const formatted = this.toFormattedJSON()
+
+    const specialPlaylists = this.Account.VideoPlaylists
+                                 .map(p => ({ id: p.id, name: p.name, type: p.type }))
+
+    return Object.assign(formatted, { specialPlaylists })
   }
 
   async isAbleToUploadVideo (videoFile: { size: number }) {
@@ -676,12 +733,12 @@ export class UserModel extends Model<UserModel> {
 
     return 'SELECT SUM("size") AS "total" ' +
       'FROM (' +
-        'SELECT MAX("videoFile"."size") AS "size" FROM "videoFile" ' +
-        'INNER JOIN "video" ON "videoFile"."videoId" = "video"."id" ' +
-        'INNER JOIN "videoChannel" ON "videoChannel"."id" = "video"."channelId" ' +
-        'INNER JOIN "account" ON "videoChannel"."accountId" = "account"."id" ' +
-        'WHERE "account"."userId" = $userId ' + andWhere +
-        'GROUP BY "video"."id"' +
+      'SELECT MAX("videoFile"."size") AS "size" FROM "videoFile" ' +
+      'INNER JOIN "video" ON "videoFile"."videoId" = "video"."id" ' +
+      'INNER JOIN "videoChannel" ON "videoChannel"."id" = "video"."channelId" ' +
+      'INNER JOIN "account" ON "videoChannel"."accountId" = "account"."id" ' +
+      'WHERE "account"."userId" = $userId ' + andWhere +
+      'GROUP BY "video"."id"' +
       ') t'
   }
 

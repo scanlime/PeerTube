@@ -12,6 +12,7 @@ import { NgbTooltipModule } from '@ng-bootstrap/ng-bootstrap'
 import { RecommendationsModule } from '@app/videos/recommendations/recommendations.module'
 import { VideoWatchPlaylistComponent } from '@app/videos/+video-watch/video-watch-playlist.component'
 import { QRCodeModule } from 'angularx-qrcode'
+import { TimestampRouteTransformerDirective } from '@app/shared/angular/timestamp-route-transformer.directive'
 
 @NgModule({
   imports: [
@@ -30,11 +31,15 @@ import { QRCodeModule } from 'angularx-qrcode'
     VideoSupportComponent,
     VideoCommentsComponent,
     VideoCommentAddComponent,
-    VideoCommentComponent
+    VideoCommentComponent,
+
+    TimestampRouteTransformerDirective
   ],
 
   exports: [
-    VideoWatchComponent
+    VideoWatchComponent,
+
+    TimestampRouteTransformerDirective
   ],
 
   providers: [
