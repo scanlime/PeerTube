@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, OnChanges, Output, ViewChild } from '@angular/core'
+import { Component, EventEmitter, Input, OnChanges, OnInit, Output, ViewChild } from '@angular/core'
 import { I18n } from '@ngx-translate/i18n-polyfill'
 import { DropdownAction } from '@app/shared/buttons/action-dropdown.component'
 import { UserBanModalComponent } from '@app/shared/moderation/user-ban-modal.component'
@@ -7,24 +7,28 @@ import { AuthService, ConfirmService, Notifier, ServerService } from '@app/core'
 import { User, UserRight } from '../../../../../shared/models/users'
 import { Account } from '@app/shared/account/account.model'
 import { BlocklistService } from '@app/shared/blocklist'
+import { ServerConfig } from '@shared/models'
 
 @Component({
   selector: 'my-user-moderation-dropdown',
   templateUrl: './user-moderation-dropdown.component.html'
 })
-export class UserModerationDropdownComponent implements OnChanges {
-  @ViewChild('userBanModal', { static: false }) userBanModal: UserBanModalComponent
+export class UserModerationDropdownComponent implements OnInit, OnChanges {
+  @ViewChild('userBanModal') userBanModal: UserBanModalComponent
 
   @Input() user: User
   @Input() account: Account
 
   @Input() buttonSize: 'normal' | 'small' = 'normal'
   @Input() placement = 'left'
+  @Input() label: string
 
   @Output() userChanged = new EventEmitter()
   @Output() userDeleted = new EventEmitter()
 
   userActions: DropdownAction<{ user: User, account: Account }>[][] = []
+
+  private serverConfig: ServerConfig
 
   constructor (
     private authService: AuthService,
@@ -33,12 +37,17 @@ export class UserModerationDropdownComponent implements OnChanges {
     private serverService: ServerService,
     private userService: UserService,
     private blocklistService: BlocklistService,
-    private auth: AuthService,
     private i18n: I18n
   ) { }
 
   get requiresEmailVerification () {
-    return this.serverService.getConfig().signup.requiresEmailVerification
+    return this.serverConfig.signup.requiresEmailVerification
+  }
+
+  ngOnInit (): void {
+    this.serverConfig = this.serverService.getTmpConfig()
+    this.serverService.getConfig()
+      .subscribe(config => this.serverConfig = config)
   }
 
   ngOnChanges () {
@@ -234,20 +243,24 @@ export class UserModerationDropdownComponent implements OnChanges {
       if (this.user && authUser.hasRight(UserRight.MANAGE_USERS) && authUser.canManage(this.user)) {
         this.userActions.push([
           {
-            label: this.i18n('Edit'),
+            label: this.i18n('Edit user'),
+            description: this.i18n('Change quota, role, and more.'),
             linkBuilder: ({ user }) => this.getRouterUserEditLink(user)
           },
           {
-            label: this.i18n('Delete'),
+            label: this.i18n('Delete user'),
+            description: this.i18n('Videos will be deleted, comments will be tombstoned.'),
             handler: ({ user }) => this.removeUser(user)
           },
           {
             label: this.i18n('Ban'),
+            description: this.i18n('User won\'t be able to login anymore, but videos and comments will be kept as is.'),
             handler: ({ user }) => this.openBanUserModal(user),
             isDisplayed: ({ user }) => !user.blocked
           },
           {
-            label: this.i18n('Unban'),
+            label: this.i18n('Unban user'),
+            description: this.i18n('Allow the user to login and create videos/comments again'),
             handler: ({ user }) => this.unbanUser(user),
             isDisplayed: ({ user }) => user.blocked
           },
@@ -265,21 +278,25 @@ export class UserModerationDropdownComponent implements OnChanges {
         this.userActions.push([
           {
             label: this.i18n('Mute this account'),
+            description: this.i18n('Hide any content from that user for you.'),
             isDisplayed: ({ account }) => account.mutedByUser === false,
             handler: ({ account }) => this.blockAccountByUser(account)
           },
           {
             label: this.i18n('Unmute this account'),
+            description: this.i18n('Show back content from that user for you.'),
             isDisplayed: ({ account }) => account.mutedByUser === true,
             handler: ({ account }) => this.unblockAccountByUser(account)
           },
           {
             label: this.i18n('Mute the instance'),
+            description: this.i18n('Hide any content from that instance for you.'),
             isDisplayed: ({ account }) => !account.userId && account.mutedServerByInstance === false,
             handler: ({ account }) => this.blockServerByUser(account.host)
           },
           {
             label: this.i18n('Unmute the instance'),
+            description: this.i18n('Show back content from that instance for you.'),
             isDisplayed: ({ account }) => !account.userId && account.mutedServerByInstance === true,
             handler: ({ account }) => this.unblockServerByUser(account.host)
           }
@@ -292,11 +309,13 @@ export class UserModerationDropdownComponent implements OnChanges {
           instanceActions = instanceActions.concat([
             {
               label: this.i18n('Mute this account by your instance'),
+              description: this.i18n('Hide any content from that user for you, your instance and its users.'),
               isDisplayed: ({ account }) => account.mutedByInstance === false,
               handler: ({ account }) => this.blockAccountByInstance(account)
             },
             {
               label: this.i18n('Unmute this account by your instance'),
+              description: this.i18n('Show back content from that user for you, your instance and its users.'),
               isDisplayed: ({ account }) => account.mutedByInstance === true,
               handler: ({ account }) => this.unblockAccountByInstance(account)
             }
@@ -308,11 +327,13 @@ export class UserModerationDropdownComponent implements OnChanges {
           instanceActions = instanceActions.concat([
             {
               label: this.i18n('Mute the instance by your instance'),
+              description: this.i18n('Hide any content from that instance for you, your instance and its users.'),
               isDisplayed: ({ account }) => !account.userId && account.mutedServerByInstance === false,
               handler: ({ account }) => this.blockServerByInstance(account.host)
             },
             {
               label: this.i18n('Unmute the instance by your instance'),
+              description: this.i18n('Show back content from that instance for you, your instance and its users.'),
               isDisplayed: ({ account }) => !account.userId && account.mutedServerByInstance === true,
               handler: ({ account }) => this.unblockServerByInstance(account.host)
             }

@@ -3,6 +3,25 @@
 
 .sub-menu {
   @include sub-menu-with-actor;
+
+  .actor {
+    width: 100%;
+  }
+}
+
+.right-buttons {
+  display: flex;
+  height: max-content;
+  margin-left: auto;
+  margin-top: 20px;
+
+  a {
+    @include peertube-button-outline;
+  }
+
+  my-subscribe-button {
+    min-height: 30px;
+  }
 }
 
 my-user-moderation-dropdown,

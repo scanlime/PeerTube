@@ -1,5 +1,5 @@
 import { values } from 'lodash'
-import * as validator from 'validator'
+import validator from 'validator'
 import { VideoFilter, VideoPrivacy, VideoRateType } from '../../../shared'
 import {
   CONSTRAINTS_FIELDS,
@@ -20,15 +20,15 @@ function isVideoFilterValid (filter: VideoFilter) {
 }
 
 function isVideoCategoryValid (value: any) {
-  return value === null || VIDEO_CATEGORIES[ value ] !== undefined
+  return value === null || VIDEO_CATEGORIES[value] !== undefined
 }
 
 function isVideoStateValid (value: any) {
-  return exists(value) && VIDEO_STATES[ value ] !== undefined
+  return exists(value) && VIDEO_STATES[value] !== undefined
 }
 
 function isVideoLicenceValid (value: any) {
-  return value === null || VIDEO_LICENCES[ value ] !== undefined
+  return value === null || VIDEO_LICENCES[value] !== undefined
 }
 
 function isVideoLanguageValid (value: any) {
@@ -73,7 +73,7 @@ function isVideoViewsValid (value: string) {
 }
 
 function isVideoRatingTypeValid (value: string) {
-  return value === 'none' || values(VIDEO_RATE_TYPES).indexOf(value as VideoRateType) !== -1
+  return value === 'none' || values(VIDEO_RATE_TYPES).includes(value as VideoRateType)
 }
 
 function isVideoFileExtnameValid (value: string) {
@@ -98,11 +98,11 @@ function isVideoImage (files: { [ fieldname: string ]: Express.Multer.File[] } |
 }
 
 function isVideoPrivacyValid (value: number) {
-  return VIDEO_PRIVACIES[ value ] !== undefined
+  return VIDEO_PRIVACIES[value] !== undefined
 }
 
 function isScheduleVideoUpdatePrivacyValid (value: number) {
-  return value === VideoPrivacy.UNLISTED || value === VideoPrivacy.PUBLIC
+  return value === VideoPrivacy.UNLISTED || value === VideoPrivacy.PUBLIC || value === VideoPrivacy.INTERNAL
 }
 
 function isVideoOriginallyPublishedAtValid (value: string | null) {

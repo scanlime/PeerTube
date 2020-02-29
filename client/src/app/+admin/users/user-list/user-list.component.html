@@ -25,7 +25,7 @@
       <div>
         <input
           type="text" name="table-filter" id="table-filter" i18n-placeholder placeholder="Filter..."
-          (keyup)="onSearch($event.target.value)"
+          (keyup)="onSearch($event)"
         >
       </div>
     </div>
@@ -49,7 +49,7 @@
   <ng-template pTemplate="body" let-expanded="expanded" let-user>
 
     <tr [pSelectableRow]="user" [ngClass]="{ banned: user.blocked }">
-      <td>
+      <td class="expand-cell">
         <p-tableCheckbox [value]="user"></p-tableCheckbox>
       </td>
 
@@ -66,7 +66,7 @@
         </a>
       </td>
 
-      <td *ngIf="!requiresEmailVerification || user.blocked; else emailWithVerificationStatus">{{ user.email }}</td>
+      <td *ngIf="!requiresEmailVerification || user.blocked; else emailWithVerificationStatus" [title]="user.email">{{ user.email }}</td>
 
       <ng-template #emailWithVerificationStatus>
         <td *ngIf="user.emailVerified === false; else emailVerifiedNotFalse" i18n-title title="User's email must be verified to login">
@@ -81,7 +81,7 @@
 
       <td>{{ user.videoQuotaUsed }} / {{ user.videoQuota }}</td>
       <td>{{ user.roleLabel }}</td>
-      <td>{{ user.createdAt }}</td>
+      <td [title]="user.createdAt">{{ user.createdAt }}</td>
       <td class="action-cell">
         <my-user-moderation-dropdown *ngIf="!isInSelectionMode()" [user]="user" (userChanged)="onUserChanged()" (userDeleted)="onUserChanged()">
         </my-user-moderation-dropdown>

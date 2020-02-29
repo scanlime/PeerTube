@@ -15,7 +15,7 @@ import {
 } from '../../../../../shared/models/videos'
 import { FeedFormat } from '../../../../../shared/models/feeds/feed-format.enum'
 import { environment } from '../../../environments/environment'
-import { ComponentPagination } from '../rest/component-pagination.model'
+import { ComponentPaginationLight } from '../rest/component-pagination.model'
 import { RestExtractor } from '../rest/rest-extractor.service'
 import { RestService } from '../rest/rest.service'
 import { UserService } from '../users/user.service'
@@ -27,14 +27,15 @@ import { objectToFormData } from '@app/shared/misc/utils'
 import { Account } from '@app/shared/account/account.model'
 import { AccountService } from '@app/shared/account/account.service'
 import { VideoChannelService } from '@app/shared/video-channel/video-channel.service'
-import { ServerService } from '@app/core'
+import { ServerService, AuthService } from '@app/core'
 import { UserSubscriptionService } from '@app/shared/user-subscription/user-subscription.service'
 import { VideoChannel } from '@app/shared/video-channel/video-channel.model'
 import { I18n } from '@ngx-translate/i18n-polyfill'
+import { NSFWPolicyType } from '@shared/models/videos/nsfw-policy.type'
 
 export interface VideosProvider {
   getVideos (parameters: {
-    videoPagination: ComponentPagination,
+    videoPagination: ComponentPaginationLight,
     sort: VideoSortField,
     filter?: VideoFilter,
     categoryOneOf?: number,
@@ -49,6 +50,8 @@ export class VideoService implements VideosProvider {
 
   constructor (
     private authHttp: HttpClient,
+    private authService: AuthService,
+    private userService: UserService,
     private restExtractor: RestExtractor,
     private restService: RestService,
     private serverService: ServerService,
@@ -64,7 +67,7 @@ export class VideoService implements VideosProvider {
   }
 
   getVideo (options: { videoId: string }): Observable<VideoDetails> {
-    return this.serverService.localeObservable
+    return this.serverService.getServerLocale()
                .pipe(
                  switchMap(translations => {
                    return this.authHttp.get<VideoDetailsServerModel>(VideoService.BASE_VIDEO_URL + options.videoId)
@@ -121,14 +124,15 @@ export class VideoService implements VideosProvider {
                .pipe(catchError(err => this.restExtractor.handleError(err)))
   }
 
-  getMyVideos (videoPagination: ComponentPagination, sort: VideoSortField): Observable<ResultList<Video>> {
+  getMyVideos (videoPagination: ComponentPaginationLight, sort: VideoSortField, search?: string): Observable<ResultList<Video>> {
     const pagination = this.restService.componentPaginationToRestPagination(videoPagination)
 
     let params = new HttpParams()
     params = this.restService.addRestGetParams(params, pagination, sort)
+    params = this.restService.addObjectParams(params, { search })
 
     return this.authHttp
-               .get<ResultList<Video>>(UserService.BASE_USERS_URL + '/me/videos', { params })
+               .get<ResultList<Video>>(UserService.BASE_USERS_URL + 'me/videos', { params })
                .pipe(
                  switchMap(res => this.extractVideos(res)),
                  catchError(err => this.restExtractor.handleError(err))
@@ -137,7 +141,7 @@ export class VideoService implements VideosProvider {
 
   getAccountVideos (
     account: Account,
-    videoPagination: ComponentPagination,
+    videoPagination: ComponentPaginationLight,
     sort: VideoSortField
   ): Observable<ResultList<Video>> {
     const pagination = this.restService.componentPaginationToRestPagination(videoPagination)
@@ -155,7 +159,7 @@ export class VideoService implements VideosProvider {
 
   getVideoChannelVideos (
     videoChannel: VideoChannel,
-    videoPagination: ComponentPagination,
+    videoPagination: ComponentPaginationLight,
     sort: VideoSortField
   ): Observable<ResultList<Video>> {
     const pagination = this.restService.componentPaginationToRestPagination(videoPagination)
@@ -172,14 +176,17 @@ export class VideoService implements VideosProvider {
   }
 
   getUserSubscriptionVideos (parameters: {
-    videoPagination: ComponentPagination,
-    sort: VideoSortField
+    videoPagination: ComponentPaginationLight,
+    sort: VideoSortField,
+    skipCount?: boolean
   }): Observable<ResultList<Video>> {
-    const { videoPagination, sort } = parameters
+    const { videoPagination, sort, skipCount } = parameters
     const pagination = this.restService.componentPaginationToRestPagination(videoPagination)
 
     let params = new HttpParams()
     params = this.restService.addRestGetParams(params, pagination, sort)
+
+    if (skipCount) params = params.set('skipCount', skipCount + '')
 
     return this.authHttp
                .get<ResultList<Video>>(UserSubscriptionService.BASE_USER_SUBSCRIPTIONS_URL + '/videos', { params })
@@ -190,25 +197,32 @@ export class VideoService implements VideosProvider {
   }
 
   getVideos (parameters: {
-    videoPagination: ComponentPagination,
+    videoPagination: ComponentPaginationLight,
     sort: VideoSortField,
     filter?: VideoFilter,
     categoryOneOf?: number,
-    languageOneOf?: string[]
+    languageOneOf?: string[],
+    skipCount?: boolean,
+    nsfw?: boolean
   }): Observable<ResultList<Video>> {
-    const { videoPagination, sort, filter, categoryOneOf, languageOneOf } = parameters
+    const { videoPagination, sort, filter, categoryOneOf, languageOneOf, skipCount, nsfw } = parameters
 
     const pagination = this.restService.componentPaginationToRestPagination(videoPagination)
 
     let params = new HttpParams()
     params = this.restService.addRestGetParams(params, pagination, sort)
 
-    if (filter) {
-      params = params.set('filter', filter)
-    }
+    if (filter) params = params.set('filter', filter)
+    if (categoryOneOf) params = params.set('categoryOneOf', categoryOneOf + '')
+    if (skipCount) params = params.set('skipCount', skipCount + '')
 
-    if (categoryOneOf) {
-      params = params.set('categoryOneOf', categoryOneOf + '')
+    if (nsfw) {
+      params = params.set('nsfw', nsfw + '')
+    } else {
+      const nsfwPolicy = this.authService.isLoggedIn()
+        ? this.authService.getUser().nsfwPolicy
+        : this.userService.getAnonymousUser().nsfwPolicy
+      if (this.nsfwPolicyToFilter(nsfwPolicy)) params.set('nsfw', 'false')
     }
 
     if (languageOneOf) {
@@ -315,7 +329,7 @@ export class VideoService implements VideosProvider {
   }
 
   extractVideos (result: ResultList<VideoServerModel>) {
-    return this.serverService.localeObservable
+    return this.serverService.getServerLocale()
                .pipe(
                  map(translations => {
                    const videosJson = result.data
@@ -332,18 +346,26 @@ export class VideoService implements VideosProvider {
   }
 
   explainedPrivacyLabels (privacies: VideoConstant<VideoPrivacy>[]) {
-    const newPrivacies = privacies.slice()
+    const base = [
+      {
+        id: VideoPrivacy.PRIVATE,
+        label: this.i18n('Only I can see this video')
+      },
+      {
+        id: VideoPrivacy.UNLISTED,
+        label: this.i18n('Only people with the private link can see this video')
+      },
+      {
+        id: VideoPrivacy.PUBLIC,
+        label: this.i18n('Anyone can see this video')
+      },
+      {
+        id: VideoPrivacy.INTERNAL,
+        label: this.i18n('Only users of this instance can see this video')
+      }
+    ]
 
-    const privatePrivacy = newPrivacies.find(p => p.id === VideoPrivacy.PRIVATE)
-    if (privatePrivacy) privatePrivacy.label = this.i18n('Only I can see this video')
-
-    const unlistedPrivacy = newPrivacies.find(p => p.id === VideoPrivacy.UNLISTED)
-    if (unlistedPrivacy) unlistedPrivacy.label = this.i18n('Only people with the private link can see this video')
-
-    const publicPrivacy = newPrivacies.find(p => p.id === VideoPrivacy.PUBLIC)
-    if (publicPrivacy) publicPrivacy.label = this.i18n('Anyone can see this video')
-
-    return privacies
+    return base.filter(o => !!privacies.find(p => p.id === o.id))
   }
 
   private setVideoRate (id: number, rateType: UserVideoRateType) {
@@ -358,5 +380,9 @@ export class VideoService implements VideosProvider {
                  map(this.restExtractor.extractDataBool),
                  catchError(err => this.restExtractor.handleError(err))
                )
+  }
+
+  private nsfwPolicyToFilter (policy: NSFWPolicyType) {
+    return policy === 'do_not_list'
   }
 }

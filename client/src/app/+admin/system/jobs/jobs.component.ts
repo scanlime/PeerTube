@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core'
-import { peertubeLocalStorage } from '@app/shared/misc/peertube-local-storage'
+import { peertubeLocalStorage } from '@app/shared/misc/peertube-web-storage'
 import { Notifier } from '@app/core'
 import { SortMeta } from 'primeng/api'
 import { Job, JobType } from '../../../../../../shared/index'
@@ -7,6 +7,7 @@ import { JobState } from '../../../../../../shared/models'
 import { RestPagination, RestTable } from '../../../shared'
 import { JobService } from './job.service'
 import { I18n } from '@ngx-translate/i18n-polyfill'
+import { JobStateClient } from '../../../../types/job-state-client.type'
 import { JobTypeClient } from '../../../../types/job-type-client.type'
 
 @Component({
@@ -15,11 +16,11 @@ import { JobTypeClient } from '../../../../types/job-type-client.type'
   styleUrls: [ './jobs.component.scss' ]
 })
 export class JobsComponent extends RestTable implements OnInit {
-  private static JOB_STATE_LOCAL_STORAGE_STATE = 'jobs-list-state'
-  private static JOB_STATE_LOCAL_STORAGE_TYPE = 'jobs-list-type'
+  private static LOCAL_STORAGE_STATE = 'jobs-list-state'
+  private static LOCAL_STORAGE_TYPE = 'jobs-list-type'
 
-  jobState: JobState = 'waiting'
-  jobStates: JobState[] = [ 'active', 'completed', 'failed', 'waiting', 'delayed' ]
+  jobState: JobStateClient = 'waiting'
+  jobStates: JobStateClient[] = [ 'active', 'completed', 'failed', 'waiting', 'delayed' ]
 
   jobType: JobTypeClient = 'all'
   jobTypes: JobTypeClient[] = [
@@ -33,7 +34,8 @@ export class JobsComponent extends RestTable implements OnInit {
     'video-file-import',
     'video-import',
     'videos-views',
-    'activitypub-refresher'
+    'activitypub-refresher',
+    'video-redundancy'
   ]
 
   jobs: Job[] = []
@@ -76,15 +78,15 @@ export class JobsComponent extends RestTable implements OnInit {
   }
 
   private loadJobStateAndType () {
-    const state = peertubeLocalStorage.getItem(JobsComponent.JOB_STATE_LOCAL_STORAGE_STATE)
+    const state = peertubeLocalStorage.getItem(JobsComponent.LOCAL_STORAGE_STATE)
     if (state) this.jobState = state as JobState
 
-    const type = peertubeLocalStorage.getItem(JobsComponent.JOB_STATE_LOCAL_STORAGE_TYPE)
+    const type = peertubeLocalStorage.getItem(JobsComponent.LOCAL_STORAGE_TYPE)
     if (type) this.jobType = type as JobType
   }
 
   private saveJobStateAndType () {
-    peertubeLocalStorage.setItem(JobsComponent.JOB_STATE_LOCAL_STORAGE_STATE, this.jobState)
-    peertubeLocalStorage.setItem(JobsComponent.JOB_STATE_LOCAL_STORAGE_TYPE, this.jobType)
+    peertubeLocalStorage.setItem(JobsComponent.LOCAL_STORAGE_STATE, this.jobState)
+    peertubeLocalStorage.setItem(JobsComponent.LOCAL_STORAGE_TYPE, this.jobType)
   }
 }

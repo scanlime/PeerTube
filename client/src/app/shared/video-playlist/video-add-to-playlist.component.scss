@@ -1,15 +1,14 @@
 @import '_variables';
 @import '_mixins';
 
-.root {
-  max-height: 300px;
-  overflow-y: auto;
+.header,
+.dropdown-item,
+.input-container {
+  padding: 6px 24px 10px 24px;
 }
 
 .header {
   min-width: 240px;
-  padding: 6px 24px 10px 24px;
-
   margin-bottom: 10px;
   border-bottom: 1px solid $separator-border-color;
 
@@ -49,8 +48,9 @@
   }
 }
 
-.dropdown-item {
-  padding: 6px 24px;
+.playlists {
+  max-height: 180px;
+  overflow-y: auto;
 }
 
 .playlist {
@@ -76,7 +76,6 @@
 .new-playlist-button,
 .new-playlist-block {
   padding-top: 10px;
-  margin-top: 10px;
   border-top: 1px solid $separator-border-color;
 }
 

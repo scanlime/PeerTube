@@ -1,6 +1,5 @@
-import { peertubeLocalStorage } from '@app/shared/misc/peertube-local-storage'
-import { LazyLoadEvent } from 'primeng/components/common/lazyloadevent'
-import { SortMeta } from 'primeng/components/common/sortmeta'
+import { peertubeLocalStorage } from '@app/shared/misc/peertube-web-storage'
+import { LazyLoadEvent, SortMeta } from 'primeng/api'
 import { RestPagination } from './rest-pagination'
 import { Subject } from 'rxjs'
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators'
@@ -66,8 +65,9 @@ export abstract class RestTable {
       })
   }
 
-  onSearch (search: string) {
-    this.searchStream.next(search)
+  onSearch (event: Event) {
+    const target = event.target as HTMLInputElement
+    this.searchStream.next(target.value)
   }
 
   protected abstract loadData (): void

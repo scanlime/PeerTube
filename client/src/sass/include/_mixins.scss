@@ -11,11 +11,6 @@
   &:focus:not(.focus-visible) {
     outline: none;
   }
-
-  &::-moz-focus-inner {
-    border: 0;
-    padding: 0
-  }
 }
 
 
@@ -77,11 +72,25 @@
   }
 }
 
+@mixin fill-svg-color ($color) {
+  ::ng-deep svg {
+    path {
+      fill: $color;
+    }
+  }
+}
+
+@mixin button-focus-visible-shadow($color) {
+  &.focus-visible {
+    box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075), 0 0 4px $color;
+  }
+}
+
 @mixin peertube-input-text($width) {
   display: inline-block;
   height: $button-height;
   width: $width;
-  background: var(--inputColor);
+  background: var(--inputBackgroundColor);
   border: 1px solid #C6C6C6;
   border-radius: 3px;
   padding-left: 15px;
@@ -118,6 +127,8 @@
 }
 
 @mixin orange-button {
+  @include button-focus-visible-shadow(var(--mainHoverColor));
+
   &, &:active, &:focus {
     color: #fff;
     background-color: var(--mainColor);
@@ -169,7 +180,6 @@
   text-align: center;
   padding: 0 17px 0 13px;
   cursor: pointer;
-  outline: 0;
 }
 
 @mixin peertube-button-link {
@@ -177,6 +187,15 @@
 
   @include disable-default-a-behaviour;
   @include peertube-button;
+}
+
+@mixin peertube-button-outline {
+  display: inline-block;
+
+  @include disable-default-a-behaviour;
+  @include peertube-button;
+
+  border: 1px solid;
 }
 
 @mixin button-with-icon($width: 20px, $margin-right: 3px, $top: -1px) {
@@ -245,7 +264,7 @@
   width: $width;
   border-radius: 3px;
   overflow: hidden;
-  background: var(--inputColor);
+  background: var(--inputBackgroundColor);
   position: relative;
   font-size: 15px;
 
@@ -337,7 +356,7 @@
   position: absolute;
 
   &:focus + span {
-    outline: 1px solid #1e5180;
+    box-shadow: 0 0 0 .1rem rgba(87, 85, 217, .2);
   }
 
   & + span {
@@ -434,7 +453,6 @@
 @mixin actor-owner {
   @include disable-default-a-behaviour;
 
-  display: inline-table;
   font-size: 13px;
   margin-top: 4px;
   color: var(--mainForegroundColor);
@@ -453,7 +471,7 @@
 }
 
 @mixin sub-menu-with-actor {
-  height: 160px;
+  height: max-content;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -477,19 +495,24 @@
       .actor-names {
         display: flex;
         align-items: center;
+        flex-wrap: wrap;
 
         .actor-display-name {
           font-size: 23px;
           font-weight: $font-bold;
+          margin-right: 7px;
         }
 
         .actor-name {
-          margin-left: 7px;
           position: relative;
           top: 3px;
           font-size: 14px;
           color: $grey-actor-name;
         }
+      }
+
+      .actor-lower {
+        grid-area: lower;
       }
 
       .actor-followers {
@@ -509,6 +532,13 @@
     a {
       margin-top: 0;
       margin-bottom: 0;
+      text-transform: uppercase;
+      font-weight: 600;
+      font-size: 110%;
+
+      @media screen and (max-width: $mobile-view) {
+        font-size: 130%;
+      }
     }
   }
 }
@@ -534,10 +564,11 @@
 }
 
 @mixin dropdown-with-icon-item {
-  padding: 6px 24px;
+  padding: 6px 15px;
 
   my-global-icon {
-    width: 24px;
+    width: 22px;
+    opacity: .7;
 
     margin-right: 10px;
     position: relative;

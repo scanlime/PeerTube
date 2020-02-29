@@ -11,10 +11,9 @@ import { ClientHtml } from '../../lib/client-html'
 import { auditLoggerFactory, CustomConfigAuditView, getAuditIdFromRes } from '../../helpers/audit-logger'
 import { remove, writeJSON } from 'fs-extra'
 import { getServerCommit } from '../../helpers/utils'
-import { Emailer } from '../../lib/emailer'
-import { isNumeric } from 'validator'
+import validator from 'validator'
 import { objectConverter } from '../../helpers/core-utils'
-import { CONFIG, reloadConfig } from '../../initializers/config'
+import { CONFIG, isEmailEnabled, reloadConfig } from '../../initializers/config'
 import { PluginManager } from '../../lib/plugins/plugin-manager'
 import { getThemeOrDefault } from '../../lib/plugins/theme-utils'
 import { Hooks } from '@server/lib/plugins/hooks'
@@ -31,12 +30,12 @@ configRouter.get('/',
 configRouter.get('/custom',
   authenticate,
   ensureUserHasRight(UserRight.MANAGE_CONFIGURATION),
-  asyncMiddleware(getCustomConfig)
+  getCustomConfig
 )
 configRouter.put('/custom',
   authenticate,
   ensureUserHasRight(UserRight.MANAGE_CONFIGURATION),
-  asyncMiddleware(customConfigUpdateValidator),
+  customConfigUpdateValidator,
   asyncMiddleware(updateCustomConfig)
 )
 configRouter.delete('/custom',
@@ -50,7 +49,9 @@ let serverCommit: string
 async function getConfig (req: express.Request, res: express.Response) {
   const { allowed } = await Hooks.wrapPromiseFun(
     isSignupAllowed,
-    {},
+    {
+      ip: req.ip
+    },
     'filter:api.user.signup.allowed.result'
   )
 
@@ -71,6 +72,12 @@ async function getConfig (req: express.Request, res: express.Response) {
         css: CONFIG.INSTANCE.CUSTOMIZATIONS.CSS
       }
     },
+    search: {
+      remoteUri: {
+        users: CONFIG.SEARCH.REMOTE_URI.USERS,
+        anonymous: CONFIG.SEARCH.REMOTE_URI.ANONYMOUS
+      }
+    },
     plugin: {
       registered: getRegisteredPlugins()
     },
@@ -79,7 +86,7 @@ async function getConfig (req: express.Request, res: express.Response) {
       default: defaultTheme
     },
     email: {
-      enabled: Emailer.isEnabled()
+      enabled: isEmailEnabled()
     },
     contactForm: {
       enabled: CONFIG.CONTACT_FORM.ENABLED
@@ -155,6 +162,14 @@ async function getConfig (req: express.Request, res: express.Response) {
     },
     tracker: {
       enabled: CONFIG.TRACKER.ENABLED
+    },
+
+    followings: {
+      instance: {
+        autoFollowIndex: {
+          indexUrl: CONFIG.FOLLOWINGS.INSTANCE.AUTO_FOLLOW_INDEX.INDEX_URL
+        }
+      }
     }
   }
 
@@ -186,7 +201,7 @@ function getAbout (req: express.Request, res: express.Response) {
   return res.json(about).end()
 }
 
-async function getCustomConfig (req: express.Request, res: express.Response) {
+function getCustomConfig (req: express.Request, res: express.Response) {
   const data = customConfig()
 
   return res.json(data).end()
@@ -227,10 +242,40 @@ async function updateCustomConfig (req: express.Request, res: express.Response) 
   return res.json(data).end()
 }
 
+function getRegisteredThemes () {
+  return PluginManager.Instance.getRegisteredThemes()
+                      .map(t => ({
+                        name: t.name,
+                        version: t.version,
+                        description: t.description,
+                        css: t.css,
+                        clientScripts: t.clientScripts
+                      }))
+}
+
+function getEnabledResolutions () {
+  return Object.keys(CONFIG.TRANSCODING.RESOLUTIONS)
+               .filter(key => CONFIG.TRANSCODING.ENABLED && CONFIG.TRANSCODING.RESOLUTIONS[key] === true)
+               .map(r => parseInt(r, 10))
+}
+
+function getRegisteredPlugins () {
+  return PluginManager.Instance.getRegisteredPlugins()
+                      .map(p => ({
+                        name: p.name,
+                        version: p.version,
+                        description: p.description,
+                        clientScripts: p.clientScripts
+                      }))
+}
+
 // ---------------------------------------------------------------------------
 
 export {
-  configRouter
+  configRouter,
+  getEnabledResolutions,
+  getRegisteredPlugins,
+  getRegisteredThemes
 }
 
 // ---------------------------------------------------------------------------
@@ -300,13 +345,13 @@ function customConfig (): CustomConfig {
       allowAudioFiles: CONFIG.TRANSCODING.ALLOW_AUDIO_FILES,
       threads: CONFIG.TRANSCODING.THREADS,
       resolutions: {
-        '0p': CONFIG.TRANSCODING.RESOLUTIONS[ '0p' ],
-        '240p': CONFIG.TRANSCODING.RESOLUTIONS[ '240p' ],
-        '360p': CONFIG.TRANSCODING.RESOLUTIONS[ '360p' ],
-        '480p': CONFIG.TRANSCODING.RESOLUTIONS[ '480p' ],
-        '720p': CONFIG.TRANSCODING.RESOLUTIONS[ '720p' ],
-        '1080p': CONFIG.TRANSCODING.RESOLUTIONS[ '1080p' ],
-        '2160p': CONFIG.TRANSCODING.RESOLUTIONS[ '2160p' ]
+        '0p': CONFIG.TRANSCODING.RESOLUTIONS['0p'],
+        '240p': CONFIG.TRANSCODING.RESOLUTIONS['240p'],
+        '360p': CONFIG.TRANSCODING.RESOLUTIONS['360p'],
+        '480p': CONFIG.TRANSCODING.RESOLUTIONS['480p'],
+        '720p': CONFIG.TRANSCODING.RESOLUTIONS['720p'],
+        '1080p': CONFIG.TRANSCODING.RESOLUTIONS['1080p'],
+        '2160p': CONFIG.TRANSCODING.RESOLUTIONS['2160p']
       },
       webtorrent: {
         enabled: CONFIG.TRANSCODING.WEBTORRENT.ENABLED
@@ -363,37 +408,10 @@ function convertCustomConfigBody (body: CustomConfig) {
   }
 
   function valueConverter (v: any) {
-    if (isNumeric(v + '')) return parseInt('' + v, 10)
+    if (validator.isNumeric(v + '')) return parseInt('' + v, 10)
 
     return v
   }
 
   return objectConverter(body, keyConverter, valueConverter)
-}
-
-function getRegisteredThemes () {
-  return PluginManager.Instance.getRegisteredThemes()
-                      .map(t => ({
-                        name: t.name,
-                        version: t.version,
-                        description: t.description,
-                        css: t.css,
-                        clientScripts: t.clientScripts
-                      }))
-}
-
-function getEnabledResolutions () {
-  return Object.keys(CONFIG.TRANSCODING.RESOLUTIONS)
-               .filter(key => CONFIG.TRANSCODING.ENABLED && CONFIG.TRANSCODING.RESOLUTIONS[ key ] === true)
-               .map(r => parseInt(r, 10))
-}
-
-function getRegisteredPlugins () {
-  return PluginManager.Instance.getRegisteredPlugins()
-                      .map(p => ({
-                        name: p.name,
-                        version: p.version,
-                        description: p.description,
-                        clientScripts: p.clientScripts
-                      }))
 }

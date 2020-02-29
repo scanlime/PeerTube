@@ -27,12 +27,13 @@ import { generateMagnetUri } from '@server/helpers/webtorrent'
 export type VideoFormattingJSONOptions = {
   completeDescription?: boolean
   additionalAttributes: {
-    state?: boolean,
-    waitTranscoding?: boolean,
-    scheduledUpdate?: boolean,
+    state?: boolean
+    waitTranscoding?: boolean
+    scheduledUpdate?: boolean
     blacklistInfo?: boolean
   }
 }
+
 function videoModelToFormattedJSON (video: MVideoFormattable, options?: VideoFormattingJSONOptions): Video {
   const userHistory = isArray(video.UserVideoHistories) ? video.UserVideoHistories[0] : undefined
 
@@ -181,12 +182,10 @@ function videoFilesModelToFormattedJSON (
 ): VideoFile[] {
   return videoFiles
     .map(videoFile => {
-      let resolutionLabel = videoFile.resolution + 'p'
-
       return {
         resolution: {
           id: videoFile.resolution,
-          label: resolutionLabel
+          label: videoFile.resolution + 'p'
         },
         magnetUri: generateMagnetUri(model, videoFile, baseUrlHttp, baseUrlWs),
         size: videoFile.size,
@@ -214,7 +213,7 @@ function addVideoFilesInAPAcc (
   for (const file of files) {
     acc.push({
       type: 'Link',
-      mediaType: MIMETYPES.VIDEO.EXT_MIMETYPE[ file.extname ] as any,
+      mediaType: MIMETYPES.VIDEO.EXT_MIMETYPE[file.extname] as any,
       href: model.getVideoFileUrl(file, baseUrlHttp),
       height: file.resolution,
       size: file.size,
@@ -270,14 +269,20 @@ function videoModelToActivityPubObject (video: MVideoAP): VideoTorrentObject {
     }
   }
 
-  const url: ActivityUrlObject[] = []
+  const url: ActivityUrlObject[] = [
+    // HTML url should be the first element in the array so Mastodon correctly displays the embed
+    {
+      type: 'Link',
+      mediaType: 'text/html',
+      href: WEBSERVER.URL + '/videos/watch/' + video.uuid
+    }
+  ]
+
   addVideoFilesInAPAcc(url, video, baseUrlHttp, baseUrlWs, video.VideoFiles || [])
 
   for (const playlist of (video.VideoStreamingPlaylists || [])) {
-    let tag: ActivityTagObject[]
-
-    tag = playlist.p2pMediaLoaderInfohashes
-                  .map(i => ({ type: 'Infohash' as 'Infohash', name: i }))
+    const tag = playlist.p2pMediaLoaderInfohashes
+                  .map(i => ({ type: 'Infohash' as 'Infohash', name: i })) as ActivityTagObject[]
     tag.push({
       type: 'Link',
       name: 'sha256',
@@ -296,22 +301,16 @@ function videoModelToActivityPubObject (video: MVideoAP): VideoTorrentObject {
     })
   }
 
-  // Add video url too
-  url.push({
-    type: 'Link',
-    mediaType: 'text/html',
-    href: WEBSERVER.URL + '/videos/watch/' + video.uuid
-  })
-
   const subtitleLanguage = []
   for (const caption of video.VideoCaptions) {
     subtitleLanguage.push({
       identifier: caption.language,
-      name: VideoCaptionModel.getLanguageLabel(caption.language)
+      name: VideoCaptionModel.getLanguageLabel(caption.language),
+      url: caption.getFileUrl(video)
     })
   }
 
-  const miniature = video.getMiniature()
+  const icons = [ video.getMiniature(), video.getPreview() ]
 
   return {
     type: 'Video' as 'Video',
@@ -336,13 +335,13 @@ function videoModelToActivityPubObject (video: MVideoAP): VideoTorrentObject {
     content: video.getTruncatedDescription(),
     support: video.support,
     subtitleLanguage,
-    icon: {
+    icon: icons.map(i => ({
       type: 'Image',
-      url: miniature.getFileUrl(),
+      url: i.getFileUrl(video),
       mediaType: 'image/jpeg',
-      width: miniature.width,
-      height: miniature.height
-    },
+      width: i.width,
+      height: i.height
+    })),
     url,
     likes: getVideoLikesActivityPubUrl(video),
     dislikes: getVideoDislikesActivityPubUrl(video),

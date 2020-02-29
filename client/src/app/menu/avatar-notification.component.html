@@ -12,21 +12,31 @@
     <div class="notifications-header">
       <div i18n>Notifications</div>
 
-      <a
-        i18n-title title="Update your notification preferences" class="glyphicon glyphicon-cog"
-        routerLink="/my-account/settings" fragment="notifications"
-      ></a>
+      <div>
+        <button
+          *ngIf="unreadNotifications"
+          i18n-title title="Mark all as read" class="glyphicon glyphicon-inbox mr-2"
+          (click)="markAllAsRead()"
+        ></button>
+        <a
+          i18n-title title="Update your notification preferences" class="glyphicon glyphicon-cog"
+          routerLink="/my-account/settings" fragment="notifications"
+        ></a>
+      </div>
     </div>
 
-    <div *ngIf="!loaded" class="loader">
+    <div *ngIf="!loaded" class="loader mt-4">
       <my-loader [loading]="!loaded"></my-loader>
     </div>
 
     <my-user-notifications
-      [ignoreLoadingBar]="true" [infiniteScroll]="false" itemsPerPage="10"
-      (notificationsLoaded)="onNotificationLoaded()"
+      [ignoreLoadingBar]="true" [infiniteScroll]="false" [itemsPerPage]="10"
+      [markAllAsReadSubject]="markAllAsReadSubject" (notificationsLoaded)="onNotificationLoaded()"
     ></my-user-notifications>
 
-    <a *ngIf="loaded" class="all-notifications" routerLink="/my-account/notifications" i18n>See all your notifications</a>
+    <a *ngIf="loaded" class="all-notifications" routerLink="/my-account/notifications">
+      <my-global-icon class="mr-1" iconName="inbox-full"></my-global-icon>
+      <span i18n>See all your notifications</span>
+    </a>
   </div>
 </ng-template>

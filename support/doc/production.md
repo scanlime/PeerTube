@@ -39,7 +39,7 @@ Create the production database and a peertube user inside PostgreSQL:
 
 ```
 $ sudo -u postgres createuser -P peertube
-$ sudo -u postgres createdb -O peertube peertube_prod
+$ sudo -u postgres createdb -O peertube -E UTF8 -T template0 peertube_prod
 ```
 
 Then enable extensions PeerTube needs:
@@ -94,6 +94,13 @@ Copy the nginx configuration template:
 
 ```
 $ sudo cp /var/www/peertube/peertube-latest/support/nginx/peertube /etc/nginx/sites-available/peertube
+```
+
+Then set the domain for the webserver configuration file. 
+Replace `[peertube-domain]` with the domain for the peertube server. 
+
+```
+$ sudo sed -i 's/peertube.example.com/[peertube-domain]/g' /etc/nginx/sites-available/peertube
 ```
 
 Then modify the webserver configuration file. Please pay attention to the `alias` keys of the static locations.

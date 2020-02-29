@@ -25,7 +25,8 @@ export class PluginSearchComponent implements OnInit {
 
   pagination: ComponentPagination = {
     currentPage: 1,
-    itemsPerPage: 10
+    itemsPerPage: 10,
+    totalItems: null
   }
   sort = '-popularity'
 
@@ -69,8 +70,10 @@ export class PluginSearchComponent implements OnInit {
     this.reloadPlugins()
   }
 
-  onSearchChange (search: string) {
-    this.searchSubject.next(search)
+  onSearchChange (event: Event) {
+    const target = event.target as HTMLInputElement
+
+    this.searchSubject.next(target.value)
   }
 
   reloadPlugins () {

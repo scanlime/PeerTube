@@ -1,9 +1,9 @@
-import { debounceTime, first, tap } from 'rxjs/operators'
+import { debounceTime, first, tap, throttleTime } from 'rxjs/operators'
 import { OnDestroy, OnInit } from '@angular/core'
 import { ActivatedRoute, Router } from '@angular/router'
 import { fromEvent, Observable, of, Subject, Subscription } from 'rxjs'
 import { AuthService } from '../../core/auth'
-import { ComponentPagination } from '../rest/component-pagination.model'
+import { ComponentPaginationLight } from '../rest/component-pagination.model'
 import { VideoSortField } from './sort-field.type'
 import { Video } from './video.model'
 import { ScreenService } from '@app/shared/misc/screen.service'
@@ -13,7 +13,10 @@ import { Notifier, ServerService } from '@app/core'
 import { DisableForReuseHook } from '@app/core/routing/disable-for-reuse-hook'
 import { I18n } from '@ngx-translate/i18n-polyfill'
 import { isLastMonth, isLastWeek, isToday, isYesterday } from '@shared/core-utils/miscs/date'
-import { ResultList } from '@shared/models'
+import { ServerConfig } from '@shared/models'
+import { GlobalIconName } from '@app/shared/images/global-icon.component'
+import { UserService, User } from '../users'
+import { LocalStorageService } from '../misc/storage.service'
 
 enum GroupDate {
   UNKNOWN = 0,
@@ -25,10 +28,9 @@ enum GroupDate {
 }
 
 export abstract class AbstractVideoList implements OnInit, OnDestroy, DisableForReuseHook {
-  pagination: ComponentPagination = {
+  pagination: ComponentPaginationLight = {
     currentPage: 1,
-    itemsPerPage: 25,
-    totalItems: null
+    itemsPerPage: 25
   }
   sort: VideoSortField = '-publishedAt'
 
@@ -47,6 +49,7 @@ export abstract class AbstractVideoList implements OnInit, OnDestroy, DisableFor
   groupByDate = false
 
   videos: Video[] = []
+  hasDoneFirstQuery = false
   disabled = false
 
   displayOptions: MiniatureDisplayOptions = {
@@ -59,13 +62,23 @@ export abstract class AbstractVideoList implements OnInit, OnDestroy, DisableFor
     blacklistInfo: false
   }
 
+  actions: {
+    routerLink: string
+    iconName: GlobalIconName
+    label: string
+  }[] = []
+
   onDataSubject = new Subject<any[]>()
+
+  protected serverConfig: ServerConfig
 
   protected abstract notifier: Notifier
   protected abstract authService: AuthService
+  protected abstract userService: UserService
   protected abstract route: ActivatedRoute
   protected abstract serverService: ServerService
   protected abstract screenService: ScreenService
+  protected abstract storageService: LocalStorageService
   protected abstract router: Router
   protected abstract i18n: I18n
   abstract titlePage: string
@@ -76,7 +89,9 @@ export abstract class AbstractVideoList implements OnInit, OnDestroy, DisableFor
   private groupedDateLabels: { [id in GroupDate]: string }
   private groupedDates: { [id: number]: GroupDate } = {}
 
-  abstract getVideosObservable (page: number): Observable<ResultList<Video>>
+  private lastQueryLength: number
+
+  abstract getVideosObservable (page: number): Observable<{ data: Video[] }>
 
   abstract generateSyndicationList (): void
 
@@ -85,6 +100,10 @@ export abstract class AbstractVideoList implements OnInit, OnDestroy, DisableFor
   }
 
   ngOnInit () {
+    this.serverConfig = this.serverService.getTmpConfig()
+    this.serverService.getConfig()
+      .subscribe(config => this.serverConfig = config)
+
     this.groupedDateLabels = {
       [GroupDate.UNKNOWN]: null,
       [GroupDate.TODAY]: this.i18n('Today'),
@@ -109,6 +128,16 @@ export abstract class AbstractVideoList implements OnInit, OnDestroy, DisableFor
     if (this.loadOnInit === true) {
       loadUserObservable.subscribe(() => this.loadMoreVideos())
     }
+
+    this.storageService.watch([
+      User.KEYS.NSFW_POLICY,
+      User.KEYS.VIDEO_LANGUAGES
+    ]).pipe(throttleTime(200)).subscribe(
+      () => {
+        this.loadUserVideoLanguagesIfNeeded()
+        if (this.hasDoneFirstQuery) this.reloadVideos()
+      }
+    )
   }
 
   ngOnDestroy () {
@@ -130,8 +159,8 @@ export abstract class AbstractVideoList implements OnInit, OnDestroy, DisableFor
   onNearOfBottom () {
     if (this.disabled) return
 
-    // Last page
-    if (this.pagination.totalItems <= (this.pagination.currentPage * this.pagination.itemsPerPage)) return
+    // No more results
+    if (this.lastQueryLength !== undefined && this.lastQueryLength < this.pagination.itemsPerPage) return
 
     this.pagination.currentPage += 1
 
@@ -140,10 +169,13 @@ export abstract class AbstractVideoList implements OnInit, OnDestroy, DisableFor
     this.loadMoreVideos()
   }
 
-  loadMoreVideos () {
+  loadMoreVideos (reset = false) {
     this.getVideosObservable(this.pagination.currentPage).subscribe(
-      ({ data, total }) => {
-        this.pagination.totalItems = total
+      ({ data }) => {
+        this.hasDoneFirstQuery = true
+        this.lastQueryLength = data.length
+
+        if (reset) this.videos = []
         this.videos = this.videos.concat(data)
 
         if (this.groupByDate) this.buildGroupedDateLabels()
@@ -153,14 +185,18 @@ export abstract class AbstractVideoList implements OnInit, OnDestroy, DisableFor
         this.onDataSubject.next(data)
       },
 
-      error => this.notifier.error(error.message)
+      error => {
+        const message = this.i18n('Cannot load more videos. Try again later.')
+
+        console.error(message, { error })
+        this.notifier.error(message)
+      }
     )
   }
 
   reloadVideos () {
     this.pagination.currentPage = 1
-    this.videos = []
-    this.loadMoreVideos()
+    this.loadMoreVideos(true)
   }
 
   toggleModerationDisplay () {
@@ -251,13 +287,18 @@ export abstract class AbstractVideoList implements OnInit, OnDestroy, DisableFor
     }
 
     let path = this.router.url
-    if (!path || path === '/') path = this.serverService.getConfig().instance.defaultClientRoute
+    if (!path || path === '/') path = this.serverConfig.instance.defaultClientRoute
 
     this.router.navigate([ path ], { queryParams, replaceUrl: true, queryParamsHandling: 'merge' })
   }
 
   private loadUserVideoLanguagesIfNeeded () {
-    if (!this.authService.isLoggedIn() || !this.useUserVideoLanguagePreferences) {
+    if (!this.useUserVideoLanguagePreferences) {
+      return of(true)
+    }
+
+    if (!this.authService.isLoggedIn()) {
+      this.languageOneOf = this.userService.getAnonymousUser().videoLanguages
       return of(true)
     }
 

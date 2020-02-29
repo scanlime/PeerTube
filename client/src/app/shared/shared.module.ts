@@ -5,9 +5,10 @@ import { FormsModule, ReactiveFormsModule } from '@angular/forms'
 import { RouterModule } from '@angular/router'
 import { MarkdownTextareaComponent } from '@app/shared/forms/markdown-textarea.component'
 import { HelpComponent } from '@app/shared/misc/help.component'
+import { ListOverflowComponent } from '@app/shared/misc/list-overflow.component'
 import { InfiniteScrollerDirective } from '@app/shared/video/infinite-scroller.directive'
 import { BytesPipe, KeysPipe, NgPipesModule } from 'ngx-pipes'
-import { SharedModule as PrimeSharedModule } from 'primeng/components/common/shared'
+import { SharedModule as PrimeSharedModule } from 'primeng/api'
 import { AUTH_INTERCEPTOR_PROVIDER } from './auth'
 import { ButtonComponent } from './buttons/button.component'
 import { DeleteButtonComponent } from './buttons/delete-button.component'
@@ -46,6 +47,7 @@ import {
 import { I18nPrimengCalendarService } from '@app/shared/i18n/i18n-primeng-calendar'
 import { InputMaskModule } from 'primeng/inputmask'
 import { ScreenService } from '@app/shared/misc/screen.service'
+import { LocalStorageService, SessionStorageService } from '@app/shared/misc/storage.service'
 import { VideoCaptionsValidatorsService } from '@app/shared/forms/form-validators/video-captions-validators.service'
 import { VideoCaptionService } from '@app/shared/video-caption'
 import { PeertubeCheckboxComponent } from '@app/shared/forms/peertube-checkbox.component'
@@ -66,6 +68,7 @@ import { OverviewService } from '@app/shared/overview'
 import { UserBanModalComponent } from '@app/shared/moderation'
 import { UserModerationDropdownComponent } from '@app/shared/moderation/user-moderation-dropdown.component'
 import { BlocklistService } from '@app/shared/blocklist'
+import { AvatarComponent } from '@app/shared/channel/avatar.component'
 import { TopMenuDropdownComponent } from '@app/shared/menu/top-menu-dropdown.component'
 import { UserHistoryService } from '@app/shared/users/user-history.service'
 import { UserNotificationService } from '@app/shared/users/user-notification.service'
@@ -84,18 +87,25 @@ import { TimestampInputComponent } from '@app/shared/forms/timestamp-input.compo
 import { VideoPlaylistElementMiniatureComponent } from '@app/shared/video-playlist/video-playlist-element-miniature.component'
 import { VideosSelectionComponent } from '@app/shared/video/videos-selection.component'
 import { NumberFormatterPipe } from '@app/shared/angular/number-formatter.pipe'
+import { VideoDurationPipe } from '@app/shared/angular/video-duration-formatter.pipe'
 import { ObjectLengthPipe } from '@app/shared/angular/object-length.pipe'
 import { FromNowPipe } from '@app/shared/angular/from-now.pipe'
+import { HighlightPipe } from '@app/shared/angular/highlight.pipe'
 import { PeerTubeTemplateDirective } from '@app/shared/angular/peertube-template.directive'
 import { VideoActionsDropdownComponent } from '@app/shared/video/video-actions-dropdown.component'
 import { VideoBlacklistComponent } from '@app/shared/video/modals/video-blacklist.component'
 import { VideoDownloadComponent } from '@app/shared/video/modals/video-download.component'
 import { VideoReportComponent } from '@app/shared/video/modals/video-report.component'
-import { ClipboardModule } from 'ngx-clipboard'
 import { FollowService } from '@app/shared/instance/follow.service'
 import { MultiSelectModule } from 'primeng/multiselect'
 import { FeatureBooleanComponent } from '@app/shared/instance/feature-boolean.component'
 import { InputReadonlyCopyComponent } from '@app/shared/forms/input-readonly-copy.component'
+import { RedundancyService } from '@app/shared/video/redundancy.service'
+import { ClipboardModule } from '@angular/cdk/clipboard'
+import { InputSwitchModule } from 'primeng/inputswitch'
+
+import { MyAccountVideoSettingsComponent } from '@app/+my-account/my-account-settings/my-account-video-settings'
+import { MyAccountInterfaceSettingsComponent } from '@app/+my-account/my-account-settings/my-account-interface'
 
 @NgModule({
   imports: [
@@ -117,7 +127,8 @@ import { InputReadonlyCopyComponent } from '@app/shared/forms/input-readonly-cop
     PrimeSharedModule,
     InputMaskModule,
     NgPipesModule,
-    MultiSelectModule
+    MultiSelectModule,
+    InputSwitchModule
   ],
 
   declarations: [
@@ -145,19 +156,23 @@ import { InputReadonlyCopyComponent } from '@app/shared/forms/input-readonly-cop
     NumberFormatterPipe,
     ObjectLengthPipe,
     FromNowPipe,
+    HighlightPipe,
     PeerTubeTemplateDirective,
+    VideoDurationPipe,
 
     ActionDropdownComponent,
     MarkdownTextareaComponent,
     InfiniteScrollerDirective,
     TextareaAutoResizeDirective,
     HelpComponent,
+    ListOverflowComponent,
 
     ReactiveFileComponent,
     PeertubeCheckboxComponent,
     TimestampInputComponent,
     InputReadonlyCopyComponent,
 
+    AvatarComponent,
     SubscribeButtonComponent,
     RemoteSubscribeComponent,
     InstanceFeaturesTableComponent,
@@ -171,7 +186,10 @@ import { InputReadonlyCopyComponent } from '@app/shared/forms/input-readonly-cop
     DateToggleComponent,
 
     GlobalIconComponent,
-    PreviewUploadComponent
+    PreviewUploadComponent,
+
+    MyAccountVideoSettingsComponent,
+    MyAccountInterfaceSettingsComponent
   ],
 
   exports: [
@@ -222,12 +240,14 @@ import { InputReadonlyCopyComponent } from '@app/shared/forms/input-readonly-cop
     InfiniteScrollerDirective,
     TextareaAutoResizeDirective,
     HelpComponent,
+    ListOverflowComponent,
     InputReadonlyCopyComponent,
 
     ReactiveFileComponent,
     PeertubeCheckboxComponent,
     TimestampInputComponent,
 
+    AvatarComponent,
     SubscribeButtonComponent,
     RemoteSubscribeComponent,
     InstanceFeaturesTableComponent,
@@ -245,7 +265,12 @@ import { InputReadonlyCopyComponent } from '@app/shared/forms/input-readonly-cop
     NumberFormatterPipe,
     ObjectLengthPipe,
     FromNowPipe,
-    PeerTubeTemplateDirective
+    HighlightPipe,
+    PeerTubeTemplateDirective,
+    VideoDurationPipe,
+
+    MyAccountVideoSettingsComponent,
+    MyAccountInterfaceSettingsComponent
   ],
 
   providers: [
@@ -290,10 +315,12 @@ import { InputReadonlyCopyComponent } from '@app/shared/forms/input-readonly-cop
 
     I18nPrimengCalendarService,
     ScreenService,
+    LocalStorageService, SessionStorageService,
 
     UserNotificationService,
 
     FollowService,
+    RedundancyService,
 
     I18n
   ]

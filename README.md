@@ -66,7 +66,7 @@ Be part of a network of multiple small federated, interoperable video hosting pr
 
 <p align="center">
   <a href="https://framatube.org/videos/watch/217eefeb-883d-45be-b7fc-a788ad8507d3">
-    <img src="https://lutim.cpy.re/8cZDRIEF.png" alt="screenshot" />
+    <img src="http://lutim.cpy.re/9CLXh0Ys.png" alt="screenshot" />
   </a>
 </p>
 
@@ -196,7 +196,7 @@ Quonfucius, IP Solution, \_Laure\_, @lex666, 0x010C, 3dsman, 3rw4n-G3D, aallrd, 
 
 ## License
 
-Copyright (C) 2015-2019 PeerTube Contributors
+Copyright (C) 2015-2020 PeerTube Contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published

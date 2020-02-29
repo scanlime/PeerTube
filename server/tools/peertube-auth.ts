@@ -1,3 +1,5 @@
+// eslint-disable @typescript-eslint/no-unnecessary-type-assertion
+
 import { registerTSPaths } from '../helpers/register-ts-paths'
 registerTSPaths()
 
@@ -5,9 +7,8 @@ import * as program from 'commander'
 import * as prompt from 'prompt'
 import { getNetrc, getSettings, writeSettings } from './cli'
 import { isUserUsernameValid } from '../helpers/custom-validators/users'
-import { getAccessToken, login } from '../../shared/extra-utils'
-
-const Table = require('cli-table')
+import { getAccessToken } from '../../shared/extra-utils'
+import * as CliTable3 from 'cli-table3'
 
 async function delInstance (url: string) {
   const [ settings, netrc ] = await Promise.all([ getSettings(), getNetrc() ])
@@ -108,10 +109,10 @@ program
   .action(async () => {
     const [ settings, netrc ] = await Promise.all([ getSettings(), getNetrc() ])
 
-    const table = new Table({
-      head: ['instance', 'login'],
-      colWidths: [30, 30]
-    })
+    const table = new CliTable3({
+      head: [ 'instance', 'login' ],
+      colWidths: [ 30, 30 ]
+    }) as any
 
     settings.remotes.forEach(element => {
       if (!netrc.machines[element]) return
@@ -132,7 +133,7 @@ program
   .description('set an existing entry as default')
   .action(async url => {
     const settings = await getSettings()
-    const instanceExists = settings.remotes.indexOf(url) !== -1
+    const instanceExists = settings.remotes.includes(url)
 
     if (instanceExists) {
       settings.default = settings.remotes.indexOf(url)

@@ -1,23 +1,37 @@
 import * as Bluebird from 'bluebird'
-import * as validator from 'validator'
+import validator from 'validator'
 import { ResultList } from '../../shared/models'
 import { Activity } from '../../shared/models/activitypub'
-import { ACTIVITY_PUB } from '../initializers/constants'
-import { ActorModel } from '../models/activitypub/actor'
+import { ACTIVITY_PUB, REMOTE_SCHEME } from '../initializers/constants'
 import { signJsonLDObject } from './peertube-crypto'
 import { pageToStartAndCount } from './core-utils'
-import { parse } from 'url'
-import { MActor } from '../typings/models'
+import { URL } from 'url'
+import { MActor, MVideoAccountLight } from '../typings/models'
 
-function activityPubContextify <T> (data: T) {
-  return Object.assign(data, {
-    '@context': [
-      'https://www.w3.org/ns/activitystreams',
-      'https://w3id.org/security/v1',
-      {
-        RsaSignature2017: 'https://w3id.org/security#RsaSignature2017',
-        pt: 'https://joinpeertube.org/ns#',
-        sc: 'http://schema.org#',
+export type ContextType = 'All' | 'View' | 'Announce' | 'CacheFile'
+
+function getContextData (type: ContextType) {
+  const context: any[] = [
+    'https://www.w3.org/ns/activitystreams',
+    'https://w3id.org/security/v1',
+    {
+      RsaSignature2017: 'https://w3id.org/security#RsaSignature2017'
+    }
+  ]
+
+  if (type !== 'View' && type !== 'Announce') {
+    const additional = {
+      pt: 'https://joinpeertube.org/ns#',
+      sc: 'http://schema.org#'
+    }
+
+    if (type === 'CacheFile') {
+      Object.assign(additional, {
+        expires: 'sc:expires',
+        CacheFile: 'pt:CacheFile'
+      })
+    } else {
+      Object.assign(additional, {
         Hashtag: 'as:Hashtag',
         uuid: 'sc:identifier',
         category: 'sc:category',
@@ -25,8 +39,7 @@ function activityPubContextify <T> (data: T) {
         subtitleLanguage: 'sc:subtitleLanguage',
         sensitive: 'as:sensitive',
         language: 'sc:inLanguage',
-        expires: 'sc:expires',
-        CacheFile: 'pt:CacheFile',
+
         Infohash: 'pt:Infohash',
         originallyPublishedAt: 'sc:datePublished',
         views: {
@@ -72,9 +85,7 @@ function activityPubContextify <T> (data: T) {
         support: {
           '@type': 'sc:Text',
           '@id': 'pt:support'
-        }
-      },
-      {
+        },
         likes: {
           '@id': 'as:likes',
           '@type': '@id'
@@ -95,13 +106,28 @@ function activityPubContextify <T> (data: T) {
           '@id': 'as:comments',
           '@type': '@id'
         }
-      }
-    ]
-  })
+      })
+    }
+
+    context.push(additional)
+  }
+
+  return {
+    '@context': context
+  }
+}
+
+function activityPubContextify <T> (data: T, type: ContextType = 'All') {
+  return Object.assign({}, data, getContextData(type))
 }
 
 type ActivityPubCollectionPaginationHandler = (start: number, count: number) => Bluebird<ResultList<any>> | Promise<ResultList<any>>
-async function activityPubCollectionPagination (baseUrl: string, handler: ActivityPubCollectionPaginationHandler, page?: any) {
+async function activityPubCollectionPagination (
+  baseUrl: string,
+  handler: ActivityPubCollectionPaginationHandler,
+  page?: any,
+  size = ACTIVITY_PUB.COLLECTION_ITEMS_PER_PAGE
+) {
   if (!page || !validator.isInt(page)) {
     // We just display the first page URL, we only need the total items
     const result = await handler(0, 1)
@@ -114,7 +140,7 @@ async function activityPubCollectionPagination (baseUrl: string, handler: Activi
     }
   }
 
-  const { start, count } = pageToStartAndCount(page, ACTIVITY_PUB.COLLECTION_ITEMS_PER_PAGE)
+  const { start, count } = pageToStartAndCount(page, size)
   const result = await handler(start, count)
 
   let next: string | undefined
@@ -124,7 +150,7 @@ async function activityPubCollectionPagination (baseUrl: string, handler: Activi
   page = parseInt(page, 10)
 
   // There are more results
-  if (result.total > page * ACTIVITY_PUB.COLLECTION_ITEMS_PER_PAGE) {
+  if (result.total > page * size) {
     next = baseUrl + '?page=' + (page + 1)
   }
 
@@ -144,8 +170,8 @@ async function activityPubCollectionPagination (baseUrl: string, handler: Activi
 
 }
 
-function buildSignedActivity (byActor: MActor, data: Object) {
-  const activity = activityPubContextify(data)
+function buildSignedActivity (byActor: MActor, data: Object, contextType?: ContextType) {
+  const activity = activityPubContextify(data, contextType)
 
   return signJsonLDObject(byActor, activity) as Promise<Activity>
 }
@@ -157,10 +183,16 @@ function getAPId (activity: string | { id: string }) {
 }
 
 function checkUrlsSameHost (url1: string, url2: string) {
-  const idHost = parse(url1).host
-  const actorHost = parse(url2).host
+  const idHost = new URL(url1).host
+  const actorHost = new URL(url2).host
 
   return idHost && actorHost && idHost.toLowerCase() === actorHost.toLowerCase()
+}
+
+function buildRemoteVideoBaseUrl (video: MVideoAccountLight, path: string) {
+  const host = video.VideoChannel.Account.Actor.Server.host
+
+  return REMOTE_SCHEME.HTTP + '://' + host + path
 }
 
 // ---------------------------------------------------------------------------
@@ -170,5 +202,6 @@ export {
   getAPId,
   activityPubContextify,
   activityPubCollectionPagination,
-  buildSignedActivity
+  buildSignedActivity,
+  buildRemoteVideoBaseUrl
 }

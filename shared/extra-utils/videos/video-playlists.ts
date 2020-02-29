@@ -45,13 +45,14 @@ function getVideoChannelPlaylistsList (url: string, videoChannelName: string, st
   })
 }
 
-function getAccountPlaylistsList (url: string, accountName: string, start: number, count: number, sort?: string) {
+function getAccountPlaylistsList (url: string, accountName: string, start: number, count: number, sort?: string, search?: string) {
   const path = '/api/v1/accounts/' + accountName + '/video-playlists'
 
   const query = {
     start,
     count,
-    sort
+    sort,
+    search
   }
 
   return makeGetRequest({
@@ -122,9 +123,9 @@ function deleteVideoPlaylist (url: string, token: string, playlistId: number | s
 }
 
 function createVideoPlaylist (options: {
-  url: string,
-  token: string,
-  playlistAttrs: VideoPlaylistCreate,
+  url: string
+  token: string
+  playlistAttrs: VideoPlaylistCreate
   expectedStatus?: number
 }) {
   const path = '/api/v1/video-playlists'
@@ -147,10 +148,10 @@ function createVideoPlaylist (options: {
 }
 
 function updateVideoPlaylist (options: {
-  url: string,
-  token: string,
-  playlistAttrs: VideoPlaylistUpdate,
-  playlistId: number | string,
+  url: string
+  token: string
+  playlistAttrs: VideoPlaylistUpdate
+  playlistId: number | string
   expectedStatus?: number
 }) {
   const path = '/api/v1/video-playlists/' + options.playlistId
@@ -173,9 +174,9 @@ function updateVideoPlaylist (options: {
 }
 
 async function addVideoInPlaylist (options: {
-  url: string,
-  token: string,
-  playlistId: number | string,
+  url: string
+  token: string
+  playlistId: number | string
   elementAttrs: VideoPlaylistElementCreate | { videoId: string }
   expectedStatus?: number
 }) {
@@ -193,11 +194,11 @@ async function addVideoInPlaylist (options: {
 }
 
 function updateVideoPlaylistElement (options: {
-  url: string,
-  token: string,
-  playlistId: number | string,
-  playlistElementId: number | string,
-  elementAttrs: VideoPlaylistElementUpdate,
+  url: string
+  token: string
+  playlistId: number | string
+  playlistElementId: number | string
+  elementAttrs: VideoPlaylistElementUpdate
   expectedStatus?: number
 }) {
   const path = '/api/v1/video-playlists/' + options.playlistId + '/videos/' + options.playlistElementId
@@ -212,10 +213,10 @@ function updateVideoPlaylistElement (options: {
 }
 
 function removeVideoFromPlaylist (options: {
-  url: string,
-  token: string,
-  playlistId: number | string,
-  playlistElementId: number,
+  url: string
+  token: string
+  playlistId: number | string
+  playlistElementId: number
   expectedStatus?: number
 }) {
   const path = '/api/v1/video-playlists/' + options.playlistId + '/videos/' + options.playlistElementId
@@ -229,14 +230,14 @@ function removeVideoFromPlaylist (options: {
 }
 
 function reorderVideosPlaylist (options: {
-  url: string,
-  token: string,
-  playlistId: number | string,
+  url: string
+  token: string
+  playlistId: number | string
   elementAttrs: {
-    startPosition: number,
-    insertAfterPosition: number,
+    startPosition: number
+    insertAfterPosition: number
     reorderLength?: number
-  },
+  }
   expectedStatus?: number
 }) {
   const path = '/api/v1/video-playlists/' + options.playlistId + '/videos/reorder'

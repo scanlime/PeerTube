@@ -1,5 +1,5 @@
 import { Model, Sequelize } from 'sequelize-typescript'
-import * as validator from 'validator'
+import validator from 'validator'
 import { Col } from 'sequelize/types/lib/utils'
 import { literal, OrderItem } from 'sequelize'
 
@@ -20,6 +20,19 @@ function getSort (value: string, lastSort: OrderItem = [ 'id', 'ASC' ]): OrderIt
   }
 
   return [ [ finalField, direction ], lastSort ]
+}
+
+function getCommentSort (value: string, lastSort: OrderItem = [ 'id', 'ASC' ]): OrderItem[] {
+  const { direction, field } = buildDirectionAndField(value)
+
+  if (field === 'totalReplies') {
+    return [
+      [ Sequelize.literal('"totalReplies"'), direction ],
+      lastSort
+    ]
+  }
+
+  return getSort(value, lastSort)
 }
 
 function getVideoSort (value: string, lastSort: OrderItem = [ 'id', 'ASC' ]): OrderItem[] {
@@ -54,7 +67,7 @@ function getVideoSort (value: string, lastSort: OrderItem = [ 'id', 'ASC' ]): Or
 function getBlacklistSort (model: any, value: string, lastSort: OrderItem = [ 'id', 'ASC' ]): OrderItem[] {
   const [ firstSort ] = getSort(value)
 
-  if (model) return [ [ literal(`"${model}.${firstSort[ 0 ]}" ${firstSort[ 1 ]}`) ], lastSort ] as any[] // FIXME: typings
+  if (model) return [ [ literal(`"${model}.${firstSort[0]}" ${firstSort[1]}`) ], lastSort ] as any[] // FIXME: typings
   return [ firstSort, lastSort ]
 }
 
@@ -126,7 +139,7 @@ function buildServerIdsFollowedBy (actorId: any) {
     'SELECT "actor"."serverId" FROM "actorFollow" ' +
     'INNER JOIN "actor" ON actor.id = "actorFollow"."targetActorId" ' +
     'WHERE "actorFollow"."actorId" = ' + actorIdNumber +
-  ')'
+    ')'
 }
 
 function buildWhereIdOrUUID (id: number | string) {
@@ -167,6 +180,7 @@ export {
   SortType,
   buildLocalAccountIdsIn,
   getSort,
+  getCommentSort,
   getVideoSort,
   getBlacklistSort,
   createSimilarityAttribute,

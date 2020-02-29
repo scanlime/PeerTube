@@ -1,4 +1,3 @@
-// Intercept ActivityPub client requests
 import * as express from 'express'
 import { VideoPrivacy, VideoRateType } from '../../../shared/models/videos'
 import { activityPubCollectionPagination, activityPubContextify } from '../../helpers/activitypub'
@@ -14,7 +13,7 @@ import {
   videosCustomGetValidator,
   videosShareValidator
 } from '../../middlewares'
-import { getAccountVideoRateValidator, videoCommentGetValidator } from '../../middlewares/validators'
+import { getAccountVideoRateValidatorFactory, videoCommentGetValidator } from '../../middlewares/validators'
 import { AccountModel } from '../../models/account/account'
 import { ActorFollowModel } from '../../models/activitypub/actor-follow'
 import { VideoModel } from '../../models/video/video'
@@ -37,9 +36,11 @@ import { buildDislikeActivity } from '../../lib/activitypub/send/send-dislike'
 import { videoPlaylistElementAPGetValidator, videoPlaylistsGetValidator } from '../../middlewares/validators/videos/video-playlists'
 import { VideoPlaylistModel } from '../../models/video/video-playlist'
 import { VideoPlaylistPrivacy } from '../../../shared/models/videos/playlist/video-playlist-privacy.model'
-import { MAccountId, MActorId, MVideo, MVideoAPWithoutCaption } from '@server/typings/models'
+import { MAccountId, MActorId, MVideoAPWithoutCaption, MVideoId } from '@server/typings/models'
 
 const activityPubClientRouter = express.Router()
+
+// Intercept ActivityPub client requests
 
 activityPubClientRouter.get('/accounts?/:name',
   executeIfActivityPub,
@@ -63,18 +64,18 @@ activityPubClientRouter.get('/accounts?/:name/playlists',
 )
 activityPubClientRouter.get('/accounts?/:name/likes/:videoId',
   executeIfActivityPub,
-  asyncMiddleware(getAccountVideoRateValidator('like')),
-  getAccountVideoRate('like')
+  asyncMiddleware(getAccountVideoRateValidatorFactory('like')),
+  getAccountVideoRateFactory('like')
 )
 activityPubClientRouter.get('/accounts?/:name/dislikes/:videoId',
   executeIfActivityPub,
-  asyncMiddleware(getAccountVideoRateValidator('dislike')),
-  getAccountVideoRate('dislike')
+  asyncMiddleware(getAccountVideoRateValidatorFactory('dislike')),
+  getAccountVideoRateFactory('dislike')
 )
 
 activityPubClientRouter.get('/videos/watch/:id',
   executeIfActivityPub,
-  asyncMiddleware(cacheRoute(ROUTE_CACHE_LIFETIME.ACTIVITY_PUB.VIDEOS)),
+  asyncMiddleware(cacheRoute()(ROUTE_CACHE_LIFETIME.ACTIVITY_PUB.VIDEOS)),
   asyncMiddleware(videosCustomGetValidator('only-video-with-rights')),
   asyncMiddleware(videoController)
 )
@@ -85,7 +86,7 @@ activityPubClientRouter.get('/videos/watch/:id/activity',
 )
 activityPubClientRouter.get('/videos/watch/:id/announces',
   executeIfActivityPub,
-  asyncMiddleware(videosCustomGetValidator('only-video')),
+  asyncMiddleware(videosCustomGetValidator('only-immutable-attributes')),
   asyncMiddleware(videoAnnouncesController)
 )
 activityPubClientRouter.get('/videos/watch/:id/announces/:actorId',
@@ -95,17 +96,17 @@ activityPubClientRouter.get('/videos/watch/:id/announces/:actorId',
 )
 activityPubClientRouter.get('/videos/watch/:id/likes',
   executeIfActivityPub,
-  asyncMiddleware(videosCustomGetValidator('only-video')),
+  asyncMiddleware(videosCustomGetValidator('only-immutable-attributes')),
   asyncMiddleware(videoLikesController)
 )
 activityPubClientRouter.get('/videos/watch/:id/dislikes',
   executeIfActivityPub,
-  asyncMiddleware(videosCustomGetValidator('only-video')),
+  asyncMiddleware(videosCustomGetValidator('only-immutable-attributes')),
   asyncMiddleware(videoDislikesController)
 )
 activityPubClientRouter.get('/videos/watch/:id/comments',
   executeIfActivityPub,
-  asyncMiddleware(videosCustomGetValidator('only-video')),
+  asyncMiddleware(videosCustomGetValidator('only-immutable-attributes')),
   asyncMiddleware(videoCommentsController)
 )
 activityPubClientRouter.get('/videos/watch/:videoId/comments/:commentId',
@@ -122,7 +123,7 @@ activityPubClientRouter.get('/videos/watch/:videoId/comments/:commentId/activity
 activityPubClientRouter.get('/video-channels/:name',
   executeIfActivityPub,
   asyncMiddleware(localVideoChannelValidator),
-  asyncMiddleware(videoChannelController)
+  videoChannelController
 )
 activityPubClientRouter.get('/video-channels/:name/followers',
   executeIfActivityPub,
@@ -154,7 +155,7 @@ activityPubClientRouter.get('/video-playlists/:playlistId',
 activityPubClientRouter.get('/video-playlists/:playlistId/:videoId',
   executeIfActivityPub,
   asyncMiddleware(videoPlaylistElementAPGetValidator),
-  asyncMiddleware(videoPlaylistElementController)
+  videoPlaylistElementController
 )
 
 // ---------------------------------------------------------------------------
@@ -192,7 +193,7 @@ async function accountPlaylistsController (req: express.Request, res: express.Re
   return activityPubResponse(activityPubContextify(activityPubResult), res)
 }
 
-function getAccountVideoRate (rateType: VideoRateType) {
+function getAccountVideoRateFactory (rateType: VideoRateType) {
   return (req: express.Request, res: express.Response) => {
     const accountVideoRate = res.locals.accountVideoRate
 
@@ -234,11 +235,11 @@ async function videoAnnounceController (req: express.Request, res: express.Respo
 
   const { activity } = await buildAnnounceWithVideoAudience(share.Actor, share, res.locals.videoAll, undefined)
 
-  return activityPubResponse(activityPubContextify(activity), res)
+  return activityPubResponse(activityPubContextify(activity, 'Announce'), res)
 }
 
 async function videoAnnouncesController (req: express.Request, res: express.Response) {
-  const video = res.locals.onlyVideo
+  const video = res.locals.onlyImmutableVideo
 
   const handler = async (start: number, count: number) => {
     const result = await VideoShareModel.listAndCountByVideoId(video.id, start, count)
@@ -253,21 +254,21 @@ async function videoAnnouncesController (req: express.Request, res: express.Resp
 }
 
 async function videoLikesController (req: express.Request, res: express.Response) {
-  const video = res.locals.onlyVideo
+  const video = res.locals.onlyImmutableVideo
   const json = await videoRates(req, 'like', video, getVideoLikesActivityPubUrl(video))
 
   return activityPubResponse(activityPubContextify(json), res)
 }
 
 async function videoDislikesController (req: express.Request, res: express.Response) {
-  const video = res.locals.onlyVideo
+  const video = res.locals.onlyImmutableVideo
   const json = await videoRates(req, 'dislike', video, getVideoDislikesActivityPubUrl(video))
 
   return activityPubResponse(activityPubContextify(json), res)
 }
 
 async function videoCommentsController (req: express.Request, res: express.Response) {
-  const video = res.locals.onlyVideo
+  const video = res.locals.onlyImmutableVideo
 
   const handler = async (start: number, count: number) => {
     const result = await VideoCommentModel.listAndCountByVideoId(video.id, start, count)
@@ -281,7 +282,7 @@ async function videoCommentsController (req: express.Request, res: express.Respo
   return activityPubResponse(activityPubContextify(json), res)
 }
 
-async function videoChannelController (req: express.Request, res: express.Response) {
+function videoChannelController (req: express.Request, res: express.Response) {
   const videoChannel = res.locals.videoChannel
 
   return activityPubResponse(activityPubContextify(videoChannel.toActivityPubObject()), res)
@@ -334,10 +335,10 @@ async function videoRedundancyController (req: express.Request, res: express.Res
 
   if (req.path.endsWith('/activity')) {
     const data = buildCreateActivity(videoRedundancy.url, serverActor, object, audience)
-    return activityPubResponse(activityPubContextify(data), res)
+    return activityPubResponse(activityPubContextify(data, 'CacheFile'), res)
   }
 
-  return activityPubResponse(activityPubContextify(object), res)
+  return activityPubResponse(activityPubContextify(object, 'CacheFile'), res)
 }
 
 async function videoPlaylistController (req: express.Request, res: express.Response) {
@@ -353,7 +354,7 @@ async function videoPlaylistController (req: express.Request, res: express.Respo
   return activityPubResponse(activityPubContextify(object), res)
 }
 
-async function videoPlaylistElementController (req: express.Request, res: express.Response) {
+function videoPlaylistElementController (req: express.Request, res: express.Response) {
   const videoPlaylistElement = res.locals.videoPlaylistElementAP
 
   const json = videoPlaylistElement.toActivityPubObject()
@@ -386,7 +387,7 @@ async function actorPlaylists (req: express.Request, account: MAccountId) {
   return activityPubCollectionPagination(WEBSERVER.URL + req.path, handler, req.query.page)
 }
 
-function videoRates (req: express.Request, rateType: VideoRateType, video: MVideo, url: string) {
+function videoRates (req: express.Request, rateType: VideoRateType, video: MVideoId, url: string) {
   const handler = async (start: number, count: number) => {
     const result = await AccountVideoRateModel.listAndCountAccountUrlsByVideoId(rateType, video.id, start, count)
     return {

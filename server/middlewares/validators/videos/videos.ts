@@ -49,8 +49,8 @@ import { getVideoWithAttributes } from '../../../helpers/video'
 const videosAddValidator = getCommonVideoEditAttributes().concat([
   body('videofile')
     .custom((value, { req }) => isVideoFile(req.files)).withMessage(
-      'This file is not supported or too large. Please, make sure it is of the following type: '
-      + CONSTRAINTS_FIELDS.VIDEOS.EXTNAME.join(', ')
+      'This file is not supported or too large. Please, make sure it is of the following type: ' +
+      CONSTRAINTS_FIELDS.VIDEOS.EXTNAME.join(', ')
     ),
   body('name').custom(isVideoNameValid).withMessage('Should have a valid name'),
   body('channelId')
@@ -147,7 +147,10 @@ async function checkVideoFollowConstraints (req: express.Request, res: express.R
             })
 }
 
-const videosCustomGetValidator = (fetchType: 'all' | 'only-video' | 'only-video-with-rights', authenticateInQuery = false) => {
+const videosCustomGetValidator = (
+  fetchType: 'all' | 'only-video' | 'only-video-with-rights' | 'only-immutable-attributes',
+  authenticateInQuery = false
+) => {
   return [
     param('id').custom(isIdOrUUIDValid).not().isEmpty().withMessage('Should have a valid id'),
 
@@ -157,22 +160,22 @@ const videosCustomGetValidator = (fetchType: 'all' | 'only-video' | 'only-video-
       if (areValidationErrors(req, res)) return
       if (!await doesVideoExist(req.params.id, res, fetchType)) return
 
+      // Controllers does not need to check video rights
+      if (fetchType === 'only-immutable-attributes') return next()
+
       const video = getVideoWithAttributes(res)
       const videoAll = video as MVideoFullLight
 
       // Video private or blacklisted
-      if (video.privacy === VideoPrivacy.PRIVATE || videoAll.VideoBlacklist) {
+      if (videoAll.requiresAuth()) {
         await authenticatePromiseIfNeeded(req, res, authenticateInQuery)
 
         const user = res.locals.oauth ? res.locals.oauth.token.User : null
 
         // Only the owner or a user that have blacklist rights can see the video
-        if (
-          !user ||
-          (videoAll.VideoChannel && videoAll.VideoChannel.Account.userId !== user.id && !user.hasRight(UserRight.MANAGE_VIDEO_BLACKLIST))
-        ) {
+        if (!user || !user.canGetVideo(videoAll)) {
           return res.status(403)
-                    .json({ error: 'Cannot get this private or blacklisted video.' })
+                    .json({ error: 'Cannot get this private/internal or blacklisted video.' })
         }
 
         return next()
@@ -248,19 +251,15 @@ const videosTerminateChangeOwnershipValidator = [
     // Check if the user who did the request is able to change the ownership of the video
     if (!checkUserCanTerminateOwnershipChange(res.locals.oauth.token.User, res.locals.videoChangeOwnership, res)) return
 
-    return next()
-  },
-  async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const videoChangeOwnership = res.locals.videoChangeOwnership
 
-    if (videoChangeOwnership.status === VideoChangeOwnershipStatus.WAITING) {
-      return next()
-    } else {
+    if (videoChangeOwnership.status !== VideoChangeOwnershipStatus.WAITING) {
       res.status(403)
-        .json({ error: 'Ownership already accepted or refused' })
-
+         .json({ error: 'Ownership already accepted or refused' })
       return
     }
+
+    return next()
   }
 ]
 
@@ -287,14 +286,14 @@ function getCommonVideoEditAttributes () {
   return [
     body('thumbnailfile')
       .custom((value, { req }) => isVideoImage(req.files, 'thumbnailfile')).withMessage(
-      'This thumbnail file is not supported or too large. Please, make sure it is of the following type: '
-      + CONSTRAINTS_FIELDS.VIDEOS.IMAGE.EXTNAME.join(', ')
-    ),
+        'This thumbnail file is not supported or too large. Please, make sure it is of the following type: ' +
+        CONSTRAINTS_FIELDS.VIDEOS.IMAGE.EXTNAME.join(', ')
+      ),
     body('previewfile')
       .custom((value, { req }) => isVideoImage(req.files, 'previewfile')).withMessage(
-      'This preview file is not supported or too large. Please, make sure it is of the following type: '
-      + CONSTRAINTS_FIELDS.VIDEOS.IMAGE.EXTNAME.join(', ')
-    ),
+        'This preview file is not supported or too large. Please, make sure it is of the following type: ' +
+        CONSTRAINTS_FIELDS.VIDEOS.IMAGE.EXTNAME.join(', ')
+      ),
 
     body('category')
       .optional()
@@ -384,6 +383,10 @@ const commonVideosFiltersValidator = [
   query('filter')
     .optional()
     .custom(isVideoFilterValid).withMessage('Should have a valid filter attribute'),
+  query('skipCount')
+    .optional()
+    .customSanitizer(toBooleanOrNull)
+    .custom(isBooleanValid).withMessage('Should have a valid skip count boolean'),
 
   (req: express.Request, res: express.Response, next: express.NextFunction) => {
     logger.debug('Checking commons video filters query', { parameters: req.query })

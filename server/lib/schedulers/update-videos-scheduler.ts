@@ -4,7 +4,6 @@ import { ScheduleVideoUpdateModel } from '../../models/video/schedule-video-upda
 import { retryTransactionWrapper } from '../../helpers/database-utils'
 import { federateVideoIfNeeded } from '../activitypub'
 import { SCHEDULER_INTERVALS_MS } from '../../initializers/constants'
-import { VideoPrivacy } from '../../../shared/models/videos'
 import { Notifier } from '../notifier'
 import { sequelizeTypescript } from '../../initializers/database'
 import { MVideoFullLight } from '@server/typings/models'
@@ -35,16 +34,14 @@ export class UpdateVideosScheduler extends AbstractScheduler {
         logger.info('Executing scheduled video update on %s.', video.uuid)
 
         if (schedule.privacy) {
-          const oldPrivacy = video.privacy
-          const isNewVideo = oldPrivacy === VideoPrivacy.PRIVATE
+          const wasConfidentialVideo = video.isConfidential()
+          const isNewVideo = video.isNewVideo(schedule.privacy)
 
-          video.privacy = schedule.privacy
-          if (isNewVideo === true) video.publishedAt = new Date()
-
+          video.setPrivacy(schedule.privacy)
           await video.save({ transaction: t })
           await federateVideoIfNeeded(video, isNewVideo, t)
 
-          if (oldPrivacy === VideoPrivacy.UNLISTED || oldPrivacy === VideoPrivacy.PRIVATE) {
+          if (wasConfidentialVideo) {
             const videoToPublish: MVideoFullLight = Object.assign(video, { ScheduleVideoUpdate: schedule, UserVideoHistories: [] })
             publishedVideos.push(videoToPublish)
           }

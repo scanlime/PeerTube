@@ -9,18 +9,23 @@
   font-weight: $font-semibold;
   font-size: 15px;
   cursor: pointer;
-  margin-left: 46px;
-  margin-bottom: 10px;
 }
 
 .glyphicon, .comment-thread-loading {
-  margin-left: 5px;
+  margin-right: 5px;
   display: inline-block;
   font-size: 13px;
 }
 
 .title-block .title-page {
   margin-right: 0;
+}
+
+#dropdownSortComments {
+  font-weight: 600;
+  text-transform: uppercase;
+  border: none;
+  transform: translateY(-7%);
 }
 
 my-feed {

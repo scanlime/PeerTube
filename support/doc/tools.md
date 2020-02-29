@@ -12,6 +12,7 @@
     - [peertube-upload.js](#peertube-uploadjs)
     - [peertube-watch.js](#peertube-watchjs)
     - [peertube-plugins.js](#peertube-pluginsjs)
+    - [peertube-redundancy.js](#peertube-redundancyjs)
 - [Server tools](#server-tools)
   - [parse-log](#parse-log)
   - [create-transcoding-job.js](#create-transcoding-jobjs)
@@ -77,7 +78,8 @@ You can access it as `peertube` via an alias in your `.bashrc` like `alias peert
     import-videos|import  import a video from a streaming platform
     watch|w               watch a video in the terminal ✩°｡⋆
     repl                  initiate a REPL to access internals
-    plugins|p [action]    manag instance plugins
+    plugins|p [action]    manage instance plugins
+    redundancy|r [action] manage video redundancies
     help [cmd]            display help for [cmd]
 ```
 
@@ -200,6 +202,34 @@ $ node dist/server/tools/peertube-plugins.js install --path /my/plugin/path
 $ node dist/server/tools/peertube-plugins.js install --npm-name peertube-theme-example
 ```
 
+#### peertube-redundancy.js
+
+Manage (list/add/remove) video redundancies:
+
+To list your videos that are duplicated by remote instances:
+
+```
+$ node dist/server/tools/peertube.js redundancy list-remote-redundancies
+```
+
+To list remote videos that your instance duplicated:
+
+```
+$ node dist/server/tools/peertube.js redundancy list-my-redundancies
+```
+
+To duplicate a specific video in your redundancy system:
+
+```
+$ node dist/server/tools/peertube.js redundancy add --video 823
+```
+
+To remove a video redundancy:
+
+```
+$ node dist/server/tools/peertube.js redundancy remove --video 823
+```
+
 ## Server tools
 
 These scripts should be run on the server, in `peertube-latest` directory.
@@ -225,6 +255,12 @@ $ sudo -u peertube NODE_CONFIG_DIR=/var/www/peertube/config NODE_ENV=production 
 Or to transcode to a specific resolution:
 ```
 $ sudo -u peertube NODE_CONFIG_DIR=/var/www/peertube/config NODE_ENV=production npm run create-transcoding-job -- -v [videoUUID] -r [resolution]
+```
+
+To generate an HLS playlist for a video:
+
+```
+$ sudo -u peertube NODE_CONFIG_DIR=/var/www/peertube/config NODE_ENV=production npm run create-transcoding-job -- --generate-hls -v [videoUUID]
 ```
 
 ### create-import-video-file-job.js

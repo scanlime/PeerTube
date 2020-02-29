@@ -4,7 +4,7 @@ import { CUSTOM_HTML_TAG_COMMENTS, EMBED_SIZE, PLUGIN_GLOBAL_CSS_PATH, WEBSERVER
 import { join } from 'path'
 import { escapeHTML, sha256 } from '../helpers/core-utils'
 import { VideoModel } from '../models/video/video'
-import * as validator from 'validator'
+import validator from 'validator'
 import { VideoPrivacy } from '../../shared/models/videos'
 import { readFile } from 'fs-extra'
 import { getActivityStreamDuration } from '../models/video/video-format-utils'
@@ -17,7 +17,7 @@ import { MAccountActor, MChannelActor, MVideo } from '../typings/models'
 
 export class ClientHtml {
 
-  private static htmlCache: { [ path: string ]: string } = {}
+  private static htmlCache: { [path: string]: string } = {}
 
   static invalidCache () {
     logger.info('Cleaning HTML cache.')
@@ -26,7 +26,9 @@ export class ClientHtml {
   }
 
   static async getDefaultHTMLPage (req: express.Request, res: express.Response, paramLang?: string) {
-    const html = await ClientHtml.getIndexHTML(req, res, paramLang)
+    const html = paramLang
+      ? await ClientHtml.getIndexHTML(req, res, paramLang)
+      : await ClientHtml.getIndexHTML(req, res)
 
     let customHtml = ClientHtml.addTitleTag(html)
     customHtml = ClientHtml.addDescriptionTag(customHtml)
@@ -37,6 +39,7 @@ export class ClientHtml {
   static async getWatchHTMLPage (videoId: string, req: express.Request, res: express.Response) {
     // Let Angular application handle errors
     if (!validator.isInt(videoId) && !validator.isUUID(videoId, 4)) {
+      res.status(404)
       return ClientHtml.getIndexHTML(req, res)
     }
 
@@ -46,8 +49,9 @@ export class ClientHtml {
     ])
 
     // Let Angular application handle errors
-    if (!video || video.privacy === VideoPrivacy.PRIVATE || video.VideoBlacklist) {
-      return ClientHtml.getIndexHTML(req, res)
+    if (!video || video.privacy === VideoPrivacy.PRIVATE || video.privacy === VideoPrivacy.INTERNAL || video.VideoBlacklist) {
+      res.status(404)
+      return html
     }
 
     let customHtml = ClientHtml.addTitleTag(html, escapeHTML(video.name))
@@ -77,6 +81,7 @@ export class ClientHtml {
 
     // Let Angular application handle errors
     if (!entity) {
+      res.status(404)
       return ClientHtml.getIndexHTML(req, res)
     }
 
@@ -89,21 +94,22 @@ export class ClientHtml {
 
   private static async getIndexHTML (req: express.Request, res: express.Response, paramLang?: string) {
     const path = ClientHtml.getIndexPath(req, res, paramLang)
-    if (ClientHtml.htmlCache[ path ]) return ClientHtml.htmlCache[ path ]
+    if (ClientHtml.htmlCache[path]) return ClientHtml.htmlCache[path]
 
     const buffer = await readFile(path)
 
     let html = buffer.toString()
 
+    if (paramLang) html = ClientHtml.addHtmlLang(html, paramLang)
     html = ClientHtml.addCustomCSS(html)
     html = await ClientHtml.addAsyncPluginCSS(html)
 
-    ClientHtml.htmlCache[ path ] = html
+    ClientHtml.htmlCache[path] = html
 
     return html
   }
 
-  private static getIndexPath (req: express.Request, res: express.Response, paramLang?: string) {
+  private static getIndexPath (req: express.Request, res: express.Response, paramLang: string) {
     let lang: string
 
     // Check param lang validity
@@ -124,6 +130,10 @@ export class ClientHtml {
     }
 
     return join(__dirname, '../../../client/dist/' + buildFileLocale(lang) + '/index.html')
+  }
+
+  private static addHtmlLang (htmlStringPage: string, paramLang: string) {
+    return htmlStringPage.replace('<html>', `<html lang="${paramLang}">`)
   }
 
   private static addTitleTag (htmlStringPage: string, title?: string) {
@@ -204,21 +214,21 @@ export class ClientHtml {
     const schemaTags = {
       '@context': 'http://schema.org',
       '@type': 'VideoObject',
-      name: videoNameEscaped,
-      description: videoDescriptionEscaped,
-      thumbnailUrl: previewUrl,
-      uploadDate: video.createdAt.toISOString(),
-      duration: getActivityStreamDuration(video.duration),
-      contentUrl: videoUrl,
-      embedUrl: embedUrl,
-      interactionCount: video.views
+      'name': videoNameEscaped,
+      'description': videoDescriptionEscaped,
+      'thumbnailUrl': previewUrl,
+      'uploadDate': video.createdAt.toISOString(),
+      'duration': getActivityStreamDuration(video.duration),
+      'contentUrl': videoUrl,
+      'embedUrl': embedUrl,
+      'interactionCount': video.views
     }
 
     let tagsString = ''
 
     // Opengraph
     Object.keys(openGraphMetaTags).forEach(tagName => {
-      const tagValue = openGraphMetaTags[ tagName ]
+      const tagValue = openGraphMetaTags[tagName]
 
       tagsString += `<meta property="${tagName}" content="${tagValue}" />`
     })

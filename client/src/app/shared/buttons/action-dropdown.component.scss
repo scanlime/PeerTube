@@ -34,7 +34,7 @@
     width: 21px;
 
     ::ng-deep {
-      @include apply-svg-color(var(--mainForegroundColor));
+      @include apply-svg-color(var(--actionButtonColor));
     }
   }
 
@@ -52,6 +52,7 @@
 
 .dropdown-menu {
   .dropdown-item {
+    display: flex;
     cursor: pointer;
     color: #000 !important;
 

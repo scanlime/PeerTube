@@ -337,25 +337,25 @@ export class UserNotificationModel extends Model<UserNotificationModel> {
   ActorFollow: ActorFollowModel
 
   static listForApi (userId: number, start: number, count: number, sort: string, unread?: boolean) {
+    const where = { userId }
+
     const query: FindOptions = {
       offset: start,
       limit: count,
       order: getSort(sort),
-      where: {
-        userId
-      }
+      where
     }
 
     if (unread !== undefined) query.where['read'] = !unread
 
-    return UserNotificationModel.scope(ScopeNames.WITH_ALL)
-                                .findAndCountAll(query)
-                                .then(({ rows, count }) => {
-                                  return {
-                                    data: rows,
-                                    total: count
-                                  }
-                                })
+    return Promise.all([
+      UserNotificationModel.count({ where })
+        .then(count => count || 0),
+
+      count === 0
+        ? []
+        : UserNotificationModel.scope(ScopeNames.WITH_ALL).findAll(query)
+    ]).then(([ total, data ]) => ({ total, data }))
   }
 
   static markAsRead (userId: number, notificationIds: number[]) {
@@ -363,7 +363,7 @@ export class UserNotificationModel extends Model<UserNotificationModel> {
       where: {
         userId,
         id: {
-          [Op.in]: notificationIds // FIXME: sequelize ANY seems broken
+          [Op.in]: notificationIds
         }
       }
     }
@@ -379,7 +379,7 @@ export class UserNotificationModel extends Model<UserNotificationModel> {
 
   toFormattedJSON (this: UserNotificationModelForApi): UserNotification {
     const video = this.Video
-      ? Object.assign(this.formatVideo(this.Video),{ channel: this.formatActor(this.Video.VideoChannel) })
+      ? Object.assign(this.formatVideo(this.Video), { channel: this.formatActor(this.Video.VideoChannel) })
       : undefined
 
     const videoImport = this.VideoImport ? {

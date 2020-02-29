@@ -1,20 +1,27 @@
-import { Component, Input, OnInit } from '@angular/core'
+import { Component, Input, OnInit, OnDestroy } from '@angular/core'
 import { Notifier, ServerService } from '@app/core'
-import { UserUpdateMe } from '../../../../../../shared'
+import { ServerConfig, UserUpdateMe } from '../../../../../../shared'
 import { AuthService } from '../../../core'
-import { FormReactive, User, UserService } from '../../../shared'
+import { FormReactive } from '../../../shared/forms/form-reactive'
+import { User, UserService } from '../../../shared/users'
 import { I18n } from '@ngx-translate/i18n-polyfill'
 import { FormValidatorService } from '@app/shared/forms/form-validators/form-validator.service'
-import { Subject } from 'rxjs'
+import { Subject, Subscription } from 'rxjs'
 
 @Component({
   selector: 'my-account-interface-settings',
   templateUrl: './my-account-interface-settings.component.html',
   styleUrls: [ './my-account-interface-settings.component.scss' ]
 })
-export class MyAccountInterfaceSettingsComponent extends FormReactive implements OnInit {
+export class MyAccountInterfaceSettingsComponent extends FormReactive implements OnInit, OnDestroy {
   @Input() user: User = null
+  @Input() reactiveUpdate = false
+  @Input() notifyOnUpdate = true
   @Input() userInformationLoaded: Subject<any>
+
+  formValuesWatcher: Subscription
+
+  private serverConfig: ServerConfig
 
   constructor (
     protected formValidatorService: FormValidatorService,
@@ -28,11 +35,15 @@ export class MyAccountInterfaceSettingsComponent extends FormReactive implements
   }
 
   get availableThemes () {
-    return this.serverService.getConfig().theme.registered
+    return this.serverConfig.theme.registered
                .map(t => t.name)
   }
 
   ngOnInit () {
+    this.serverConfig = this.serverService.getTmpConfig()
+    this.serverService.getConfig()
+        .subscribe(config => this.serverConfig = config)
+
     this.buildForm({
       theme: null
     })
@@ -42,7 +53,15 @@ export class MyAccountInterfaceSettingsComponent extends FormReactive implements
         this.form.patchValue({
           theme: this.user.theme
         })
+
+        if (this.reactiveUpdate) {
+          this.formValuesWatcher = this.form.valueChanges.subscribe(val => this.updateInterfaceSettings())
+        }
       })
+  }
+
+  ngOnDestroy () {
+    this.formValuesWatcher?.unsubscribe()
   }
 
   updateInterfaceSettings () {
@@ -52,14 +71,19 @@ export class MyAccountInterfaceSettingsComponent extends FormReactive implements
       theme
     }
 
-    this.userService.updateMyProfile(details).subscribe(
-      () => {
-        this.authService.refreshUserInformation()
+    if (this.authService.isLoggedIn()) {
+      this.userService.updateMyProfile(details).subscribe(
+        () => {
+          this.authService.refreshUserInformation()
 
-        this.notifier.success(this.i18n('Interface settings updated.'))
-      },
+          if (this.notifyOnUpdate) this.notifier.success(this.i18n('Interface settings updated.'))
+        },
 
-      err => this.notifier.error(err.message)
-    )
+        err => this.notifier.error(err.message)
+      )
+    } else {
+      this.userService.updateMyAnonymousProfile(details)
+      if (this.notifyOnUpdate) this.notifier.success(this.i18n('Interface settings updated.'))
+    }
   }
 }

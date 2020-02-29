@@ -1,6 +1,6 @@
-import { ChangeDetectionStrategy, ChangeDetectorRef, Component, EventEmitter, Input, Output, ViewChild } from '@angular/core'
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, EventEmitter, Input, OnInit, Output, ViewChild } from '@angular/core'
 import { Video } from '@app/shared/video/video.model'
-import { VideoPlaylistElementType, VideoPlaylistElementUpdate } from '@shared/models'
+import { ServerConfig, VideoPlaylistElementType, VideoPlaylistElementUpdate } from '@shared/models'
 import { AuthService, ConfirmService, Notifier, ServerService } from '@app/core'
 import { ActivatedRoute } from '@angular/router'
 import { I18n } from '@ngx-translate/i18n-polyfill'
@@ -17,8 +17,8 @@ import { VideoPlaylistElement } from '@app/shared/video-playlist/video-playlist-
   templateUrl: './video-playlist-element-miniature.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class VideoPlaylistElementMiniatureComponent {
-  @ViewChild('moreDropdown', { static: false }) moreDropdown: NgbDropdown
+export class VideoPlaylistElementMiniatureComponent implements OnInit {
+  @ViewChild('moreDropdown') moreDropdown: NgbDropdown
 
   @Input() playlist: VideoPlaylist
   @Input() playlistElement: VideoPlaylistElement
@@ -39,6 +39,8 @@ export class VideoPlaylistElementMiniatureComponent {
     stopTimestamp: number
   } = {} as any
 
+  private serverConfig: ServerConfig
+
   constructor (
     private authService: AuthService,
     private serverService: ServerService,
@@ -50,6 +52,15 @@ export class VideoPlaylistElementMiniatureComponent {
     private videoPlaylistService: VideoPlaylistService,
     private cdr: ChangeDetectorRef
   ) {}
+
+  ngOnInit (): void {
+    this.serverConfig = this.serverService.getTmpConfig()
+    this.serverService.getConfig()
+        .subscribe(config => {
+          this.serverConfig = config
+          this.cdr.detectChanges()
+        })
+  }
 
   isUnavailable (e: VideoPlaylistElement) {
     return e.type === VideoPlaylistElementType.UNAVAILABLE
@@ -75,16 +86,19 @@ export class VideoPlaylistElementMiniatureComponent {
     return {
       videoId: this.playlistElement.video.uuid,
       start: this.playlistElement.startTimestamp,
-      stop: this.playlistElement.stopTimestamp
+      stop: this.playlistElement.stopTimestamp,
+      resume: true
     }
   }
 
   isVideoBlur (video: Video) {
-    return video.isVideoNSFWForUser(this.authService.getUser(), this.serverService.getConfig())
+    return video.isVideoNSFWForUser(this.authService.getUser(), this.serverConfig)
   }
 
   removeFromPlaylist (playlistElement: VideoPlaylistElement) {
-    this.videoPlaylistService.removeVideoFromPlaylist(this.playlist.id, playlistElement.id)
+    const videoId = this.playlistElement.video ? this.playlistElement.video.id : undefined
+
+    this.videoPlaylistService.removeVideoFromPlaylist(this.playlist.id, playlistElement.id, videoId)
         .subscribe(
           () => {
             this.notifier.success(this.i18n('Video removed from {{name}}', { name: this.playlist.displayName }))
@@ -104,7 +118,7 @@ export class VideoPlaylistElementMiniatureComponent {
     body.startTimestamp = this.timestampOptions.startTimestampEnabled ? this.timestampOptions.startTimestamp : null
     body.stopTimestamp = this.timestampOptions.stopTimestampEnabled ? this.timestampOptions.stopTimestamp : null
 
-    this.videoPlaylistService.updateVideoOfPlaylist(this.playlist.id, playlistElement.id, body)
+    this.videoPlaylistService.updateVideoOfPlaylist(this.playlist.id, playlistElement.id, body, this.playlistElement.video.id)
         .subscribe(
           () => {
             this.notifier.success(this.i18n('Timestamps updated'))

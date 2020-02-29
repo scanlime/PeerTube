@@ -8,7 +8,7 @@ import { I18n } from '@ngx-translate/i18n-polyfill'
 import { FormValidatorService } from '@app/shared/forms/form-validators/form-validator.service'
 import { SelectItem } from 'primeng/api'
 import { forkJoin } from 'rxjs'
-import { first } from 'rxjs/operators'
+import { ServerConfig } from '@shared/models'
 
 @Component({
   selector: 'my-edit-custom-config',
@@ -18,11 +18,13 @@ import { first } from 'rxjs/operators'
 export class EditCustomConfigComponent extends FormReactive implements OnInit {
   customConfig: CustomConfig
 
-  resolutions: { id: string, label: string }[] = []
+  resolutions: { id: string, label: string, description?: string }[] = []
   transcodingThreadOptions: { label: string, value: number }[] = []
 
   languageItems: SelectItem[] = []
   categoryItems: SelectItem[] = []
+
+  private serverConfig: ServerConfig
 
   constructor (
     protected formValidatorService: FormValidatorService,
@@ -38,7 +40,8 @@ export class EditCustomConfigComponent extends FormReactive implements OnInit {
     this.resolutions = [
       {
         id: '0p',
-        label: this.i18n('Audio-only')
+        label: this.i18n('Audio-only'),
+        description: this.i18n('A <code>.mp4</code> that keeps the original audio track, with no video')
       },
       {
         id: '240p',
@@ -84,7 +87,7 @@ export class EditCustomConfigComponent extends FormReactive implements OnInit {
   }
 
   get availableThemes () {
-    return this.serverService.getConfig().theme.registered
+    return this.serverConfig.theme.registered
       .map(t => t.name)
   }
 
@@ -93,6 +96,10 @@ export class EditCustomConfigComponent extends FormReactive implements OnInit {
   }
 
   ngOnInit () {
+    this.serverConfig = this.serverService.getTmpConfig()
+    this.serverService.getConfig()
+        .subscribe(config => this.serverConfig = config)
+
     const formGroupData: { [key in keyof CustomConfig ]: any } = {
       instance: {
         name: this.customConfigValidatorsService.INSTANCE_NAME,
@@ -215,28 +222,8 @@ export class EditCustomConfigComponent extends FormReactive implements OnInit {
     }
 
     this.buildForm(formGroupData)
-
-    forkJoin([
-      this.configService.getCustomConfig(),
-      this.serverService.videoLanguagesLoaded.pipe(first()), // First so the observable completes
-      this.serverService.videoCategoriesLoaded.pipe(first())
-    ]).subscribe(
-      ([ config ]) => {
-        this.customConfig = config
-
-        const languages = this.serverService.getVideoLanguages()
-        this.languageItems = languages.map(l => ({ label: l.label, value: l.id }))
-
-        const categories = this.serverService.getVideoCategories()
-        this.categoryItems = categories.map(l => ({ label: l.label, value: l.id }))
-
-        this.updateForm()
-        // Force form validation
-        this.forceCheck()
-      },
-
-      err => this.notifier.error(err.message)
-    )
+    this.loadForm()
+    this.checkTranscodingFields()
   }
 
   isTranscodingEnabled () {
@@ -247,14 +234,18 @@ export class EditCustomConfigComponent extends FormReactive implements OnInit {
     return this.form.value['signup']['enabled'] === true
   }
 
+  isAutoFollowIndexEnabled () {
+    return this.form.value['followings']['instance']['autoFollowIndex']['enabled'] === true
+  }
+
   async formValidated () {
-    this.configService.updateCustomConfig(this.form.value)
+    this.configService.updateCustomConfig(this.form.getRawValue())
       .subscribe(
         res => {
           this.customConfig = res
 
           // Reload general configuration
-          this.serverService.loadConfig()
+          this.serverService.resetConfig()
 
           this.updateForm()
 
@@ -283,5 +274,53 @@ export class EditCustomConfigComponent extends FormReactive implements OnInit {
 
   private updateForm () {
     this.form.patchValue(this.customConfig)
+  }
+
+  private loadForm () {
+    forkJoin([
+      this.configService.getCustomConfig(),
+      this.serverService.getVideoLanguages(),
+      this.serverService.getVideoCategories()
+    ]).subscribe(
+      ([ config, languages, categories ]) => {
+        this.customConfig = config
+
+        this.languageItems = languages.map(l => ({ label: l.label, value: l.id }))
+        this.categoryItems = categories.map(l => ({ label: l.label, value: l.id }))
+
+        this.updateForm()
+        // Force form validation
+        this.forceCheck()
+      },
+
+      err => this.notifier.error(err.message)
+    )
+  }
+
+  private checkTranscodingFields () {
+    const hlsControl = this.form.get('transcoding.hls.enabled')
+    const webtorrentControl = this.form.get('transcoding.webtorrent.enabled')
+
+    webtorrentControl.valueChanges
+                     .subscribe(newValue => {
+                       if (newValue === false && !hlsControl.disabled) {
+                         hlsControl.disable()
+                       }
+
+                       if (newValue === true && !hlsControl.enabled) {
+                         hlsControl.enable()
+                       }
+                     })
+
+    hlsControl.valueChanges
+              .subscribe(newValue => {
+                if (newValue === false && !webtorrentControl.disabled) {
+                  webtorrentControl.disable()
+                }
+
+                if (newValue === true && !webtorrentControl.enabled) {
+                  webtorrentControl.enable()
+                }
+              })
   }
 }

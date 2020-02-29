@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core'
-import { MarkdownIt } from 'markdown-it'
+import { buildVideoLink } from '../../../assets/player/utils'
 import { HtmlRendererService } from '@app/shared/renderer/html-renderer.service'
+import * as MarkdownIt from 'markdown-it'
 
 type MarkdownParsers = {
   textMarkdownIt: MarkdownIt
@@ -74,6 +75,14 @@ export class MarkdownService {
     return this.render('completeMarkdownIt', markdown)
   }
 
+  async processVideoTimestamps (html: string) {
+    return html.replace(/((\d{1,2}):)?(\d{1,2}):(\d{1,2})/g, function (str, _, h, m, s) {
+      const t = (3600 * +(h || 0)) + (60 * +(m || 0)) + (+(s || 0))
+      const url = buildVideoLink({ startTime: t })
+      return `<a class="video-timestamp" href="${url}">${str}</a>`
+    })
+  }
+
   private async render (name: keyof MarkdownParsers, markdown: string) {
     if (!markdown) return ''
 
@@ -91,7 +100,7 @@ export class MarkdownService {
   }
 
   private async createMarkdownIt (config: MarkdownConfig) {
-    // FIXME: import('...') returns a struct module, containing a "default" field corresponding to our sanitizeHtml function
+    // FIXME: import('...') returns a struct module, containing a "default" field
     const MarkdownItClass: typeof import ('markdown-it') = (await import('markdown-it') as any).default
 
     const markdownIt = new MarkdownItClass('zero', { linkify: true, breaks: true, html: config.html })

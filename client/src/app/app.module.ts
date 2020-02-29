@@ -4,31 +4,31 @@ import { ServerService } from '@app/core'
 import { ResetPasswordModule } from '@app/reset-password'
 
 import { MetaLoader, MetaModule, MetaStaticLoader, PageTitlePositioning } from '@ngx-meta/core'
-import { ClipboardModule } from 'ngx-clipboard'
 import 'focus-visible'
 
 import { AppRoutingModule } from './app-routing.module'
 import { AppComponent } from './app.component'
 import { CoreModule } from './core'
-import { HeaderComponent } from './header'
+import { HeaderComponent, SearchTypeaheadComponent, SuggestionsComponent, SuggestionComponent } from './header'
 import { LoginModule } from './login'
 import { AvatarNotificationComponent, LanguageChooserComponent, MenuComponent } from './menu'
 import { SharedModule } from './shared'
 import { VideosModule } from './videos'
-import { buildFileLocale, getCompleteLocale, isDefaultLocale } from '../../../shared/models/i18n'
-import { getDevLocale, isOnDevLocale } from '@app/shared/i18n/i18n-utils'
 import { SearchModule } from '@app/search'
 import { WelcomeModalComponent } from '@app/modal/welcome-modal.component'
 import { InstanceConfigWarningModalComponent } from '@app/modal/instance-config-warning-modal.component'
+import { buildFileLocale, getCompleteLocale, isDefaultLocale } from '@shared/models'
+import { APP_BASE_HREF } from '@angular/common'
+import { QuickSettingsModalComponent } from '@app/modal/quick-settings-modal.component'
 
 export function metaFactory (serverService: ServerService): MetaLoader {
   return new MetaStaticLoader({
     pageTitlePositioning: PageTitlePositioning.PrependPageTitle,
     pageTitleSeparator: ' - ',
-    get applicationName () { return serverService.getConfig().instance.name },
+    get applicationName () { return serverService.getTmpConfig().instance.name },
     defaults: {
-      get title () { return serverService.getConfig().instance.name },
-      get description () { return serverService.getConfig().instance.shortDescription }
+      get title () { return serverService.getTmpConfig().instance.name },
+      get description () { return serverService.getTmpConfig().instance.shortDescription }
     }
   })
 }
@@ -40,16 +40,18 @@ export function metaFactory (serverService: ServerService): MetaLoader {
 
     MenuComponent,
     LanguageChooserComponent,
+    QuickSettingsModalComponent,
     AvatarNotificationComponent,
     HeaderComponent,
+    SearchTypeaheadComponent,
+    SuggestionsComponent,
+    SuggestionComponent,
 
     WelcomeModalComponent,
     InstanceConfigWarningModalComponent
   ],
   imports: [
     BrowserModule,
-    // FIXME: https://github.com/maxisam/ngx-clipboard/issues/133
-    ClipboardModule,
 
     CoreModule,
     SharedModule,
@@ -69,17 +71,17 @@ export function metaFactory (serverService: ServerService): MetaLoader {
 
     AppRoutingModule // Put it after all the module because it has the 404 route
   ],
+
   providers: [
+    {
+      provide: APP_BASE_HREF,
+      useValue: '/'
+    },
+
     {
       provide: TRANSLATIONS,
       useFactory: (locale: string) => {
-        // On dev mode, test localization
-        if (isOnDevLocale()) {
-          locale = buildFileLocale(getDevLocale())
-          return require(`raw-loader!../locale/angular.${locale}.xlf`)
-        }
-
-        // Default locale, nothing to translate
+                // Default locale, nothing to translate
         const completeLocale = getCompleteLocale(locale)
         if (isDefaultLocale(completeLocale)) return ''
 

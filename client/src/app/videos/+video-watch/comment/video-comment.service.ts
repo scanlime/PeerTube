@@ -3,17 +3,18 @@ import { HttpClient, HttpParams } from '@angular/common/http'
 import { Injectable } from '@angular/core'
 import { objectLineFeedToHtml } from '@app/shared/misc/utils'
 import { Observable } from 'rxjs'
-import { ResultList, FeedFormat } from '../../../../../../shared/models'
+import { FeedFormat, ResultList } from '../../../../../../shared/models'
 import {
   VideoComment as VideoCommentServerModel,
   VideoCommentCreate,
-  VideoCommentThreadTree
+  VideoCommentThreadTree as VideoCommentThreadTreeServerModel
 } from '../../../../../../shared/models/videos/video-comment.model'
 import { environment } from '../../../../environments/environment'
 import { RestExtractor, RestService } from '../../../shared/rest'
-import { ComponentPagination } from '../../../shared/rest/component-pagination.model'
-import { VideoSortField } from '../../../shared/video/sort-field.type'
+import { ComponentPaginationLight } from '../../../shared/rest/component-pagination.model'
+import { CommentSortField } from '../../../shared/video/sort-field.type'
 import { VideoComment } from './video-comment.model'
+import { VideoCommentThreadTree } from '@app/videos/+video-watch/comment/video-comment-thread-tree.model'
 
 @Injectable()
 export class VideoCommentService {
@@ -50,8 +51,8 @@ export class VideoCommentService {
 
   getVideoCommentThreads (parameters: {
     videoId: number | string,
-    componentPagination: ComponentPagination,
-    sort: VideoSortField
+    componentPagination: ComponentPaginationLight,
+    sort: CommentSortField
   }): Observable<ResultList<VideoComment>> {
     const { videoId, componentPagination, sort } = parameters
 
@@ -76,9 +77,9 @@ export class VideoCommentService {
     const url = `${VideoCommentService.BASE_VIDEO_URL + videoId}/comment-threads/${threadId}`
 
     return this.authHttp
-               .get(url)
+               .get<VideoCommentThreadTreeServerModel>(url)
                .pipe(
-                 map(tree => this.extractVideoCommentTree(tree as VideoCommentThreadTree)),
+                 map(tree => this.extractVideoCommentTree(tree)),
                  catchError(err => this.restExtractor.handleError(err))
                )
   }
@@ -138,12 +139,12 @@ export class VideoCommentService {
     return { data: comments, total: totalComments }
   }
 
-  private extractVideoCommentTree (tree: VideoCommentThreadTree) {
-    if (!tree) return tree
+  private extractVideoCommentTree (tree: VideoCommentThreadTreeServerModel) {
+    if (!tree) return tree as VideoCommentThreadTree
 
     tree.comment = new VideoComment(tree.comment)
     tree.children.forEach(c => this.extractVideoCommentTree(c))
 
-    return tree
+    return tree as VideoCommentThreadTree
   }
 }

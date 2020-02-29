@@ -1,5 +1,6 @@
 $icon-font-path: '~@neos21/bootstrap3-glyphicons/assets/fonts/';
 
+@import '_bootstrap-variables';
 @import '_variables';
 @import '_mixins';
 
@@ -23,25 +24,34 @@ body {
   // now beware node-sass requires interpolation
   // for css custom properties #{$var}
   --mainColor: #{$orange-color};
+  --mainColorLighter: #{$orange-color-lighter};
   --mainHoverColor: #{$orange-hover-color};
   --mainBackgroundColor: #{$bg-color};
   --mainForegroundColor: #{$fg-color};
+  --secondaryColor: #{$cyan-color};
 
   --menuBackgroundColor: #{$menu-background};
   --menuForegroundColor: #{$menu-color};
   --submenuColor: #{$sub-menu-color};
 
-  --inputColor: #{$input-background-color};
+  --inputBackgroundColor: #{$input-background-color};
   --inputPlaceholderColor: #{$input-placeholder-color};
 
-  --supportButtonBackgroundColor: #{$support-button};
-  --supportButtonColor: #{$white};
+  --actionButtonColor: #{$grey-foreground-color};
+  --supportButtonBackgroundColor: #{transparent};
+  --supportButtonColor: #{var(--actionButtonColor)};
+  --supportButtonHeartColor: #{$support-button-heart};
 
   font-family: $main-fonts;
   font-weight: $font-regular;
   color: var(--mainForegroundColor);
   background-color: var(--mainBackgroundColor);
   font-size: 14px;
+}
+
+::selection {
+  color: var(--mainBackgroundColor);
+  background-color: var(--mainHoverColor);
 }
 
 #incompatible-browser {
@@ -58,7 +68,7 @@ strong {
 
 input.readonly {
   /* Force blank on readonly inputs */
-  background-color: var(--inputColor) !important;
+  background-color: var(--inputBackgroundColor) !important;
 }
 
 input, textarea {
@@ -142,17 +152,24 @@ label {
   @include disable-default-a-behaviour;
 
   &.active, &.title-page-single {
-    border-bottom: 2px solid var(--mainColor);
-    font-weight: $font-bold;
     margin-top: 30px;
     margin-bottom: 25px;
+  }
+
+  &.active {
+    font-weight: $font-bold;
+    border-bottom: 2px solid var(--mainColor);
+  }
+
+  &.title-page-single {
+    font-size: 125%;
   }
 
   &:hover, &:active, &:focus {
     color: var(--mainForegroundColor);
   }
 
-  @media screen and (max-width: 500px) {
+  @media screen and (max-width: $mobile-view) {
     margin-right: 15px;
   }
 }
@@ -192,26 +209,6 @@ label {
   to { transform: scale(1) rotate(360deg);}
 }
 
-.orange-button {
-  @include peertube-button;
-  @include orange-button;
-}
-
-.orange-button-link {
-  @include peertube-button-link;
-  @include orange-button;
-}
-
-.grey-button {
-  @include peertube-button;
-  @include grey-button;
-}
-
-.grey-button-link {
-  @include peertube-button-link;
-  @include grey-button;
-}
-
 // In tables, don't have a hover different background
 table {
   .action-button-edit, .action-button-delete {
@@ -230,7 +227,16 @@ table {
   font-weight: $font-semibold;
 }
 
-@media screen and (max-width: 1600px) {
+.dropdown-item {
+  @include dropdown-with-icon-item;
+
+  my-global-icon {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+@media screen and (max-width: #{map-get($grid-breakpoints, xxl)}) {
   .main-col {
     &.expanded {
       .margin-content {
@@ -241,7 +247,7 @@ table {
   }
 }
 
-@media screen and (max-width: 900px) {
+@media screen and (max-width: #{map-get($grid-breakpoints, lg)}) {
   .main-col {
     &.expanded {
       .margin-content {
@@ -253,7 +259,7 @@ table {
         padding-left: 50px;
 
         .title-page {
-          font-size: 15px;
+          font-size: 17px;
         }
       }
     }

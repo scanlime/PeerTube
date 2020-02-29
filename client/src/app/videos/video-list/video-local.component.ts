@@ -11,6 +11,8 @@ import { ScreenService } from '@app/shared/misc/screen.service'
 import { UserRight } from '../../../../../shared/models/users'
 import { Notifier, ServerService } from '@app/core'
 import { HooksService } from '@app/core/plugins/hooks.service'
+import { UserService } from '@app/shared'
+import { LocalStorageService } from '@app/shared/misc/storage.service'
 
 @Component({
   selector: 'my-videos-local',
@@ -31,7 +33,9 @@ export class VideoLocalComponent extends AbstractVideoList implements OnInit, On
     protected route: ActivatedRoute,
     protected notifier: Notifier,
     protected authService: AuthService,
+    protected userService: UserService,
     protected screenService: ScreenService,
+    protected storageService: LocalStorageService,
     private videoService: VideoService,
     private hooks: HooksService
   ) {
@@ -62,7 +66,8 @@ export class VideoLocalComponent extends AbstractVideoList implements OnInit, On
       sort: this.sort,
       filter: this.filter,
       categoryOneOf: this.categoryOneOf,
-      languageOneOf: this.languageOneOf
+      languageOneOf: this.languageOneOf,
+      skipCount: true
     }
 
     return this.hooks.wrapObsFun(

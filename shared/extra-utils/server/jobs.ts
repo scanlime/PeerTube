@@ -2,26 +2,26 @@ import * as request from 'supertest'
 import { Job, JobState, JobType } from '../../models'
 import { wait } from '../miscs/miscs'
 import { ServerInfo } from './servers'
-import { makeGetRequest } from '@shared/extra-utils'
+import { makeGetRequest } from '../../../shared/extra-utils'
 
 function getJobsList (url: string, accessToken: string, state: JobState) {
   const path = '/api/v1/jobs/' + state
 
   return request(url)
-          .get(path)
-          .set('Accept', 'application/json')
-          .set('Authorization', 'Bearer ' + accessToken)
-          .expect(200)
-          .expect('Content-Type', /json/)
+    .get(path)
+    .set('Accept', 'application/json')
+    .set('Authorization', 'Bearer ' + accessToken)
+    .expect(200)
+    .expect('Content-Type', /json/)
 }
 
 function getJobsListPaginationAndSort (options: {
-  url: string,
-  accessToken: string,
-  state: JobState,
-  start: number,
-  count: number,
-  sort: string,
+  url: string
+  accessToken: string
+  state: JobState
+  start: number
+  count: number
+  sort: string
   jobType?: JobType
 }) {
   const { url, accessToken, state, start, count, sort, jobType } = options

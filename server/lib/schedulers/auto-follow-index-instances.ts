@@ -41,7 +41,7 @@ export class AutoFollowIndexInstances extends AbstractScheduler {
 
       this.lastCheck = new Date()
 
-      const { body } = await doRequest({ uri, qs, json: true })
+      const { body } = await doRequest<any>({ uri, qs, json: true })
 
       const hosts: string[] = body.data.map(o => o.host)
       const chunks = chunk(hosts, 20)
@@ -57,8 +57,7 @@ export class AutoFollowIndexInstances extends AbstractScheduler {
             isAutoFollow: true
           }
 
-          await JobQueue.Instance.createJob({ type: 'activitypub-follow', payload })
-                  .catch(err => logger.error('Cannot create follow job for %s.', unfollowedHost, err))
+          JobQueue.Instance.createJob({ type: 'activitypub-follow', payload })
         }
       }
 

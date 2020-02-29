@@ -1,13 +1,13 @@
 import { catchError, map, concatMap, toArray } from 'rxjs/operators'
 import { HttpClient, HttpParams } from '@angular/common/http'
 import { Injectable } from '@angular/core'
-import { SortMeta } from 'primeng/components/common/sortmeta'
+import { SortMeta } from 'primeng/api'
 import { from as observableFrom, Observable } from 'rxjs'
 import { VideoBlacklist, VideoBlacklistType, ResultList } from '../../../../../shared'
 import { Video } from '../video/video.model'
 import { environment } from '../../../environments/environment'
 import { RestExtractor, RestPagination, RestService } from '../rest'
-import { ComponentPagination } from '../rest/component-pagination.model'
+import { ComponentPaginationLight } from '../rest/component-pagination.model'
 
 @Injectable()
 export class VideoBlacklistService {
@@ -34,7 +34,7 @@ export class VideoBlacklistService {
                )
   }
 
-  getAutoBlacklistedAsVideoList (videoPagination: ComponentPagination): Observable<ResultList<Video>> {
+  getAutoBlacklistedAsVideoList (videoPagination: ComponentPaginationLight): Observable<ResultList<Video>> {
     const pagination = this.restService.componentPaginationToRestPagination(videoPagination)
 
     // prioritize first created since waiting longest
