@@ -23,12 +23,13 @@ body {
   /*** theme ***/
   // now beware node-sass requires interpolation
   // for css custom properties #{$var}
-  --mainColor: #{$orange-color};
-  --mainColorLighter: #{$orange-color-lighter};
-  --mainHoverColor: #{$orange-hover-color};
+  --mainColor: #{$main-color};
+  --mainColorLighter: #{$main-color-lighter};
+  --mainColorLightest: #{$main-color-lightest};
+  --mainHoverColor: #{$main-hover-color};
   --mainBackgroundColor: #{$bg-color};
   --mainForegroundColor: #{$fg-color};
-  --secondaryColor: #{$cyan-color};
+  --secondaryColor: #{$secondary-color};
 
   --menuBackgroundColor: #{$menu-background};
   --menuForegroundColor: #{$menu-color};
@@ -76,10 +77,6 @@ input, textarea {
   color: var(--mainForegroundColor);
 }
 
-.btn-outline-secondary {
-  border-color: $input-border-color;
-}
-
 label {
   font-weight: $font-bold;
   font-size: 15px;
@@ -106,9 +103,14 @@ label {
   color: black;
 }
 
+.row {
+  margin: 0 !important;
+}
+
 .main-col {
   margin-left: $menu-width;
-  width: auto;
+  width: calc(100% - #{$menu-width});
+  outline: none;
 
   .margin-content {
     margin-left: $not-expanded-horizontal-margins;
@@ -130,6 +132,7 @@ label {
   // Override some properties if the main content is expanded (no menu on the left)
   &.expanded {
     margin-left: 0;
+    width: 100%;
 
     .margin-content {
       margin-left: $expanded-horizontal-margins;
@@ -171,6 +174,17 @@ label {
 
   @media screen and (max-width: $mobile-view) {
     margin-right: 15px;
+  }
+}
+
+.title-page-about,
+.title-page-settings {
+  white-space: nowrap;
+  font-size: 115%;
+  font-weight: $font-regular;
+
+  &.active {
+    font-weight: $font-semibold;
   }
 }
 
@@ -236,6 +250,11 @@ table {
   }
 }
 
+.anchor {
+  position: relative;
+  top: #{-($header-height + 20px)};
+}
+
 @media screen and (max-width: #{map-get($grid-breakpoints, xxl)}) {
   .main-col {
     &.expanded {
@@ -257,6 +276,7 @@ table {
 
       .sub-menu {
         padding-left: 50px;
+        padding-right: 50px;
 
         .title-page {
           font-size: 17px;

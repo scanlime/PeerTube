@@ -29,7 +29,7 @@ import {
 } from '../../../helpers/custom-validators/videos'
 import { getDurationFromVideoFile } from '../../../helpers/ffmpeg-utils'
 import { logger } from '../../../helpers/logger'
-import { CONSTRAINTS_FIELDS } from '../../../initializers/constants'
+import { CONSTRAINTS_FIELDS, OVERVIEWS } from '../../../initializers/constants'
 import { authenticatePromiseIfNeeded } from '../../oauth'
 import { areValidationErrors } from '../utils'
 import { cleanUpReqFiles } from '../../../helpers/express-utils'
@@ -42,7 +42,12 @@ import { getServerActor } from '../../../helpers/utils'
 import { CONFIG } from '../../../initializers/config'
 import { isLocalVideoAccepted } from '../../../lib/moderation'
 import { Hooks } from '../../../lib/plugins/hooks'
-import { checkUserCanManageVideo, doesVideoChannelOfAccountExist, doesVideoExist } from '../../../helpers/middlewares'
+import {
+  checkUserCanManageVideo,
+  doesVideoChannelOfAccountExist,
+  doesVideoExist,
+  doesVideoFileOfVideoExist
+} from '../../../helpers/middlewares'
 import { MVideoFullLight } from '@server/typings/models'
 import { getVideoWithAttributes } from '../../../helpers/video'
 
@@ -198,6 +203,20 @@ const videosCustomGetValidator = (
 const videosGetValidator = videosCustomGetValidator('all')
 const videosDownloadValidator = videosCustomGetValidator('all', true)
 
+const videoFileMetadataGetValidator = getCommonVideoEditAttributes().concat([
+  param('id').custom(isIdOrUUIDValid).not().isEmpty().withMessage('Should have a valid id'),
+  param('videoFileId').custom(isIdValid).not().isEmpty().withMessage('Should have a valid videoFileId'),
+
+  async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    logger.debug('Checking videoFileMetadataGet parameters', { parameters: req.params })
+
+    if (areValidationErrors(req, res)) return
+    if (!await doesVideoFileOfVideoExist(+req.params.videoFileId, req.params.id, res)) return
+
+    return next()
+  }
+])
+
 const videosRemoveValidator = [
   param('id').custom(isIdOrUUIDValid).not().isEmpty().withMessage('Should have a valid id'),
 
@@ -277,6 +296,19 @@ const videosAcceptChangeOwnershipValidator = [
 
       return
     }
+
+    return next()
+  }
+]
+
+const videosOverviewValidator = [
+  query('page')
+    .optional()
+    .isInt({ min: 1, max: OVERVIEWS.VIDEOS.SAMPLES_COUNT })
+    .withMessage('Should have a valid pagination'),
+
+  (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (areValidationErrors(req, res)) return
 
     return next()
   }
@@ -411,6 +443,7 @@ export {
   videosAddValidator,
   videosUpdateValidator,
   videosGetValidator,
+  videoFileMetadataGetValidator,
   videosDownloadValidator,
   checkVideoFollowConstraints,
   videosCustomGetValidator,
@@ -422,7 +455,9 @@ export {
 
   getCommonVideoEditAttributes,
 
-  commonVideosFiltersValidator
+  commonVideosFiltersValidator,
+
+  videosOverviewValidator
 }
 
 // ---------------------------------------------------------------------------

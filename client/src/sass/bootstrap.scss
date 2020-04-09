@@ -29,6 +29,11 @@ $icon-font-path: '~@neos21/bootstrap3-glyphicons/assets/fonts/';
 /* rules for dropdowns excepts when in button group, to avoid impacting the dropdown-toggle */
 .dropdown:not(.btn-group) {
   z-index: z(dropdown) !important;
+
+  &.list-overflow-menu,
+  &.parent-entry {
+    z-index: z(header) - 1 !important;
+  }
 }
 
 .dropdown-menu {
@@ -45,7 +50,7 @@ $icon-font-path: '~@neos21/bootstrap3-glyphicons/assets/fonts/';
       background-color: var(--mainHoverColor);
       opacity: .9;
     }
-    
+
     &::after {
       display: none;
     }
@@ -95,15 +100,20 @@ $icon-font-path: '~@neos21/bootstrap3-glyphicons/assets/fonts/';
     }
 
     my-global-icon {
-      @include icon(24px);
+      @include icon(22px);
 
       position: relative;
-      top: 3px;
+      top: 5px;
       float: right;
 
       margin: 0;
       padding: 0;
-      opacity: 1;
+      opacity: .5;
+
+      &[iconName="cross"] {
+        @include icon(16px);
+        top: -3px;
+      }
     }
   }
 
@@ -113,7 +123,7 @@ $icon-font-path: '~@neos21/bootstrap3-glyphicons/assets/fonts/';
 
     .action-button-cancel {
       @include peertube-button;
-      @include grey-button;
+      @include tertiary-button;
 
       display: inline-block;
       margin-right: 10px;
@@ -148,24 +158,30 @@ $icon-font-path: '~@neos21/bootstrap3-glyphicons/assets/fonts/';
   }
 }
 
-ngb-tabset.bootstrap {
+.nav-tabs {
 
   .nav-link {
-    &, & a {
-      @include disable-default-a-behaviour;
+    @include disable-default-a-behaviour;
 
-      color: var(--mainForegroundColor) !important;
-    }
-  }
-
-  .nav-pills .nav-link.active {
-    color: #000 !important;
+    color: var(--mainForegroundColor) !important;
   }
 }
 
-.nav-tabs .nav-link.active {
-  background-color: var(--mainBackgroundColor) !important;
-  border-bottom: none;
+.nav-tabs .nav-link {
+  &:not(.active) {
+    border-bottom: 3px solid transparent;
+  }
+  &.active {
+    font-weight: $font-semibold;
+    background-color: var(--mainBackgroundColor) !important;
+    border: none;
+    border-bottom: 2px solid var(--mainColor);
+  }
+  &:hover {
+    border-top-color: transparent;
+    border-left-color: transparent;
+    border-right-color: transparent;
+  }
 }
 
 .card {
@@ -205,12 +221,46 @@ ngb-tooltip-window {
   z-index: z(tooltip) !important;
 }
 
+.btn-outline-secondary {
+  border-color: $input-border-color;
+
+  &:focus-within,
+  &:focus,
+  &:hover {
+    color: #fff;
+    background-color: #6c757d;
+  }
+}
+
 .btn-outline-tertiary {
   color: var(--secondaryColor);
   border-color: var(--secondaryColor);
 
+  &:focus-within,
+  &:focus,
   &:hover {
     color: var(--mainBackgroundColor);
     background-color: var(--secondaryColor);
   }
+}
+
+// input box-shadow on focus
+.form-control {
+  font-size: 15px;
+  color: var(--mainForegroundColor);
+  background-color: var(--inputBackgroundColor);
+  outline: none;
+
+  &:focus-within,
+  &:focus {
+    box-shadow: #{$focus-box-shadow-form} var(--mainColorLightest);
+
+    &.input-error {
+      box-shadow: #{$focus-box-shadow-form} #{scale-color($red, $alpha: -75%)};
+    }
+  }
+}
+
+.input-group > .form-control {
+  flex: initial;
 }

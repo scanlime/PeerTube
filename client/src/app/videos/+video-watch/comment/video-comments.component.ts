@@ -96,6 +96,7 @@ export class VideoCommentsComponent implements OnInit, OnChanges, OnDestroy {
         res => {
           this.threadComments[commentId] = res
           this.threadLoading[commentId] = false
+          this.hooks.runAction('action:video-watch.video-thread-replies.loaded', 'video-watch', { data: res })
 
           if (highlightThread) {
             this.highlightedThread = new VideoComment(res.comment)
@@ -130,6 +131,7 @@ export class VideoCommentsComponent implements OnInit, OnChanges, OnDestroy {
         this.componentPagination.totalItems = res.total
 
         this.onDataSubject.next(res.data)
+        this.hooks.runAction('action:video-watch.video-threads.loaded', 'video-watch', { data: this.componentPagination })
       },
 
       err => this.notifier.error(err.message)
@@ -181,7 +183,7 @@ export class VideoCommentsComponent implements OnInit, OnChanges, OnDestroy {
           // Mark the comment as deleted
           this.softDeleteComment(commentToDelete)
 
-          if (this.highlightedThread.id === commentToDelete.id) this.highlightedThread = undefined
+          if (this.highlightedThread?.id === commentToDelete.id) this.highlightedThread = undefined
         },
 
         err => this.notifier.error(err.message)
@@ -193,9 +195,8 @@ export class VideoCommentsComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   onNearOfBottom () {
-    this.componentPagination.currentPage++
-
     if (hasMoreItems(this.componentPagination)) {
+      this.componentPagination.currentPage++
       this.loadMoreThreads()
     }
   }
@@ -219,7 +220,6 @@ export class VideoCommentsComponent implements OnInit, OnChanges, OnDestroy {
       this.componentPagination.totalItems = null
 
       this.syndicationItems = this.videoCommentService.getVideoCommentsFeeds(this.video.uuid)
-
       this.loadMoreThreads()
     }
   }

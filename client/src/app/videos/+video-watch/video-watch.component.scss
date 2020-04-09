@@ -53,7 +53,6 @@ $video-info-margin-left: 44px;
   background-color: #000;
   display: flex;
   justify-content: center;
-  margin: 0 -15px;
 
   #videojs-wrapper {
     display: flex;
@@ -470,7 +469,7 @@ my-video-comments {
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: space-between;
   background-color: rgba(0, 0, 0, 0.9);
   color: #fff;
 

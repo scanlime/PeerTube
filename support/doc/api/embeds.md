@@ -28,7 +28,7 @@ import { PeerTubePlayer } from '@peertube/embed-api'
 Or use the minified build from NPM CDN in your HTML file:
 
 ```
-<script src="https://unpkg.com/@peertube/embed-api@0.0.1/build/player.min.js"></script>
+<script src="https://unpkg.com/@peertube/embed-api/build/player.min.js"></script>
 
 <script>
   const PeerTubePlayer = window['PeerTubePlayer']
@@ -46,7 +46,7 @@ await player.ready // wait for the player to be ready
 // now you can use it!
 player.play()
 player.seek(32)
-player.stop()
+player.pause()
 ```
 
 # Methods
@@ -111,31 +111,26 @@ Get the playback volume. Returns a value between `0` and `1`.
 
 You can subscribe to events by using `addEventListener()`. See above for details.
 
-## Event `play`
-
-Fired when playback begins or is resumed after pausing.
-
-## Event `pause`
-
-Fired when playback is paused.
-
 ## Event `playbackStatusUpdate`
 
-Fired every half second to provide the current status of playback. The parameter of the callback will resemble:
+Fired every half second to provide the current status of playback. 
+The parameter of the callback will resemble:
 
 ```json
 {
   "position": 22.3,
   "volume": 0.9,
+  "duration": "171.37499",
   "playbackState": "playing"
 }
 ```
 
-The `volume` field contains the volume from `0` (silent) to `1` (full volume). The `playbackState` can be `playing` or `paused`. More states may be added later.
+The `volume` field contains the volume from `0` (silent) to `1` (full volume).
+The `playbackState` can be `unstarted`, `playing`, `paused` or `ended`. More states may be added later.
 
 ## Event `playbackStatusChange`
 
-Fired when playback transitions between states, such as `pausing` and `playing`. More states may be added later.
+Fired when playback transitions between states, such as `paused` and `playing`. More states may be added later.
 
 ## Event `resolutionUpdate`
 

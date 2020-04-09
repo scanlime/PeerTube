@@ -8,7 +8,7 @@ window.addEventListener('load', async () => {
   const videoId = lastPart.indexOf('?') === -1 ? lastPart : lastPart.split('?')[ 0 ]
 
   const iframe = document.createElement('iframe')
-  iframe.src = `/videos/embed/${videoId}?autoplay=1&controls=0&api=1`
+  iframe.src = `/videos/embed/${videoId}?api=1`
 
   const mainElement = document.querySelector('#host')
   mainElement.appendChild(iframe)
@@ -30,7 +30,7 @@ window.addEventListener('load', async () => {
   ]
 
   monitoredEvents.forEach(e => {
-    player.addEventListener(e as PlayerEventType, () => console.log(`PLAYER: event '${e}' received`))
+    player.addEventListener(e as PlayerEventType, (param) => console.log(`PLAYER: event '${e}' received`, param))
     console.log(`PLAYER: now listening for event '${e}'`)
   })
 

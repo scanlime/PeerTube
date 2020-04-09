@@ -4,7 +4,14 @@ import * as chai from 'chai'
 import 'mocha'
 import { omit } from 'lodash'
 import { getMaxBitrate, VideoDetails, VideoResolution, VideoState } from '../../../../shared/models/videos'
-import { audio, canDoQuickTranscode, getVideoFileBitrate, getVideoFileFPS, getVideoFileResolution } from '../../../helpers/ffmpeg-utils'
+import {
+  audio,
+  canDoQuickTranscode,
+  getVideoFileBitrate,
+  getVideoFileFPS,
+  getVideoFileResolution,
+  getMetadataFromFile
+} from '../../../helpers/ffmpeg-utils'
 import {
   buildAbsoluteFixturePath,
   cleanupTests,
@@ -14,17 +21,20 @@ import {
   generateVideoWithFramerate,
   getMyVideos,
   getVideo,
+  getVideoFileMetadataUrl,
   getVideosList,
   makeGetRequest,
   root,
   ServerInfo,
   setAccessTokensToServers,
-  uploadVideo,
+  uploadVideo, uploadVideoAndGetId,
   waitJobs,
   webtorrentAdd
 } from '../../../../shared/extra-utils'
 import { join } from 'path'
 import { VIDEO_TRANSCODING_FPS } from '../../../../server/initializers/constants'
+import { FfprobeData } from 'fluent-ffmpeg'
+import { VideoFileMetadata } from '@shared/models/videos/video-file-metadata'
 
 const expect = chai.expect
 
@@ -454,6 +464,63 @@ describe('Test video transcoding', function () {
         const path = join(root(), 'test' + servers[1].internalServerNumber, 'videos', video.uuid + '-720.mp4')
         const fps = await getVideoFileFPS(path)
         expect(fps).to.be.equal(59)
+      }
+    }
+  })
+
+  it('Should provide valid ffprobe data', async function () {
+    this.timeout(160000)
+
+    const videoUUID = (await uploadVideoAndGetId({ server: servers[1], videoName: 'ffprobe data' })).uuid
+    await waitJobs(servers)
+
+    {
+      const path = join(root(), 'test' + servers[1].internalServerNumber, 'videos', videoUUID + '-240.mp4')
+      const metadata = await getMetadataFromFile<VideoFileMetadata>(path)
+
+      // expected format properties
+      for (const p of [
+        'tags.encoder',
+        'format_long_name',
+        'size',
+        'bit_rate'
+      ]) {
+        expect(metadata.format).to.have.nested.property(p)
+      }
+
+      // expected stream properties
+      for (const p of [
+        'codec_long_name',
+        'profile',
+        'width',
+        'height',
+        'display_aspect_ratio',
+        'avg_frame_rate',
+        'pix_fmt'
+      ]) {
+        expect(metadata.streams[0]).to.have.nested.property(p)
+      }
+
+      expect(metadata).to.not.have.nested.property('format.filename')
+    }
+
+    for (const server of servers) {
+      const res2 = await getVideo(server.url, videoUUID)
+      const videoDetails: VideoDetails = res2.body
+
+      const videoFiles = videoDetails.files
+                                     .concat(videoDetails.streamingPlaylists[0].files)
+      expect(videoFiles).to.have.lengthOf(8)
+
+      for (const file of videoFiles) {
+        expect(file.metadata).to.be.undefined
+        expect(file.metadataUrl).to.exist
+        expect(file.metadataUrl).to.contain(servers[1].url)
+        expect(file.metadataUrl).to.contain(videoUUID)
+
+        const res3 = await getVideoFileMetadataUrl(file.metadataUrl)
+        const metadata: FfprobeData = res3.body
+        expect(metadata).to.have.nested.property('format.size')
       }
     }
   })

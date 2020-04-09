@@ -70,7 +70,7 @@ export class VideoUploadComponent extends VideoSend implements OnInit, OnDestroy
   }
 
   get videoExtensions () {
-    return this.serverConfig.video.file.extensions.join(',')
+    return this.serverConfig.video.file.extensions.join(', ')
   }
 
   ngOnInit () {
@@ -106,6 +106,11 @@ export class VideoUploadComponent extends VideoSend implements OnInit, OnDestroy
 
   getVideoFile () {
     return this.videofileInput.nativeElement.files[0]
+  }
+
+  setVideoFile (files: FileList) {
+    this.videofileInput.nativeElement.files = files
+    this.fileChange()
   }
 
   getAudioUploadLabel () {

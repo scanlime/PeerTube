@@ -234,13 +234,15 @@ export class UserService {
     return this.userCache[userId]
   }
 
-  getUser (userId: number) {
-    return this.authHttp.get<UserServerModel>(UserService.BASE_USERS_URL + userId)
+  getUser (userId: number, withStats = false) {
+    const params = new HttpParams().append('withStats', withStats + '')
+    return this.authHttp.get<UserServerModel>(UserService.BASE_USERS_URL + userId, { params })
                .pipe(catchError(err => this.restExtractor.handleError(err)))
   }
 
   getAnonymousUser () {
     let videoLanguages
+
     try {
       videoLanguages = JSON.parse(this.localStorageService.getItem(User.KEYS.VIDEO_LANGUAGES))
     } catch (err) {
@@ -252,10 +254,11 @@ export class UserService {
       // local storage keys
       nsfwPolicy: this.localStorageService.getItem(User.KEYS.NSFW_POLICY) as NSFWPolicyType,
       webTorrentEnabled: this.localStorageService.getItem(User.KEYS.WEBTORRENT_ENABLED) !== 'false',
-      autoPlayVideo: this.localStorageService.getItem(User.KEYS.AUTO_PLAY_VIDEO) === 'true',
-      autoPlayNextVideoPlaylist: this.localStorageService.getItem(User.KEYS.AUTO_PLAY_VIDEO_PLAYLIST) === 'true',
       theme: this.localStorageService.getItem(User.KEYS.THEME) || 'default',
       videoLanguages,
+
+      autoPlayNextVideoPlaylist: this.localStorageService.getItem(User.KEYS.AUTO_PLAY_VIDEO_PLAYLIST) !== 'false',
+      autoPlayVideo: this.localStorageService.getItem(User.KEYS.AUTO_PLAY_VIDEO) === 'true',
 
       // session storage keys
       autoPlayNextVideo: this.sessionStorageService.getItem(User.KEYS.SESSION_STORAGE_AUTO_PLAY_NEXT_VIDEO) === 'true'

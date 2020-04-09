@@ -44,6 +44,10 @@ export class VideoRedundanciesListComponent extends RestTable implements OnInit 
     this.bytesPipe = new BytesPipe()
   }
 
+  getIdentifier () {
+    return 'VideoRedundanciesListComponent'
+  }
+
   ngOnInit () {
     this.loadSelectLocalStorage()
 
@@ -59,6 +63,12 @@ export class VideoRedundanciesListComponent extends RestTable implements OnInit 
             this.buildPieData(r)
           }
         })
+  }
+
+  getColspan () {
+    if (this.isDisplayingRemoteVideos()) return 3
+
+    return 2
   }
 
   isDisplayingRemoteVideos () {

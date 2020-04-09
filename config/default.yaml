@@ -126,6 +126,14 @@ redundancy:
 #        strategy: 'recently-added' # Cache recently added videos
 #        min_views: 10 # Having at least x views
 
+# Other instances that duplicate your content
+remote_redundancy:
+  videos:
+    # 'nobody': Do not accept remote redundancies
+    # 'anybody': Accept remote redundancies from anybody
+    # 'followings': Accept redundancies from instance followings
+    accept_from: 'anybody'
+
 csp:
   enabled: false
   report_only: true # CSP directives are still being tested, so disable the report only mode at your own risk!
@@ -249,7 +257,7 @@ auto_blacklist:
 
 instance:
   name: 'PeerTube'
-  short_description: 'PeerTube, a federated (ActivityPub) video streaming platform using P2P (BitTorrent) directly in the web browser with WebTorrent and Angular.'
+  short_description: 'PeerTube, an ActivityPub-federated video streaming platform using P2P directly in your web browser.'
   description: 'Welcome to this PeerTube instance!' # Support markdown
   terms: 'No terms for now.' # Support markdown
   code_of_conduct: '' # Supports markdown

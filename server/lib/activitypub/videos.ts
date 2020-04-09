@@ -14,7 +14,7 @@ import {
 } from '../../../shared/index'
 import { VideoTorrentObject } from '../../../shared/models/activitypub/objects'
 import { VideoPrivacy } from '../../../shared/models/videos'
-import { sanitizeAndCheckVideoTorrentObject } from '../../helpers/custom-validators/activitypub/videos'
+import { isAPVideoFileMetadataObject, sanitizeAndCheckVideoTorrentObject } from '../../helpers/custom-validators/activitypub/videos'
 import { isVideoFileInfoHashValid } from '../../helpers/custom-validators/videos'
 import { deleteNonExistingModels, resetSequelizeInstance, retryTransactionWrapper } from '../../helpers/database-utils'
 import { logger } from '../../helpers/logger'
@@ -25,7 +25,8 @@ import {
   P2P_MEDIA_LOADER_PEER_VERSION,
   PREVIEWS_SIZE,
   REMOTE_SCHEME,
-  STATIC_PATHS, THUMBNAILS_SIZE
+  STATIC_PATHS,
+  THUMBNAILS_SIZE
 } from '../../initializers/constants'
 import { TagModel } from '../../models/video/tag'
 import { VideoModel } from '../../models/video/video'
@@ -68,7 +69,8 @@ import {
   MVideoAPWithoutCaption,
   MVideoFile,
   MVideoFullLight,
-  MVideoId, MVideoImmutable,
+  MVideoId,
+  MVideoImmutable,
   MVideoThumbnail
 } from '../../typings/models'
 import { MThumbnail } from '../../typings/models/video/thumbnail'
@@ -694,6 +696,14 @@ function videoFileActivityUrlToDBAttributes (
       throw new Error('Cannot parse magnet URI ' + magnet.href)
     }
 
+    // Fetch associated metadata url, if any
+    const metadata = urls.filter(isAPVideoFileMetadataObject)
+                         .find(u => {
+                           return u.height === fileUrl.height &&
+                             u.fps === fileUrl.fps &&
+                             u.rel.includes(fileUrl.mediaType)
+                         })
+
     const mediaType = fileUrl.mediaType
     const attribute = {
       extname: MIMETYPES.VIDEO.MIMETYPE_EXT[mediaType],
@@ -701,6 +711,7 @@ function videoFileActivityUrlToDBAttributes (
       resolution: fileUrl.height,
       size: fileUrl.size,
       fps: fileUrl.fps || -1,
+      metadataUrl: metadata?.href,
 
       // This is a video file owned by a video or by a streaming playlist
       videoId: (videoOrPlaylist as MStreamingPlaylist).playlistUrl ? null : videoOrPlaylist.id,

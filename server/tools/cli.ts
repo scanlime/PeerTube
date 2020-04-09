@@ -3,7 +3,7 @@ import { getAppNumber, isTestInstance } from '../helpers/core-utils'
 import { join } from 'path'
 import { root } from '../../shared/extra-utils/miscs/miscs'
 import { getVideoChannel } from '../../shared/extra-utils/videos/video-channels'
-import { Command } from 'commander'
+import { CommanderStatic } from 'commander'
 import { VideoChannel, VideoPrivacy } from '../../shared/models/videos'
 import { createLogger, format, transports } from 'winston'
 import { getMyUserInformation } from '@shared/extra-utils/users/users'
@@ -35,19 +35,17 @@ interface Settings {
   default: number
 }
 
-function getSettings () {
-  return new Promise<Settings>((res, rej) => {
-    const defaultSettings = {
-      remotes: [],
-      default: -1
-    }
+async function getSettings (): Promise<Settings> {
+  const defaultSettings = {
+    remotes: [],
+    default: -1
+  }
 
-    config.read((err, data) => {
-      if (err) return rej(err)
+  const data = await config.read()
 
-      return res(Object.keys(data).length === 0 ? defaultSettings : data)
-    })
-  })
+  return Object.keys(data).length === 0
+    ? defaultSettings
+    : data
 }
 
 async function getNetrc () {
@@ -62,24 +60,12 @@ async function getNetrc () {
   return netrc
 }
 
-function writeSettings (settings) {
-  return new Promise((res, rej) => {
-    config.write(settings, err => {
-      if (err) return rej(err)
-
-      return res()
-    })
-  })
+function writeSettings (settings: Settings) {
+  return config.write(settings)
 }
 
 function deleteSettings () {
-  return new Promise((res, rej) => {
-    config.trash((err) => {
-      if (err) return rej(err)
-
-      return res()
-    })
-  })
+  return config.trash()
 }
 
 function getRemoteObjectOrDie (
@@ -118,7 +104,7 @@ function getRemoteObjectOrDie (
   }
 }
 
-function buildCommonVideoOptions (command: Command) {
+function buildCommonVideoOptions (command: CommanderStatic) {
   function list (val) {
     return val.split(',')
   }
@@ -139,7 +125,7 @@ function buildCommonVideoOptions (command: Command) {
     .option('-v, --verbose <verbose>', 'Verbosity, from 0/\'error\' to 4/\'debug\'', 'info')
 }
 
-async function buildVideoAttributesFromCommander (url: string, command: Command, defaultAttributes: any = {}) {
+async function buildVideoAttributesFromCommander (url: string, command: CommanderStatic, defaultAttributes: any = {}) {
   const defaultBooleanAttributes = {
     nsfw: false,
     commentsEnabled: true,
@@ -227,7 +213,6 @@ function getLogger (logLevel = 'info') {
 
 export {
   version,
-  config,
   getLogger,
   getSettings,
   getNetrc,
