@@ -1,20 +1,15 @@
-import { Injectable } from '@angular/core'
-import { PluginService } from '@app/core/plugins/plugin.service'
-import { ClientActionHookName, ClientFilterHookName } from '@shared/models/plugins/client-hook.model'
 import { from, Observable } from 'rxjs'
 import { mergeMap, switchMap } from 'rxjs/operators'
-import { ServerService } from '@app/core/server'
-import { PluginClientScope } from '@shared/models/plugins/plugin-client-scope.type'
+import { Injectable } from '@angular/core'
+import { PluginService } from '@app/core/plugins/plugin.service'
+import { ClientActionHookName, ClientFilterHookName, PluginClientScope } from '@shared/models'
 
 type RawFunction<U, T> = (params: U) => T
 type ObservableFunction<U, T> = RawFunction<U, Observable<T>>
 
 @Injectable()
 export class HooksService {
-  constructor (
-    private server: ServerService,
-    private pluginService: PluginService
-  ) { }
+  constructor (private pluginService: PluginService) { }
 
   wrapObsFun
     <P, R, H1 extends ClientFilterHookName, H2 extends ClientFilterHookName>

@@ -1,6 +1,6 @@
 import * as Channel from 'jschannel'
+import { EventHandler, PeerTubeResolution, PeerTubeTextTrack, PlayerEventType } from './definitions'
 import { EventRegistrar } from './events'
-import { EventHandler, PlayerEventType, PeerTubeResolution } from './definitions'
 
 const PASSTHROUGH_EVENTS = [
   'pause',
@@ -105,6 +105,21 @@ export class PeerTubePlayer {
   }
 
   /**
+   * Tell the embed to change the current caption
+   * @param value Caption id
+   */
+  async setCaption (value: string) {
+    await this.sendMessage('setCaption', value)
+  }
+
+  /**
+   * Get video captions
+   */
+  async getCaptions (): Promise<PeerTubeTextTrack[]> {
+    return this.sendMessage<void, PeerTubeTextTrack[]>('getCaptions')
+  }
+
+  /**
    * Tell the embed to seek to a specific position (in seconds)
    * @param seconds
    */
@@ -153,6 +168,27 @@ export class PeerTubePlayer {
    */
   async setPlaybackRate (rate: number) {
     await this.sendMessage('setPlaybackRate', rate)
+  }
+
+  /**
+   * Play next video in playlist
+   */
+  async playNextVideo () {
+    await this.sendMessage('playNextVideo')
+  }
+
+  /**
+   * Play previous video in playlist
+   */
+  async playPreviousVideo () {
+    await this.sendMessage('playPreviousVideo')
+  }
+
+  /**
+   * Get video position currently played (starts from 1)
+   */
+  async getCurrentPosition () {
+    return this.sendMessage<void, number>('getCurrentPosition')
   }
 
   private constructChannel () {

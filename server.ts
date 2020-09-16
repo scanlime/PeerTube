@@ -70,7 +70,9 @@ if (CONFIG.CSP.ENABLED) {
 // ----------- Database -----------
 
 // Initialize database and models
-import { initDatabaseModels } from './server/initializers/database'
+import { initDatabaseModels, checkDatabaseConnectionOrDie } from './server/initializers/database'
+checkDatabaseConnectionOrDie()
+
 import { migrate } from './server/initializers/migrator'
 migrate()
   .then(() => initDatabaseModels(false))
@@ -84,7 +86,7 @@ migrate()
 loadLanguages()
 
 // ----------- PeerTube modules -----------
-import { installApplication } from './server/initializers'
+import { installApplication } from './server/initializers/installer'
 import { Emailer } from './server/lib/emailer'
 import { JobQueue } from './server/lib/job-queue'
 import { VideosPreviewCache, VideosCaptionCache } from './server/lib/files-cache'
@@ -137,14 +139,14 @@ if (isTestInstance()) {
 }
 
 // For the logger
-morgan.token('remote-addr', req => {
+morgan.token<express.Request>('remote-addr', req => {
   if (CONFIG.LOG.ANONYMIZE_IP === true || req.get('DNT') === '1') {
     return anonymize(req.ip, 16, 16)
   }
 
   return req.ip
 })
-morgan.token('user-agent', req => {
+morgan.token<express.Request>('user-agent', req => {
   if (req.get('DNT') === '1') {
     return useragent.parse(req.get('user-agent')).family
   }

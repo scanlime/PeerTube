@@ -1,4 +1,6 @@
-import { FindOptions, literal, Op, QueryTypes, where, fn, col, WhereOptions } from 'sequelize'
+import * as Bluebird from 'bluebird'
+import { values } from 'lodash'
+import { col, FindOptions, fn, literal, Op, QueryTypes, where, WhereOptions } from 'sequelize'
 import {
   AfterDestroy,
   AfterUpdate,
@@ -19,8 +21,21 @@ import {
   Table,
   UpdatedAt
 } from 'sequelize-typescript'
-import { hasUserRight, MyUser, USER_ROLE_LABELS, UserRight, VideoPlaylistType, VideoPrivacy, VideoAbuseState } from '../../../shared'
+import {
+  MMyUserFormattable,
+  MUserDefault,
+  MUserFormattable,
+  MUserId,
+  MUserNotifSettingChannelDefault,
+  MUserWithNotificationSetting,
+  MVideoFullLight
+} from '@server/types/models'
+import { hasUserRight, USER_ROLE_LABELS } from '../../../shared/core-utils/users'
+import { AbuseState, MyUser, UserRight, VideoPlaylistType, VideoPrivacy } from '../../../shared/models'
 import { User, UserRole } from '../../../shared/models/users'
+import { UserAdminFlag } from '../../../shared/models/users/user-flag.model'
+import { NSFWPolicyType } from '../../../shared/models/videos/nsfw-policy.type'
+import { isThemeNameValid } from '../../helpers/custom-validators/plugins'
 import {
   isNoInstanceConfigWarningModal,
   isNoWelcomeModal,
@@ -42,49 +57,19 @@ import {
   isUserWebTorrentEnabledValid
 } from '../../helpers/custom-validators/users'
 import { comparePassword, cryptPassword } from '../../helpers/peertube-crypto'
-import { OAuthTokenModel } from '../oauth/oauth-token'
-import { getSort, throwIfNotValid } from '../utils'
-import { VideoChannelModel } from '../video/video-channel'
-import { VideoPlaylistModel } from '../video/video-playlist'
-import { AccountModel } from './account'
-import { NSFWPolicyType } from '../../../shared/models/videos/nsfw-policy.type'
-import { values } from 'lodash'
 import { DEFAULT_USER_THEME_NAME, NSFW_POLICY_TYPES } from '../../initializers/constants'
 import { clearCacheByUserId } from '../../lib/oauth-model'
-import { UserNotificationSettingModel } from './user-notification-setting'
-import { VideoModel } from '../video/video'
+import { getThemeOrDefault } from '../../lib/plugins/theme-utils'
 import { ActorModel } from '../activitypub/actor'
 import { ActorFollowModel } from '../activitypub/actor-follow'
+import { OAuthTokenModel } from '../oauth/oauth-token'
+import { getSort, throwIfNotValid } from '../utils'
+import { VideoModel } from '../video/video'
+import { VideoChannelModel } from '../video/video-channel'
 import { VideoImportModel } from '../video/video-import'
-import { UserAdminFlag } from '../../../shared/models/users/user-flag.model'
-import { isThemeNameValid } from '../../helpers/custom-validators/plugins'
-import { getThemeOrDefault } from '../../lib/plugins/theme-utils'
-import * as Bluebird from 'bluebird'
-import {
-  MMyUserFormattable,
-  MUserDefault,
-  MUserFormattable,
-  MUserId,
-  MUserNotifSettingChannelDefault,
-  MUserWithNotificationSetting,
-  MVideoFullLight
-} from '@server/typings/models'
-
-const literalVideoQuotaUsed: any = [
-  literal(
-    '(' +
-      'SELECT COALESCE(SUM("size"), 0) ' +
-      'FROM (' +
-        'SELECT MAX("videoFile"."size") AS "size" FROM "videoFile" ' +
-        'INNER JOIN "video" ON "videoFile"."videoId" = "video"."id" ' +
-        'INNER JOIN "videoChannel" ON "videoChannel"."id" = "video"."channelId" ' +
-        'INNER JOIN "account" ON "videoChannel"."accountId" = "account"."id" ' +
-        'WHERE "account"."userId" = "UserModel"."id" GROUP BY "video"."id"' +
-      ') t' +
-    ')'
-  ),
-  'videoQuotaUsed'
-]
+import { VideoPlaylistModel } from '../video/video-playlist'
+import { AccountModel } from './account'
+import { UserNotificationSettingModel } from './user-notification-setting'
 
 enum ScopeNames {
   FOR_ME_API = 'FOR_ME_API',
@@ -156,7 +141,17 @@ enum ScopeNames {
   [ScopeNames.WITH_STATS]: {
     attributes: {
       include: [
-        literalVideoQuotaUsed,
+        [
+          literal(
+            '(' +
+              UserModel.generateUserQuotaBaseSQL({
+                withSelect: false,
+                whereUserId: '"UserModel"."id"'
+              }) +
+            ')'
+          ),
+          'videoQuotaUsed'
+        ],
         [
           literal(
             '(' +
@@ -174,28 +169,26 @@ enum ScopeNames {
             '(' +
               `SELECT concat_ws(':', "abuses", "acceptedAbuses") ` +
               'FROM (' +
-                'SELECT COUNT("videoAbuse"."id") AS "abuses", ' +
-                       `COUNT("videoAbuse"."id") FILTER (WHERE "videoAbuse"."state" = ${VideoAbuseState.ACCEPTED}) AS "acceptedAbuses" ` +
-                'FROM "videoAbuse" ' +
-                'INNER JOIN "video" ON "videoAbuse"."videoId" = "video"."id" ' +
-                'INNER JOIN "videoChannel" ON "videoChannel"."id" = "video"."channelId" ' +
-                'INNER JOIN "account" ON "account"."id" = "videoChannel"."accountId" ' +
+                'SELECT COUNT("abuse"."id") AS "abuses", ' +
+                       `COUNT("abuse"."id") FILTER (WHERE "abuse"."state" = ${AbuseState.ACCEPTED}) AS "acceptedAbuses" ` +
+                'FROM "abuse" ' +
+                'INNER JOIN "account" ON "account"."id" = "abuse"."flaggedAccountId" ' +
                 'WHERE "account"."userId" = "UserModel"."id"' +
               ') t' +
             ')'
           ),
-          'videoAbusesCount'
+          'abusesCount'
         ],
         [
           literal(
             '(' +
-              'SELECT COUNT("videoAbuse"."id") ' +
-              'FROM "videoAbuse" ' +
-              'INNER JOIN "account" ON "account"."id" = "videoAbuse"."reporterAccountId" ' +
+              'SELECT COUNT("abuse"."id") ' +
+              'FROM "abuse" ' +
+              'INNER JOIN "account" ON "account"."id" = "abuse"."reporterAccountId" ' +
               'WHERE "account"."userId" = "UserModel"."id"' +
             ')'
           ),
-          'videoAbusesCreatedCount'
+          'abusesCreatedCount'
         ],
         [
           literal(
@@ -227,8 +220,8 @@ enum ScopeNames {
 })
 export class UserModel extends Model<UserModel> {
 
-  @AllowNull(false)
-  @Is('UserPassword', value => throwIfNotValid(value, isUserPasswordValid, 'user password'))
+  @AllowNull(true)
+  @Is('UserPassword', value => throwIfNotValid(value, isUserPasswordValid, 'user password', true))
   @Column
   password: string
 
@@ -354,6 +347,16 @@ export class UserModel extends Model<UserModel> {
   @Column
   noWelcomeModal: boolean
 
+  @AllowNull(true)
+  @Default(null)
+  @Column
+  pluginAuth: string
+
+  @AllowNull(true)
+  @Default(null)
+  @Column
+  lastLoginDate: Date
+
   @CreatedAt
   createdAt: Date
 
@@ -389,7 +392,7 @@ export class UserModel extends Model<UserModel> {
   @BeforeCreate
   @BeforeUpdate
   static cryptPasswordIfNeeded (instance: UserModel) {
-    if (instance.changed('password')) {
+    if (instance.changed('password') && instance.password) {
       return cryptPassword(instance.password)
         .then(hash => {
           instance.password = hash
@@ -408,11 +411,18 @@ export class UserModel extends Model<UserModel> {
     return this.count()
   }
 
-  static listForApi (start: number, count: number, sort: string, search?: string) {
-    let where: WhereOptions
+  static listForApi (parameters: {
+    start: number
+    count: number
+    sort: string
+    search?: string
+    blocked?: boolean
+  }) {
+    const { start, count, sort, search, blocked } = parameters
+    const where: WhereOptions = {}
 
     if (search) {
-      where = {
+      Object.assign(where, {
         [Op.or]: [
           {
             email: {
@@ -425,12 +435,30 @@ export class UserModel extends Model<UserModel> {
             }
           }
         ]
-      }
+      })
+    }
+
+    if (blocked !== undefined) {
+      Object.assign(where, {
+        blocked: blocked
+      })
     }
 
     const query: FindOptions = {
       attributes: {
-        include: [ literalVideoQuotaUsed ]
+        include: [
+          [
+            literal(
+              '(' +
+                UserModel.generateUserQuotaBaseSQL({
+                  withSelect: false,
+                  whereUserId: '"UserModel"."id"'
+                }) +
+              ')'
+            ),
+            'videoQuotaUsed'
+          ] as any // FIXME: typings
+        ]
       },
       offset: start,
       limit: count,
@@ -659,7 +687,10 @@ export class UserModel extends Model<UserModel> {
 
   static getOriginalVideoFileTotalFromUser (user: MUserId) {
     // Don't use sequelize because we need to use a sub query
-    const query = UserModel.generateUserQuotaBaseSQL()
+    const query = UserModel.generateUserQuotaBaseSQL({
+      withSelect: true,
+      whereUserId: '$userId'
+    })
 
     return UserModel.getTotalRawQuery(query, user.id)
   }
@@ -667,16 +698,38 @@ export class UserModel extends Model<UserModel> {
   // Returns cumulative size of all video files uploaded in the last 24 hours.
   static getOriginalVideoFileTotalDailyFromUser (user: MUserId) {
     // Don't use sequelize because we need to use a sub query
-    const query = UserModel.generateUserQuotaBaseSQL('"video"."createdAt" > now() - interval \'24 hours\'')
+    const query = UserModel.generateUserQuotaBaseSQL({
+      withSelect: true,
+      whereUserId: '$userId',
+      where: '"video"."createdAt" > now() - interval \'24 hours\''
+    })
 
     return UserModel.getTotalRawQuery(query, user.id)
   }
 
   static async getStats () {
+    function getActiveUsers (days: number) {
+      const query = {
+        where: {
+          [Op.and]: [
+            literal(`"lastLoginDate" > NOW() - INTERVAL '${days}d'`)
+          ]
+        }
+      }
+
+      return UserModel.count(query)
+    }
+
     const totalUsers = await UserModel.count()
+    const totalDailyActiveUsers = await getActiveUsers(1)
+    const totalWeeklyActiveUsers = await getActiveUsers(7)
+    const totalMonthlyActiveUsers = await getActiveUsers(30)
 
     return {
-      totalUsers
+      totalUsers,
+      totalDailyActiveUsers,
+      totalWeeklyActiveUsers,
+      totalMonthlyActiveUsers
     }
   }
 
@@ -726,8 +779,8 @@ export class UserModel extends Model<UserModel> {
     const videoQuotaUsed = this.get('videoQuotaUsed')
     const videoQuotaUsedDaily = this.get('videoQuotaUsedDaily')
     const videosCount = this.get('videosCount')
-    const [ videoAbusesCount, videoAbusesAcceptedCount ] = (this.get('videoAbusesCount') as string || ':').split(':')
-    const videoAbusesCreatedCount = this.get('videoAbusesCreatedCount')
+    const [ abusesCount, abusesAcceptedCount ] = (this.get('abusesCount') as string || ':').split(':')
+    const abusesCreatedCount = this.get('abusesCreatedCount')
     const videoCommentsCount = this.get('videoCommentsCount')
 
     const json: User = {
@@ -761,14 +814,14 @@ export class UserModel extends Model<UserModel> {
       videosCount: videosCount !== undefined
         ? parseInt(videosCount + '', 10)
         : undefined,
-      videoAbusesCount: videoAbusesCount
-        ? parseInt(videoAbusesCount, 10)
+      abusesCount: abusesCount
+        ? parseInt(abusesCount, 10)
         : undefined,
-      videoAbusesAcceptedCount: videoAbusesAcceptedCount
-        ? parseInt(videoAbusesAcceptedCount, 10)
+      abusesAcceptedCount: abusesAcceptedCount
+        ? parseInt(abusesAcceptedCount, 10)
         : undefined,
-      videoAbusesCreatedCount: videoAbusesCreatedCount !== undefined
-        ? parseInt(videoAbusesCreatedCount + '', 10)
+      abusesCreatedCount: abusesCreatedCount !== undefined
+        ? parseInt(abusesCreatedCount + '', 10)
         : undefined,
       videoCommentsCount: videoCommentsCount !== undefined
         ? parseInt(videoCommentsCount + '', 10)
@@ -788,7 +841,11 @@ export class UserModel extends Model<UserModel> {
 
       videoChannels: [],
 
-      createdAt: this.createdAt
+      createdAt: this.createdAt,
+
+      pluginAuth: this.pluginAuth,
+
+      lastLoginDate: this.lastLoginDate
     }
 
     if (parameters.withAdminFlags) {
@@ -835,18 +892,33 @@ export class UserModel extends Model<UserModel> {
     return uploadedTotal < this.videoQuota && uploadedDaily < this.videoQuotaDaily
   }
 
-  private static generateUserQuotaBaseSQL (where?: string) {
-    const andWhere = where ? 'AND ' + where : ''
+  private static generateUserQuotaBaseSQL (options: {
+    whereUserId: '$userId' | '"UserModel"."id"'
+    withSelect: boolean
+    where?: string
+  }) {
+    const andWhere = options.where
+      ? 'AND ' + options.where
+      : ''
 
-    return 'SELECT SUM("size") AS "total" ' +
-      'FROM (' +
-      'SELECT MAX("videoFile"."size") AS "size" FROM "videoFile" ' +
-      'INNER JOIN "video" ON "videoFile"."videoId" = "video"."id" ' +
-      'INNER JOIN "videoChannel" ON "videoChannel"."id" = "video"."channelId" ' +
+    const videoChannelJoin = 'INNER JOIN "videoChannel" ON "videoChannel"."id" = "video"."channelId" ' +
       'INNER JOIN "account" ON "videoChannel"."accountId" = "account"."id" ' +
-      'WHERE "account"."userId" = $userId ' + andWhere +
-      'GROUP BY "video"."id"' +
-      ') t'
+      `WHERE "account"."userId" = ${options.whereUserId} ${andWhere}`
+
+    const webtorrentFiles = 'SELECT "videoFile"."size" AS "size", "video"."id" AS "videoId" FROM "videoFile" ' +
+      'INNER JOIN "video" ON "videoFile"."videoId" = "video"."id" ' +
+      videoChannelJoin
+
+    const hlsFiles = 'SELECT "videoFile"."size" AS "size", "video"."id" AS "videoId" FROM "videoFile" ' +
+      'INNER JOIN "videoStreamingPlaylist" ON "videoFile"."videoStreamingPlaylistId" = "videoStreamingPlaylist".id ' +
+      'INNER JOIN "video" ON "videoStreamingPlaylist"."videoId" = "video"."id" ' +
+      videoChannelJoin
+
+    return 'SELECT COALESCE(SUM("size"), 0) AS "total" ' +
+      'FROM (' +
+        `SELECT MAX("t1"."size") AS "size" FROM (${webtorrentFiles} UNION ${hlsFiles}) t1 ` +
+        'GROUP BY "t1"."videoId"' +
+      ') t2'
   }
 
   private static getTotalRawQuery (query: string, userId: number) {

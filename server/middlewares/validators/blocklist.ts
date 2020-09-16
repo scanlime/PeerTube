@@ -6,9 +6,9 @@ import { AccountBlocklistModel } from '../../models/account/account-blocklist'
 import { isHostValid } from '../../helpers/custom-validators/servers'
 import { ServerBlocklistModel } from '../../models/server/server-blocklist'
 import { ServerModel } from '../../models/server/server'
-import { getServerActor } from '../../helpers/utils'
 import { WEBSERVER } from '../../initializers/constants'
 import { doesAccountNameWithHostExist } from '../../helpers/middlewares'
+import { getServerActor } from '@server/models/application/application'
 
 const blockAccountValidator = [
   body('accountName').exists().withMessage('Should have an account name with host'),
@@ -24,8 +24,7 @@ const blockAccountValidator = [
 
     if (user.Account.id === accountToBlock.id) {
       res.status(409)
-         .send({ error: 'You cannot block yourself.' })
-         .end()
+         .json({ error: 'You cannot block yourself.' })
 
       return
     }
@@ -80,16 +79,10 @@ const blockServerValidator = [
 
     if (host === WEBSERVER.HOST) {
       return res.status(409)
-        .send({ error: 'You cannot block your own server.' })
-        .end()
+        .json({ error: 'You cannot block your own server.' })
     }
 
-    const server = await ServerModel.loadByHost(host)
-    if (!server) {
-      return res.status(404)
-                .send({ error: 'Server host not found.' })
-                .end()
-    }
+    const server = await ServerModel.loadOrCreateByHost(host)
 
     res.locals.server = server
 
@@ -144,8 +137,7 @@ async function doesUnblockAccountExist (accountId: number, targetAccountId: numb
   const accountBlock = await AccountBlocklistModel.loadByAccountAndTarget(accountId, targetAccountId)
   if (!accountBlock) {
     res.status(404)
-       .send({ error: 'Account block entry not found.' })
-       .end()
+       .json({ error: 'Account block entry not found.' })
 
     return false
   }
@@ -159,8 +151,7 @@ async function doesUnblockServerExist (accountId: number, host: string, res: exp
   const serverBlock = await ServerBlocklistModel.loadByAccountAndHost(accountId, host)
   if (!serverBlock) {
     res.status(404)
-       .send({ error: 'Server block entry not found.' })
-       .end()
+       .json({ error: 'Server block entry not found.' })
 
     return false
   }

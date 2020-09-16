@@ -63,8 +63,17 @@
         "allowNumber": "true"
       }
     ],
+    "@typescript-eslint/no-this-alias": [
+      "error",
+      {
+        "allowDestructuring": true, // Allow `const { props, state } = this`; false by default
+        "allowedNames": ["self"] // Allow `const self = this`; `[]` by default
+      }
+    ],
 
     "@typescript-eslint/return-await": "off",
+    "@typescript-eslint/dot-notation": "off",
+    "@typescript-eslint/method-signature-style": "off",
     "@typescript-eslint/no-base-to-string": "off",
     "@typescript-eslint/quotes": "off",
     "@typescript-eslint/no-var-requires": "off",
@@ -76,6 +85,7 @@
     "@typescript-eslint/consistent-type-definitions": "off",
     "@typescript-eslint/no-misused-promises": "off",
     "@typescript-eslint/no-namespace": "off",
+    "@typescript-eslint/no-empty-interface": "off",
     "@typescript-eslint/no-extraneous-class": "off",
     // bugged but useful
     "@typescript-eslint/restrict-plus-operands": "off"

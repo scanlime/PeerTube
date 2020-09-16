@@ -1,9 +1,8 @@
-import videojs, { VideoJsPlayer } from 'video.js'
-
+import videojs from 'video.js'
 import * as WebTorrent from 'webtorrent'
 import { renderVideo } from './video-renderer'
 import { LoadedQualityData, PlayerNetworkInfo, WebtorrentPluginOptions } from '../peertube-videojs-typings'
-import { getRtcConfig, timeToInt, videoFileMaxByResolution, videoFileMinByResolution } from '../utils'
+import { getRtcConfig, timeToInt, videoFileMaxByResolution, videoFileMinByResolution, isIOS, isSafari } from '../utils'
 import { PeertubeChunkStore } from './peertube-chunk-store'
 import {
   getAverageBandwidthInStore,
@@ -31,7 +30,7 @@ class WebTorrentPlugin extends Plugin {
 
   private readonly autoplay: boolean = false
   private readonly startTime: number = 0
-  private readonly savePlayerSrcFunction: VideoJsPlayer['src']
+  private readonly savePlayerSrcFunction: videojs.Player['src']
   private readonly videoDuration: number
   private readonly CONSTANTS = {
     INFO_SCHEDULER: 1000, // Don't change this
@@ -69,13 +68,13 @@ class WebTorrentPlugin extends Plugin {
 
   private downloadSpeeds: number[] = []
 
-  constructor (player: VideoJsPlayer, options?: WebtorrentPluginOptions) {
+  constructor (player: videojs.Player, options?: WebtorrentPluginOptions) {
     super(player)
 
     this.startTime = timeToInt(options.startTime)
 
     // Disable auto play on iOS
-    this.autoplay = options.autoplay && this.isIOS() === false
+    this.autoplay = options.autoplay
     this.playerRefusedP2P = !getStoredP2PEnabled()
 
     this.videoFiles = options.videoFiles
@@ -159,7 +158,7 @@ class WebTorrentPlugin extends Plugin {
 
     // Don't try on iOS that does not support MediaSource
     // Or don't use P2P if webtorrent is disabled
-    if (this.isIOS() || this.playerRefusedP2P) {
+    if (isIOS() || this.playerRefusedP2P) {
       return this.fallbackToHttp(options, () => {
         this.player.playbackRate(oldPlaybackRate)
         return done()
@@ -358,10 +357,14 @@ class WebTorrentPlugin extends Plugin {
   }
 
   private getAppropriateFile (averageDownloadSpeed?: number): VideoFile {
-    if (this.videoFiles === undefined || this.videoFiles.length === 0) return undefined
-    if (this.videoFiles.length === 1) return this.videoFiles[0]
+    if (this.videoFiles === undefined) return undefined
 
-    // Don't change the torrent is the play was ended
+    const files = this.videoFiles.filter(f => f.resolution.id !== 0)
+
+    if (files.length === 0) return undefined
+    if (files.length === 1) return files[0]
+
+    // Don't change the torrent if the player ended
     if (this.torrent && this.torrent.progress === 1 && this.player.ended()) return this.currentVideoFile
 
     if (!averageDownloadSpeed) averageDownloadSpeed = this.getAndSaveActualDownloadSpeed()
@@ -371,32 +374,31 @@ class WebTorrentPlugin extends Plugin {
 
     // We take the first resolution just above the player height
     // Example: player height is 530px, we want the 720p file instead of 480p
-    let maxResolution = this.videoFiles[0].resolution.id
-    for (let i = this.videoFiles.length - 1; i >= 0; i--) {
-      const resolutionId = this.videoFiles[i].resolution.id
-      if (resolutionId >= playerHeight) {
+    let maxResolution = files[0].resolution.id
+    for (let i = files.length - 1; i >= 0; i--) {
+      const resolutionId = files[i].resolution.id
+      if (resolutionId !== 0 && resolutionId >= playerHeight) {
         maxResolution = resolutionId
         break
       }
     }
 
     // Filter videos we can play according to our screen resolution and bandwidth
-    const filteredFiles = this.videoFiles
-                              .filter(f => f.resolution.id <= maxResolution)
-                              .filter(f => {
-                                const fileBitrate = (f.size / this.videoDuration)
-                                let threshold = fileBitrate
+    const filteredFiles = files.filter(f => f.resolution.id <= maxResolution)
+                               .filter(f => {
+                                 const fileBitrate = (f.size / this.videoDuration)
+                                 let threshold = fileBitrate
 
-                                // If this is for a higher resolution or an initial load: add a margin
-                                if (!this.currentVideoFile || f.resolution.id > this.currentVideoFile.resolution.id) {
-                                  threshold += ((fileBitrate * this.CONSTANTS.AUTO_QUALITY_THRESHOLD_PERCENT) / 100)
-                                }
+                                 // If this is for a higher resolution or an initial load: add a margin
+                                 if (!this.currentVideoFile || f.resolution.id > this.currentVideoFile.resolution.id) {
+                                   threshold += ((fileBitrate * this.CONSTANTS.AUTO_QUALITY_THRESHOLD_PERCENT) / 100)
+                                 }
 
-                                return averageDownloadSpeed > threshold
-                              })
+                                 return averageDownloadSpeed > threshold
+                               })
 
     // If the download speed is too bad, return the lowest resolution we have
-    if (filteredFiles.length === 0) return videoFileMinByResolution(this.videoFiles)
+    if (filteredFiles.length === 0) return videoFileMinByResolution(files)
 
     return videoFileMaxByResolution(filteredFiles)
   }
@@ -418,7 +420,7 @@ class WebTorrentPlugin extends Plugin {
   private initializePlayer () {
     this.buildQualities()
 
-    if (this.autoplay === true) {
+    if (this.autoplay) {
       this.player.posterImage.hide()
 
       return this.updateVideoFile(undefined, { forcePlay: true, seek: this.startTime })
@@ -542,10 +544,6 @@ class WebTorrentPlugin extends Plugin {
 
   private disableErrorDisplay () {
     this.player.removeClass('vjs-error-display-enabled')
-  }
-
-  private isIOS () {
-    return !!navigator.platform && /iPad|iPhone|iPod/.test(navigator.platform)
   }
 
   private pickAverageVideoFile () {

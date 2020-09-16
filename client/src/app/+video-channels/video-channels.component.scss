@@ -40,6 +40,13 @@
   }
 }
 
+.margin-content {
+  // margin-content is required, but child views have their own margins
+  // that match views outside the scope of accounts, so we only align
+  // them with the margins of .sub-menu when required.
+  margin: 0;
+}
+
 .right-buttons {
   display: flex;
   height: max-content;
@@ -65,5 +72,18 @@
 
   my-subscribe-button {
     height: min-content;
+  }
+}
+
+@media screen and (max-width: $mobile-view) {
+  .sub-menu {
+    .actor {
+      flex-direction: column;
+
+      .actor-info .actor-names {
+        flex-direction: column;
+        align-items: normal;
+      }
+    }
   }
 }

@@ -1,5 +1,6 @@
-import { NSFWPolicyType } from '../videos/nsfw-policy.type'
 import { ClientScript } from '../plugins/plugin-package-json.model'
+import { NSFWPolicyType } from '../videos/nsfw-policy.type'
+import { BroadcastMessageLevel } from './broadcast-message-level.type'
 
 export interface ServerConfigPlugin {
   name: string
@@ -10,6 +11,22 @@ export interface ServerConfigPlugin {
 
 export interface ServerConfigTheme extends ServerConfigPlugin {
   css: string[]
+}
+
+export interface RegisteredExternalAuthConfig {
+  npmName: string
+  name: string
+  version: string
+  authName: string
+  authDisplayName: string
+}
+
+export interface RegisteredIdAndPassAuthConfig {
+  npmName: string
+  name: string
+  version: string
+  authName: string
+  weight: number
 }
 
 export interface ServerConfig {
@@ -33,10 +50,21 @@ export interface ServerConfig {
       users: boolean
       anonymous: boolean
     }
+
+    searchIndex: {
+      enabled: boolean
+      url: string
+      disableLocalSearch: boolean
+      isDefaultSearch: boolean
+    }
   }
 
   plugin: {
     registered: ServerConfigPlugin[]
+
+    registeredExternalAuths: RegisteredExternalAuthConfig[]
+
+    registeredIdAndPassAuths: RegisteredIdAndPassAuthConfig[]
   }
 
   theme: {
@@ -140,5 +168,12 @@ export interface ServerConfig {
         indexUrl: string
       }
     }
+  }
+
+  broadcastMessage: {
+    enabled: boolean
+    message: string
+    level: BroadcastMessageLevel
+    dismissable: boolean
   }
 }

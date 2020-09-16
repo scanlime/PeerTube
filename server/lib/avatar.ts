@@ -1,7 +1,7 @@
 import 'multer'
 import { sendUpdateActor } from './activitypub/send'
 import { AVATARS_SIZE, LRU_CACHE, QUEUE_CONCURRENCY } from '../initializers/constants'
-import { updateActorAvatarInstance } from './activitypub'
+import { updateActorAvatarInstance } from './activitypub/actor'
 import { processImage } from '../helpers/image-utils'
 import { extname, join } from 'path'
 import { retryTransactionWrapper } from '../helpers/database-utils'
@@ -11,7 +11,7 @@ import { sequelizeTypescript } from '../initializers/database'
 import * as LRUCache from 'lru-cache'
 import { queue } from 'async'
 import { downloadImage } from '../helpers/requests'
-import { MAccountDefault, MChannelDefault } from '../typings/models'
+import { MAccountDefault, MChannelDefault } from '../types/models'
 
 async function updateActorAvatarFile (
   avatarPhysicalFile: Express.Multer.File,

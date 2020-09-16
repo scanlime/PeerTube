@@ -5,6 +5,10 @@
   @include create-button;
 }
 
+input[type=text] {
+  @include peertube-input-text(300px);
+}
+
 ::ng-deep .action-button {
   &.action-button-delete {
     margin-right: 10px;
@@ -34,13 +38,7 @@
 }
 
 .video-playlists-header {
-  display: flex;
-  justify-content: space-between;
-  margin: 20px 0 50px;
-
-  input[type=text] {
-    @include peertube-input-text(300px);
-  }
+  margin-bottom: 30px;
 }
 
 @media screen and (max-width: $small-view) {
@@ -64,6 +62,17 @@
 
     .miniature-name {
       max-width: $video-thumbnail-width;
+    }
+  }
+}
+
+@media screen and (max-width: $mobile-view) {
+  .video-playlists-header {
+    flex-direction: column;
+
+    input[type=text] {
+      width: 100% !important;
+      margin-bottom: 12px;
     }
   }
 }

@@ -1,43 +1,73 @@
+<h1>
+  <my-global-icon iconName="follower" aria-hidden="true"></my-global-icon>
+  <ng-container i18n>Instances following you</ng-container>
+</h1>
+
 <p-table
-  [value]="followers" [lazy]="true" [paginator]="true" [totalRecords]="totalRecords" [rows]="rowsPerPage"
-  [sortField]="sort.field" [sortOrder]="sort.order" (onLazyLoad)="loadLazy($event)"
+  [value]="followers" [lazy]="true" [paginator]="totalRecords > 0" [totalRecords]="totalRecords" [rows]="rowsPerPage" [rowsPerPageOptions]="rowsPerPageOptions"
+  [sortField]="sort.field" [sortOrder]="sort.order" (onLazyLoad)="loadLazy($event)" (onPage)="onPage($event)"
+  [showCurrentPageReport]="true" i18n-currentPageReportTemplate
+  currentPageReportTemplate="Showing {{'{first}'}} to {{'{last}'}} of {{'{totalRecords}'}} followers"
 >
   <ng-template pTemplate="caption">
     <div class="caption">
-      <input
-        type="text" name="table-filter" id="table-filter" i18n-placeholder placeholder="Filter..."
-        (keyup)="onSearch($event)"
-      >
+      <div class="ml-auto has-feedback has-clear">
+        <input
+          type="text" name="table-filter" id="table-filter" i18n-placeholder placeholder="Filter..."
+          (keyup)="onSearch($event)"
+        >
+        <a class="glyphicon glyphicon-remove-sign form-control-feedback form-control-clear" (click)="resetSearch()"></a>
+        <span class="sr-only" i18n>Clear filters</span>
+      </div>
     </div>
   </ng-template>
 
   <ng-template pTemplate="header">
     <tr>
+      <th style="width: 150px;">Actions</th>
       <th i18n>Follower handle</th>
-      <th i18n pSortableColumn="state">State <p-sortIcon field="state"></p-sortIcon></th>
-      <th i18n pSortableColumn="score">Score <p-sortIcon field="score"></p-sortIcon></th>
-      <th i18n pSortableColumn="createdAt">Created <p-sortIcon field="createdAt"></p-sortIcon></th>
-      <th></th>
+      <th style="width: 100px;" i18n pSortableColumn="state">State <p-sortIcon field="state"></p-sortIcon></th>
+      <th style="width: 100px;" i18n pSortableColumn="score">Score <p-sortIcon field="score"></p-sortIcon></th>
+      <th style="width: 150px;" i18n pSortableColumn="createdAt">Created <p-sortIcon field="createdAt"></p-sortIcon></th>
     </tr>
   </ng-template>
 
   <ng-template pTemplate="body" let-follow>
     <tr>
-      <td><a [href]="follow.follower.url" target="_blank" rel="noopener noreferrer">{{ follow.follower.name + '@' + follow.follower.host }}</a></td>
-
-      <td *ngIf="follow.state === 'accepted'" i18n>Accepted</td>
-      <td *ngIf="follow.state === 'pending'" i18n>Pending</td>
-
-      <td>{{ follow.score }}</td>
-      <td>{{ follow.createdAt }}</td>
-
       <td class="action-cell">
         <ng-container *ngIf="follow.state === 'pending'">
-          <my-button i18n-label label="Accept" icon="tick" (click)="acceptFollower(follow)"></my-button>
-          <my-button i18n-label label="Refuse" icon="cross" (click)="rejectFollower(follow)"></my-button>
+          <my-button i18n-title title="Accept" icon="tick" (click)="acceptFollower(follow)"></my-button>
+          <my-button i18n-title title="Refuse" icon="cross" (click)="rejectFollower(follow)"></my-button>
         </ng-container>
 
-        <my-delete-button *ngIf="follow.state === 'accepted'" (click)="deleteFollower(follow)"></my-delete-button>
+        <my-delete-button label *ngIf="follow.state === 'accepted'" (click)="deleteFollower(follow)"></my-delete-button>
+      </td>
+      <td>
+        <a [href]="follow.follower.url" i18n-title title="Open actor page in a new tab" target="_blank" rel="noopener noreferrer">
+          {{ follow.follower.name + '@' + follow.follower.host }}
+          <span class="glyphicon glyphicon-new-window"></span>
+        </a>
+      </td>
+
+      <td *ngIf="follow.state === 'accepted'">
+        <span class="badge badge-green" i18n>Accepted</span>
+      </td>
+      <td *ngIf="follow.state === 'pending'">
+        <span class="badge badge-yellow" i18n>Pending</span>
+      </td>
+
+      <td>{{ follow.score }}</td>
+      <td>{{ follow.createdAt | date: 'short' }}</td>
+    </tr>
+  </ng-template>
+
+  <ng-template pTemplate="emptymessage">
+    <tr>
+      <td colspan="6">
+        <div class="no-results">
+          <ng-container *ngIf="search" i18n>No follower found matching current filters.</ng-container>
+          <ng-container *ngIf="!search" i18n>Your instance doesn't have any follower.</ng-container>
+        </div>
       </td>
     </tr>
   </ng-template>

@@ -2,7 +2,7 @@
 // We duplicated this plugin to choose the hls.js version we want, because streamroot only provide a bundled file
 
 import * as Hlsjs from 'hls.js/dist/hls.light.js'
-import videojs, { VideoJsPlayer } from 'video.js'
+import videojs from 'video.js'
 import { HlsjsConfigHandlerOptions, QualityLevelRepresentation, QualityLevels, VideoJSTechHLS } from '../peertube-videojs-typings'
 
 type ErrorCounts = {
@@ -13,7 +13,7 @@ type Metadata = {
   levels: Hlsjs.Level[]
 }
 
-type CustomAudioTrack = AudioTrack & { name?: string, lang?: string }
+type CustomAudioTrack = Hlsjs.AudioTrack & { name?: string, lang?: string }
 
 const registerSourceHandler = function (vjs: typeof videojs) {
   if (!Hlsjs.isSupported()) {
@@ -55,7 +55,7 @@ const registerSourceHandler = function (vjs: typeof videojs) {
   (vjs as any).Html5Hlsjs = Html5Hlsjs
 }
 
-function hlsjsConfigHandler (this: VideoJsPlayer, options: HlsjsConfigHandlerOptions) {
+function hlsjsConfigHandler (this: videojs.Player, options: HlsjsConfigHandlerOptions) {
   const player = this
 
   if (!options) return
@@ -88,7 +88,7 @@ class Html5Hlsjs {
 
   private readonly videoElement: HTMLVideoElement
   private readonly errorCounts: ErrorCounts = {}
-  private readonly player: VideoJsPlayer
+  private readonly player: videojs.Player
   private readonly tech: videojs.Tech
   private readonly source: videojs.Tech.SourceObject
   private readonly vjs: typeof videojs
@@ -179,8 +179,6 @@ class Html5Hlsjs {
 
     this.player.textTracks().removeEventListener('change', this.handlers.textTracksChange)
     this.uiTextTrackHandled = false
-
-    this.player.audioTracks().removeEventListener('change', this.handlers.audioTracksChange)
 
     this.hls.destroy()
   }

@@ -19,7 +19,6 @@ import { AvatarModel } from '../../models/avatar/avatar'
 import { ServerModel } from '../../models/server/server'
 import { VideoChannelModel } from '../../models/video/video-channel'
 import { JobQueue } from '../job-queue'
-import { getServerActor } from '../../helpers/utils'
 import { ActorFetchByUrlType, fetchActorByUrl } from '../../helpers/actor'
 import { sequelizeTypescript } from '../../initializers/database'
 import {
@@ -34,8 +33,9 @@ import {
   MActorFullActor,
   MActorId,
   MChannel
-} from '../../typings/models'
+} from '../../types/models'
 import { extname } from 'path'
+import { getServerActor } from '@server/models/application/application'
 
 // Set account keys, this could be long so process after the account creation and do not block the client
 function setAsyncActorKeys <T extends MActor> (actor: T) {
@@ -117,7 +117,7 @@ async function getOrCreateActorAndServerAndModel (
   if (actor.VideoChannel) (actor as MActorAccountChannelIdActor).VideoChannel.Actor = actor
 
   const { actor: actorRefreshed, refreshed } = await retryTransactionWrapper(refreshActorIfNeeded, actor, fetchType)
-  if (!actorRefreshed) throw new Error('Actor ' + actorRefreshed.url + ' does not exist anymore.')
+  if (!actorRefreshed) throw new Error('Actor ' + actor.url + ' does not exist anymore.')
 
   if ((created === true || refreshed === true) && updateCollections === true) {
     const payload = { uri: actor.outboxUrl, type: 'activity' as 'activity' }
@@ -166,7 +166,7 @@ async function updateActorInstance (actorInstance: ActorModel, attributes: Activ
   actorInstance.followersUrl = attributes.followers
   actorInstance.followingUrl = attributes.following
 
-  if (attributes.endpoints && attributes.endpoints.sharedInbox) {
+  if (attributes.endpoints?.sharedInbox) {
     actorInstance.sharedInboxUrl = attributes.endpoints.sharedInbox
   }
 }
@@ -457,7 +457,7 @@ async function fetchRemoteActor (actorUrl: string): Promise<{ statusCode?: numbe
     followersUrl: actorJSON.followers,
     followingUrl: actorJSON.following,
 
-    sharedInboxUrl: actorJSON.endpoints && actorJSON.endpoints.sharedInbox
+    sharedInboxUrl: actorJSON.endpoints?.sharedInbox
       ? actorJSON.endpoints.sharedInbox
       : null
   })

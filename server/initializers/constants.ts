@@ -1,8 +1,17 @@
 import { join } from 'path'
-import { JobType, VideoRateType, VideoResolution, VideoState } from '../../shared/models'
+import { randomBytes } from 'crypto'
 import { ActivityPubActorType } from '../../shared/models/activitypub'
 import { FollowState } from '../../shared/models/actors'
-import { VideoAbuseState, VideoImportState, VideoPrivacy, VideoTranscodingFPS } from '../../shared/models/videos'
+import {
+  AbuseState,
+  VideoImportState,
+  VideoPrivacy,
+  VideoTranscodingFPS,
+  JobType,
+  VideoRateType,
+  VideoResolution,
+  VideoState
+} from '../../shared/models'
 // Do not use barrels, remain constants as independent as possible
 import { isTestInstance, sanitizeHost, sanitizeUrl, root } from '../helpers/core-utils'
 import { NSFWPolicyType } from '../../shared/models/videos/nsfw-policy.type'
@@ -14,7 +23,7 @@ import { CONFIG, registerConfigChangedHandler } from './config'
 
 // ---------------------------------------------------------------------------
 
-const LAST_MIGRATION_VERSION = 485
+const LAST_MIGRATION_VERSION = 530
 
 // ---------------------------------------------------------------------------
 
@@ -46,11 +55,10 @@ const WEBSERVER = {
 
 // Sortable columns per schema
 const SORTABLE_COLUMNS = {
-  USERS: [ 'id', 'username', 'videoQuotaUsed', 'createdAt' ],
+  USERS: [ 'id', 'username', 'videoQuotaUsed', 'createdAt', 'lastLoginDate', 'role' ],
   USER_SUBSCRIPTIONS: [ 'id', 'createdAt' ],
   ACCOUNTS: [ 'createdAt' ],
   JOBS: [ 'createdAt' ],
-  VIDEO_ABUSES: [ 'id', 'createdAt', 'state' ],
   VIDEO_CHANNELS: [ 'id', 'name', 'updatedAt', 'createdAt' ],
   VIDEO_IMPORTS: [ 'createdAt' ],
   VIDEO_COMMENT_THREADS: [ 'createdAt', 'totalReplies' ],
@@ -59,15 +67,18 @@ const SORTABLE_COLUMNS = {
   FOLLOWERS: [ 'createdAt', 'state', 'score' ],
   FOLLOWING: [ 'createdAt', 'redundancyAllowed', 'state' ],
 
-  VIDEOS: [ 'name', 'duration', 'createdAt', 'publishedAt', 'views', 'likes', 'trending' ],
+  VIDEOS: [ 'name', 'duration', 'createdAt', 'publishedAt', 'originallyPublishedAt', 'views', 'likes', 'trending' ],
 
-  VIDEOS_SEARCH: [ 'name', 'duration', 'createdAt', 'publishedAt', 'views', 'likes', 'match' ],
+  // Don't forget to update peertube-search-index with the same values
+  VIDEOS_SEARCH: [ 'name', 'duration', 'createdAt', 'publishedAt', 'originallyPublishedAt', 'views', 'likes', 'match' ],
   VIDEO_CHANNELS_SEARCH: [ 'match', 'displayName', 'createdAt' ],
+
+  ABUSES: [ 'id', 'createdAt', 'state' ],
 
   ACCOUNTS_BLOCKLIST: [ 'createdAt' ],
   SERVERS_BLOCKLIST: [ 'createdAt' ],
 
-  USER_NOTIFICATIONS: [ 'createdAt' ],
+  USER_NOTIFICATIONS: [ 'createdAt', 'read' ],
 
   VIDEO_PLAYLISTS: [ 'displayName', 'createdAt', 'updatedAt' ],
 
@@ -145,11 +156,11 @@ const JOB_CONCURRENCY: { [id in JobType]: number } = {
 const JOB_TTL: { [id in JobType]: number } = {
   'activitypub-http-broadcast': 60000 * 10, // 10 minutes
   'activitypub-http-unicast': 60000 * 10, // 10 minutes
-  'activitypub-http-fetcher': 60000 * 10, // 10 minutes
+  'activitypub-http-fetcher': 1000 * 3600 * 10, // 10 hours
   'activitypub-follow': 60000 * 10, // 10 minutes
   'video-file-import': 1000 * 3600, // 1 hour
   'video-transcoding': 1000 * 3600 * 48, // 2 days, transcoding could be long
-  'video-import': 1000 * 3600 * 2, //  hours
+  'video-import': 1000 * 3600 * 2, // 2 hours
   'email': 60000 * 10, // 10 minutes
   'videos-views': undefined, // Unlimited
   'activitypub-refresher': 60000 * 10, // 10 minutes
@@ -178,10 +189,6 @@ const SCHEDULER_INTERVALS_MS = {
   removeOldHistory: 60000 * 60 * 24 // 1 day
 }
 
-const INSTANCES_INDEX = {
-  HOSTS_PATH: '/api/v1/instances/hosts'
-}
-
 // ---------------------------------------------------------------------------
 
 const CONSTRAINTS_FIELDS = {
@@ -195,9 +202,12 @@ const CONSTRAINTS_FIELDS = {
     VIDEO_LANGUAGES: { max: 500 }, // Array length
     BLOCKED_REASON: { min: 3, max: 250 } // Length
   },
-  VIDEO_ABUSES: {
+  ABUSES: {
     REASON: { min: 2, max: 3000 }, // Length
     MODERATION_COMMENT: { min: 2, max: 3000 } // Length
+  },
+  ABUSE_MESSAGES: {
+    MESSAGE: { min: 2, max: 3000 } // Length
   },
   VIDEO_BLACKLIST: {
     REASON: { min: 2, max: 300 } // Length
@@ -283,7 +293,7 @@ const CONSTRAINTS_FIELDS = {
     COUNT: { min: 0 }
   },
   VIDEO_COMMENTS: {
-    TEXT: { min: 1, max: 3000 }, // Length
+    TEXT: { min: 1, max: 10000 }, // Length
     URL: { min: 3, max: 2000 } // Length
   },
   VIDEO_SHARE: {
@@ -376,13 +386,14 @@ const VIDEO_STATES = {
 const VIDEO_IMPORT_STATES = {
   [VideoImportState.FAILED]: 'Failed',
   [VideoImportState.PENDING]: 'Pending',
-  [VideoImportState.SUCCESS]: 'Success'
+  [VideoImportState.SUCCESS]: 'Success',
+  [VideoImportState.REJECTED]: 'Rejected'
 }
 
-const VIDEO_ABUSE_STATES = {
-  [VideoAbuseState.PENDING]: 'Pending',
-  [VideoAbuseState.REJECTED]: 'Rejected',
-  [VideoAbuseState.ACCEPTED]: 'Accepted'
+const ABUSE_STATES = {
+  [AbuseState.PENDING]: 'Pending',
+  [AbuseState.REJECTED]: 'Rejected',
+  [AbuseState.ACCEPTED]: 'Accepted'
 }
 
 const VIDEO_PLAYLIST_PRIVACIES = {
@@ -406,12 +417,15 @@ const MIMETYPES = {
       'audio/x-ms-wma': '.wma',
       'audio/wav': '.wav',
       'audio/x-flac': '.flac',
-      'audio/flac': '.flac'
+      'audio/flac': '.flac',
+      '‎audio/aac': '.aac',
+      'audio/ac3': '.ac3'
     },
     EXT_MIMETYPE: null as { [ id: string ]: string }
   },
   VIDEO: {
-    MIMETYPE_EXT: null as { [ id: string ]: string },
+    MIMETYPE_EXT: null as { [ id: string ]: string | string[] },
+    MIMETYPES_REGEX: null as string,
     EXT_MIMETYPE: null as { [ id: string ]: string }
   },
   IMAGE: {
@@ -464,7 +478,7 @@ const ACTIVITY_PUB = {
   ACCEPT_HEADER: 'application/activity+json, application/ld+json',
   PUBLIC: 'https://www.w3.org/ns/activitystreams#Public',
   COLLECTION_ITEMS_PER_PAGE: 10,
-  FETCH_PAGE_LIMIT: 100,
+  FETCH_PAGE_LIMIT: 2000,
   URL_MIME_TYPES: {
     VIDEO: [] as string[],
     TORRENT: [ 'application/x-bittorrent' ],
@@ -531,8 +545,8 @@ const STATIC_DOWNLOAD_PATHS = {
 }
 const LAZY_STATIC_PATHS = {
   AVATARS: '/lazy-static/avatars/',
-  PREVIEWS: '/static/previews/',
-  VIDEO_CAPTIONS: '/static/video-captions/'
+  PREVIEWS: '/lazy-static/previews/',
+  VIDEO_CAPTIONS: '/lazy-static/video-captions/'
 }
 
 // Cache control
@@ -635,7 +649,8 @@ const AUDIT_LOG_FILENAME = 'peertube-audit.log'
 const TRACKER_RATE_LIMITS = {
   INTERVAL: 60000 * 5, // 5 minutes
   ANNOUNCES_PER_IP_PER_INFOHASH: 15, // maximum announces per torrent in the interval
-  ANNOUNCES_PER_IP: 30 // maximum announces for all our torrents in the interval
+  ANNOUNCES_PER_IP: 30, // maximum announces for all our torrents in the interval
+  BLOCK_IP_LIFETIME: 60000 * 10 // 10 minutes
 }
 
 const P2P_MEDIA_LOADER_PEER_VERSION = 2
@@ -645,8 +660,19 @@ const P2P_MEDIA_LOADER_PEER_VERSION = 2
 const PLUGIN_GLOBAL_CSS_FILE_NAME = 'plugins-global.css'
 const PLUGIN_GLOBAL_CSS_PATH = join(CONFIG.STORAGE.TMP_DIR, PLUGIN_GLOBAL_CSS_FILE_NAME)
 
+let PLUGIN_EXTERNAL_AUTH_TOKEN_LIFETIME = 1000 * 60 * 5 // 5 minutes
+
 const DEFAULT_THEME_NAME = 'default'
 const DEFAULT_USER_THEME_NAME = 'instance-default'
+
+// ---------------------------------------------------------------------------
+
+const SEARCH_INDEX = {
+  ROUTES: {
+    VIDEOS: '/api/v1/search/videos',
+    VIDEO_CHANNELS: '/api/v1/search/video-channels'
+  }
+}
 
 // ---------------------------------------------------------------------------
 
@@ -686,6 +712,8 @@ if (isTestInstance() === true) {
   FILES_CACHE.VIDEO_CAPTIONS.MAX_AGE = 3000
   MEMOIZE_TTL.OVERVIEWS_SAMPLE = 3000
   OVERVIEWS.VIDEOS.SAMPLE_THRESHOLD = 2
+
+  PLUGIN_EXTERNAL_AUTH_TOKEN_LIFETIME = 5000
 }
 
 updateWebserverUrls()
@@ -698,11 +726,20 @@ registerConfigChangedHandler(() => {
 
 // ---------------------------------------------------------------------------
 
+const FILES_CONTENT_HASH = {
+  MANIFEST: generateContentHash(),
+  FAVICON: generateContentHash(),
+  LOGO: generateContentHash()
+}
+
+// ---------------------------------------------------------------------------
+
 export {
   WEBSERVER,
   API_VERSION,
   PEERTUBE_VERSION,
   LAZY_STATIC_PATHS,
+  SEARCH_INDEX,
   HLS_REDUNDANCY_DIRECTORY,
   P2P_MEDIA_LOADER_PEER_VERSION,
   AVATARS_SIZE,
@@ -726,7 +763,6 @@ export {
   PREVIEWS_SIZE,
   REMOTE_SCHEME,
   FOLLOW_STATES,
-  INSTANCES_INDEX,
   DEFAULT_USER_THEME_NAME,
   SERVER_ACTOR_NAME,
   PLUGIN_GLOBAL_CSS_FILE_NAME,
@@ -757,7 +793,7 @@ export {
   VIDEO_RATE_TYPES,
   VIDEO_TRANSCODING_FPS,
   FFMPEG_NICE,
-  VIDEO_ABUSE_STATES,
+  ABUSE_STATES,
   VIDEO_CHANNELS,
   LRU_CACHE,
   JOB_REQUEST_TIMEOUT,
@@ -778,32 +814,70 @@ export {
   VIDEO_VIEW_LIFETIME,
   CONTACT_FORM_LIFETIME,
   VIDEO_PLAYLIST_PRIVACIES,
+  PLUGIN_EXTERNAL_AUTH_TOKEN_LIFETIME,
   ASSETS_PATH,
+  FILES_CONTENT_HASH,
   loadLanguages,
-  buildLanguages
+  buildLanguages,
+  generateContentHash
 }
 
 // ---------------------------------------------------------------------------
 
 function buildVideoMimetypeExt () {
   const data = {
+    // streamable formats that warrant cross-browser compatibility
     'video/webm': '.webm',
-    'video/ogg': '.ogv',
+    // We'll add .ogg if additional extensions are enabled
+    // We could add .ogg here but since it could be an audio file,
+    // it would be confusing for users because PeerTube will refuse their file (based on the mimetype)
+    'video/ogg': [ '.ogv' ],
     'video/mp4': '.mp4'
   }
 
   if (CONFIG.TRANSCODING.ENABLED) {
     if (CONFIG.TRANSCODING.ALLOW_ADDITIONAL_EXTENSIONS) {
+      data['video/ogg'].push('.ogg')
+
       Object.assign(data, {
-        'video/quicktime': '.mov',
-        'video/x-msvideo': '.avi',
-        'video/x-flv': '.flv',
         'video/x-matroska': '.mkv',
-        'video/avi': '.avi',
+
+        // Developed by Apple
+        'video/quicktime': [ '.mov', '.qt', '.mqv' ], // often used as output format by editing software
         'video/x-m4v': '.m4v',
+        'video/m4v': '.m4v',
+
+        // Developed by the Adobe Flash Platform
+        'video/x-flv': '.flv',
+        'video/x-f4v': '.f4v', // replacement for flv
+
+        // Developed by Microsoft
+        'video/x-ms-wmv': '.wmv',
+        'video/x-msvideo': '.avi',
+        'video/avi': '.avi',
+
+        // Developed by 3GPP
+        // common video formats for cell phones
+        'video/3gpp': [ '.3gp', '.3gpp' ],
+        'video/3gpp2': [ '.3g2', '.3gpp2' ],
+
+        // Developed by FFmpeg/Mplayer
+        'application/x-nut': '.nut',
+
+        // The standard video format used by many Sony and Panasonic HD camcorders.
+        // It is also used for storing high definition video on Blu-ray discs.
+        'video/mp2t': '.mts',
+        'video/m2ts': '.m2ts',
+
+        // Old formats reliant on MPEG-1/MPEG-2
+        'video/mpv': '.mpv',
+        'video/mpeg2': '.m2v',
+        'video/mpeg': [ '.m1v', '.mpg', '.mpe', '.mpeg', '.vob' ],
+        'video/dvd': '.vob',
+
         // Could be anything
         'application/octet-stream': null,
-        'video/m4v': '.m4v'
+        'application/mxf': '.mxf' // often used as exchange format by editing software
       })
     }
 
@@ -826,14 +900,36 @@ function updateWebserverUrls () {
 
 function updateWebserverConfig () {
   MIMETYPES.VIDEO.MIMETYPE_EXT = buildVideoMimetypeExt()
-  MIMETYPES.VIDEO.EXT_MIMETYPE = invert(MIMETYPES.VIDEO.MIMETYPE_EXT)
+  MIMETYPES.VIDEO.MIMETYPES_REGEX = buildMimetypesRegex(MIMETYPES.VIDEO.MIMETYPE_EXT)
+
   ACTIVITY_PUB.URL_MIME_TYPES.VIDEO = Object.keys(MIMETYPES.VIDEO.MIMETYPE_EXT)
 
-  CONSTRAINTS_FIELDS.VIDEOS.EXTNAME = buildVideosExtname()
+  MIMETYPES.VIDEO.EXT_MIMETYPE = buildVideoExtMimetype(MIMETYPES.VIDEO.MIMETYPE_EXT)
+
+  CONSTRAINTS_FIELDS.VIDEOS.EXTNAME = Object.keys(MIMETYPES.VIDEO.EXT_MIMETYPE)
 }
 
-function buildVideosExtname () {
-  return Object.keys(MIMETYPES.VIDEO.EXT_MIMETYPE)
+function buildVideoExtMimetype (obj: { [ id: string ]: string | string[] }) {
+  const result: { [id: string]: string } = {}
+
+  for (const mimetype of Object.keys(obj)) {
+    const value = obj[mimetype]
+    if (!value) continue
+
+    const extensions = Array.isArray(value) ? value : [ value ]
+
+    for (const extension of extensions) {
+      result[extension] = mimetype
+    }
+  }
+
+  return result
+}
+
+function buildMimetypesRegex (obj: { [id: string]: string | string[] }) {
+  return Object.keys(obj)
+    .map(m => `(${m})`)
+    .join('|')
 }
 
 function loadLanguages () {
@@ -860,7 +956,9 @@ function buildLanguages () {
     jsl: true, // Japanese sign language
     sfs: true, // South African sign language
     swl: true, // Swedish sign language
-    rsl: true, // Russian sign language: true
+    rsl: true, // Russian sign language
+
+    kab: true, // Kabyle
 
     epo: true, // Esperanto
     tlh: true, // Klingon
@@ -881,4 +979,8 @@ function buildLanguages () {
   languages['el'] = 'Greek'
 
   return languages
+}
+
+function generateContentHash () {
+  return randomBytes(20).toString('hex')
 }

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-expressions,@typescript-eslint/require-await */
 
 import 'mocha'
-
+import { AbuseState, VideoAbuseCreate } from '@shared/models'
 import {
   cleanupTests,
   createUser,
@@ -20,7 +20,8 @@ import {
   checkBadSortPagination,
   checkBadStartPagination
 } from '../../../../shared/extra-utils/requests/check-api-params'
-import { VideoAbuseState } from '../../../../shared/models/videos'
+
+// FIXME: deprecated in 2.3. Remove this controller
 
 describe('Test video abuses API validators', function () {
   let server: ServerInfo
@@ -76,6 +77,22 @@ describe('Test video abuses API validators', function () {
         statusCodeExpected: 403
       })
     })
+
+    it('Should fail with a bad id filter', async function () {
+      await makeGetRequest({ url: server.url, path, token: server.accessToken, query: { id: 'toto' } })
+    })
+
+    it('Should fail with a bad state filter', async function () {
+      await makeGetRequest({ url: server.url, path, token: server.accessToken, query: { state: 'toto' } })
+    })
+
+    it('Should fail with a bad videoIs filter', async function () {
+      await makeGetRequest({ url: server.url, path, token: server.accessToken, query: { videoIs: 'toto' } })
+    })
+
+    it('Should succeed with the correct params', async function () {
+      await makeGetRequest({ url: server.url, path, token: server.accessToken, query: { id: 13 }, statusCodeExpected: 200 })
+    })
   })
 
   describe('When reporting a video abuse', function () {
@@ -116,22 +133,33 @@ describe('Test video abuses API validators', function () {
       await makePostBodyRequest({ url: server.url, path, token: server.accessToken, fields })
     })
 
-    it('Should succeed with the correct parameters', async function () {
-      const fields = { reason: 'super reason' }
+    it('Should succeed with the correct parameters (basic)', async function () {
+      const fields = { reason: 'my super reason' }
 
       const res = await makePostBodyRequest({ url: server.url, path, token: server.accessToken, fields, statusCodeExpected: 200 })
-      videoAbuseId = res.body.videoAbuse.id
+      videoAbuseId = res.body.abuse.id
+    })
+
+    it('Should fail with a wrong predefined reason', async function () {
+      const fields = { reason: 'my super reason', predefinedReasons: [ 'wrongPredefinedReason' ] }
+
+      await makePostBodyRequest({ url: server.url, path, token: server.accessToken, fields })
+    })
+
+    it('Should fail with negative timestamps', async function () {
+      const fields = { reason: 'my super reason', startAt: -1 }
+
+      await makePostBodyRequest({ url: server.url, path, token: server.accessToken, fields })
+    })
+
+    it('Should succeed with the corret parameters (advanced)', async function () {
+      const fields: VideoAbuseCreate = { reason: 'my super reason', predefinedReasons: [ 'serverRules' ], startAt: 1, endAt: 5 }
+
+      await makePostBodyRequest({ url: server.url, path, token: server.accessToken, fields, statusCodeExpected: 200 })
     })
   })
 
   describe('When updating a video abuse', function () {
-    const basePath = '/api/v1/videos/'
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    let path: string
-
-    before(() => {
-      path = basePath + server.video.id + '/abuse/' + videoAbuseId
-    })
 
     it('Should fail with a non authenticated user', async function () {
       await updateVideoAbuse(server.url, 'blabla', server.video.uuid, videoAbuseId, {}, 401)
@@ -157,19 +185,12 @@ describe('Test video abuses API validators', function () {
     })
 
     it('Should succeed with the correct params', async function () {
-      const body = { state: VideoAbuseState.ACCEPTED }
+      const body = { state: AbuseState.ACCEPTED }
       await updateVideoAbuse(server.url, server.accessToken, server.video.uuid, videoAbuseId, body)
     })
   })
 
   describe('When deleting a video abuse', function () {
-    const basePath = '/api/v1/videos/'
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    let path: string
-
-    before(() => {
-      path = basePath + server.video.id + '/abuse/' + videoAbuseId
-    })
 
     it('Should fail with a non authenticated user', async function () {
       await deleteVideoAbuse(server.url, 'blabla', server.video.uuid, videoAbuseId, 401)

@@ -1,7 +1,7 @@
 import './embed.scss'
 
 import * as Channel from 'jschannel'
-import { PeerTubeResolution } from '../player/definitions'
+import { PeerTubeResolution, PeerTubeTextTrack } from '../player/definitions'
 import { PeerTubeEmbed } from './embed'
 
 /**
@@ -26,7 +26,7 @@ export class PeerTubeEmbedApi {
   }
 
   private get element () {
-    return this.embed.videoElement
+    return this.embed.playerElement
   }
 
   private constructChannel () {
@@ -44,9 +44,16 @@ export class PeerTubeEmbedApi {
     channel.bind('setResolution', (txn, resolutionId) => this.setResolution(resolutionId))
     channel.bind('getResolutions', (txn, params) => this.resolutions)
 
+    channel.bind('getCaptions', (txn, params) => this.getCaptions())
+    channel.bind('setCaption', (txn, id) => this.setCaption(id)),
+
     channel.bind('setPlaybackRate', (txn, playbackRate) => this.embed.player.playbackRate(playbackRate))
     channel.bind('getPlaybackRate', (txn, params) => this.embed.player.playbackRate())
     channel.bind('getPlaybackRates', (txn, params) => this.embed.player.options_.playbackRates)
+
+    channel.bind('playNextVideo', (txn, params) => this.embed.playNextVideo())
+    channel.bind('playPreviousVideo', (txn, params) => this.embed.playPreviousVideo())
+    channel.bind('getCurrentPosition', (txn, params) => this.embed.getCurrentPosition())
     this.channel = channel
   }
 
@@ -71,6 +78,26 @@ export class PeerTubeEmbedApi {
     this.embed.player.p2pMediaLoader().getHLSJS().nextLevel = resolutionId
   }
 
+  private getCaptions (): PeerTubeTextTrack[] {
+    return this.embed.player.textTracks().tracks_.map(t => {
+      return {
+        id: t.id,
+        src: t.src,
+        label: t.label,
+        mode: t.mode as any
+      }
+    })
+  }
+
+  private setCaption (id: string) {
+    const tracks = this.embed.player.textTracks().tracks_
+
+    for (const track of tracks) {
+      if (track.id === id) track.mode = 'showing'
+      else track.mode = 'disabled'
+    }
+  }
+
   /**
    * Let the host know that we're ready to go!
    */
@@ -85,7 +112,6 @@ export class PeerTubeEmbedApi {
     setInterval(() => {
       const position = this.element.currentTime
       const volume = this.element.volume
-      const duration = this.element.duration
 
       this.channel.notify({
         method: 'playbackStatusUpdate',

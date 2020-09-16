@@ -6,11 +6,11 @@ import { MIMETYPES } from '../../../initializers/constants'
 import { getFormattedObjects } from '../../../helpers/utils'
 import { VideoCaptionModel } from '../../../models/video/video-caption'
 import { logger } from '../../../helpers/logger'
-import { federateVideoIfNeeded } from '../../../lib/activitypub'
+import { federateVideoIfNeeded } from '../../../lib/activitypub/videos'
 import { moveAndProcessCaptionFile } from '../../../helpers/captions-utils'
 import { CONFIG } from '../../../initializers/config'
 import { sequelizeTypescript } from '../../../initializers/database'
-import { MVideoCaptionVideo } from '@server/typings/models'
+import { MVideoCaptionVideo } from '@server/types/models'
 
 const reqVideoCaptionAdd = createReqFiles(
   [ 'captionfile' ],

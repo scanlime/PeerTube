@@ -1,15 +1,15 @@
 import { ActivityDelete } from '../../../../shared/models/activitypub'
 import { retryTransactionWrapper } from '../../../helpers/database-utils'
 import { logger } from '../../../helpers/logger'
-import { sequelizeTypescript } from '../../../initializers'
+import { sequelizeTypescript } from '../../../initializers/database'
 import { ActorModel } from '../../../models/activitypub/actor'
 import { VideoModel } from '../../../models/video/video'
 import { VideoCommentModel } from '../../../models/video/video-comment'
 import { markCommentAsDeleted } from '../../video-comment'
 import { forwardVideoRelatedActivity } from '../send/utils'
 import { VideoPlaylistModel } from '../../../models/video/video-playlist'
-import { APProcessorOptions } from '../../../typings/activitypub-processor.model'
-import { MAccountActor, MActor, MActorSignature, MChannelActor, MChannelActorAccountActor } from '../../../typings/models'
+import { APProcessorOptions } from '../../../types/activitypub-processor.model'
+import { MAccountActor, MActor, MActorSignature, MChannelActor, MChannelActorAccountActor } from '../../../types/models'
 
 async function processDeleteActivity (options: APProcessorOptions<ActivityDelete>) {
   const { activity, byActor } = options

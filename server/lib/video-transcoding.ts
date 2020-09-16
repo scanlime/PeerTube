@@ -17,7 +17,7 @@ import { updateMasterHLSPlaylist, updateSha256Segments } from './hls'
 import { VideoStreamingPlaylistModel } from '../models/video/video-streaming-playlist'
 import { VideoStreamingPlaylistType } from '../../shared/models/videos/video-streaming-playlist.type'
 import { CONFIG } from '../initializers/config'
-import { MStreamingPlaylistFilesVideo, MVideoFile, MVideoWithAllFiles, MVideoWithFile } from '@server/typings/models'
+import { MStreamingPlaylistFilesVideo, MVideoFile, MVideoWithAllFiles, MVideoWithFile } from '@server/types/models'
 import { createTorrentAndSetInfoHash } from '@server/helpers/webtorrent'
 import { generateVideoStreamingPlaylistName, getVideoFilename, getVideoFilePath } from './video-paths'
 
@@ -234,7 +234,7 @@ async function onVideoFileTranscoding (video: MVideoWithFile, videoFile: MVideoF
   const fps = await getVideoFileFPS(transcodingPath)
   const metadata = await getMetadataFromFile(transcodingPath)
 
-  await move(transcodingPath, outputPath)
+  await move(transcodingPath, outputPath, { overwrite: true })
 
   videoFile.size = stats.size
   videoFile.fps = fps
@@ -242,12 +242,8 @@ async function onVideoFileTranscoding (video: MVideoWithFile, videoFile: MVideoF
 
   await createTorrentAndSetInfoHash(video, videoFile)
 
-  const updatedVideoFile = await videoFile.save()
-
-  // Add it if this is a new created file
-  if (video.VideoFiles.some(f => f.id === videoFile.id) === false) {
-    video.VideoFiles.push(updatedVideoFile)
-  }
+  await VideoFileModel.customUpsert(videoFile, 'video', undefined)
+  video.VideoFiles = await video.$get('VideoFiles')
 
   return video
 }

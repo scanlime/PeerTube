@@ -1,22 +1,22 @@
+import { Hooks } from '@server/lib/plugins/hooks'
 import * as express from 'express'
+import { remove, writeJSON } from 'fs-extra'
 import { snakeCase } from 'lodash'
-import { ServerConfig, UserRight } from '../../../shared'
+import validator from 'validator'
+import { RegisteredExternalAuthConfig, RegisteredIdAndPassAuthConfig, ServerConfig, UserRight } from '../../../shared'
 import { About } from '../../../shared/models/server/about.model'
 import { CustomConfig } from '../../../shared/models/server/custom-config.model'
-import { isSignupAllowed, isSignupAllowedForCurrentIP } from '../../helpers/signup'
-import { CONSTRAINTS_FIELDS, DEFAULT_THEME_NAME, PEERTUBE_VERSION } from '../../initializers/constants'
-import { asyncMiddleware, authenticate, ensureUserHasRight } from '../../middlewares'
-import { customConfigUpdateValidator } from '../../middlewares/validators/config'
-import { ClientHtml } from '../../lib/client-html'
 import { auditLoggerFactory, CustomConfigAuditView, getAuditIdFromRes } from '../../helpers/audit-logger'
-import { remove, writeJSON } from 'fs-extra'
-import { getServerCommit } from '../../helpers/utils'
-import validator from 'validator'
 import { objectConverter } from '../../helpers/core-utils'
+import { isSignupAllowed, isSignupAllowedForCurrentIP } from '../../helpers/signup'
+import { getServerCommit } from '../../helpers/utils'
 import { CONFIG, isEmailEnabled, reloadConfig } from '../../initializers/config'
+import { CONSTRAINTS_FIELDS, DEFAULT_THEME_NAME, PEERTUBE_VERSION } from '../../initializers/constants'
+import { ClientHtml } from '../../lib/client-html'
 import { PluginManager } from '../../lib/plugins/plugin-manager'
 import { getThemeOrDefault } from '../../lib/plugins/theme-utils'
-import { Hooks } from '@server/lib/plugins/hooks'
+import { asyncMiddleware, authenticate, ensureUserHasRight } from '../../middlewares'
+import { customConfigUpdateValidator } from '../../middlewares/validators/config'
 
 const configRouter = express.Router()
 
@@ -76,10 +76,18 @@ async function getConfig (req: express.Request, res: express.Response) {
       remoteUri: {
         users: CONFIG.SEARCH.REMOTE_URI.USERS,
         anonymous: CONFIG.SEARCH.REMOTE_URI.ANONYMOUS
+      },
+      searchIndex: {
+        enabled: CONFIG.SEARCH.SEARCH_INDEX.ENABLED,
+        url: CONFIG.SEARCH.SEARCH_INDEX.URL,
+        disableLocalSearch: CONFIG.SEARCH.SEARCH_INDEX.DISABLE_LOCAL_SEARCH,
+        isDefaultSearch: CONFIG.SEARCH.SEARCH_INDEX.IS_DEFAULT_SEARCH
       }
     },
     plugin: {
-      registered: getRegisteredPlugins()
+      registered: getRegisteredPlugins(),
+      registeredExternalAuths: getExternalAuthsPlugins(),
+      registeredIdAndPassAuths: getIdAndPassAuthPlugins()
     },
     theme: {
       registered: getRegisteredThemes(),
@@ -170,6 +178,13 @@ async function getConfig (req: express.Request, res: express.Response) {
           indexUrl: CONFIG.FOLLOWINGS.INSTANCE.AUTO_FOLLOW_INDEX.INDEX_URL
         }
       }
+    },
+
+    broadcastMessage: {
+      enabled: CONFIG.BROADCAST_MESSAGE.ENABLED,
+      message: CONFIG.BROADCAST_MESSAGE.MESSAGE,
+      level: CONFIG.BROADCAST_MESSAGE.LEVEL,
+      dismissable: CONFIG.BROADCAST_MESSAGE.DISMISSABLE
     }
   }
 
@@ -267,6 +282,42 @@ function getRegisteredPlugins () {
                         description: p.description,
                         clientScripts: p.clientScripts
                       }))
+}
+
+function getIdAndPassAuthPlugins () {
+  const result: RegisteredIdAndPassAuthConfig[] = []
+
+  for (const p of PluginManager.Instance.getIdAndPassAuths()) {
+    for (const auth of p.idAndPassAuths) {
+      result.push({
+        npmName: p.npmName,
+        name: p.name,
+        version: p.version,
+        authName: auth.authName,
+        weight: auth.getWeight()
+      })
+    }
+  }
+
+  return result
+}
+
+function getExternalAuthsPlugins () {
+  const result: RegisteredExternalAuthConfig[] = []
+
+  for (const p of PluginManager.Instance.getExternalAuths()) {
+    for (const auth of p.externalAuths) {
+      result.push({
+        npmName: p.npmName,
+        name: p.name,
+        version: p.version,
+        authName: auth.authName,
+        authDisplayName: auth.authDisplayName()
+      })
+    }
+  }
+
+  return result
 }
 
 // ---------------------------------------------------------------------------
@@ -393,6 +444,24 @@ function customConfig (): CustomConfig {
           enabled: CONFIG.FOLLOWINGS.INSTANCE.AUTO_FOLLOW_INDEX.ENABLED,
           indexUrl: CONFIG.FOLLOWINGS.INSTANCE.AUTO_FOLLOW_INDEX.INDEX_URL
         }
+      }
+    },
+    broadcastMessage: {
+      enabled: CONFIG.BROADCAST_MESSAGE.ENABLED,
+      message: CONFIG.BROADCAST_MESSAGE.MESSAGE,
+      level: CONFIG.BROADCAST_MESSAGE.LEVEL,
+      dismissable: CONFIG.BROADCAST_MESSAGE.DISMISSABLE
+    },
+    search: {
+      remoteUri: {
+        users: CONFIG.SEARCH.REMOTE_URI.USERS,
+        anonymous: CONFIG.SEARCH.REMOTE_URI.ANONYMOUS
+      },
+      searchIndex: {
+        enabled: CONFIG.SEARCH.SEARCH_INDEX.ENABLED,
+        url: CONFIG.SEARCH.SEARCH_INDEX.URL,
+        disableLocalSearch: CONFIG.SEARCH.SEARCH_INDEX.DISABLE_LOCAL_SEARCH,
+        isDefaultSearch: CONFIG.SEARCH.SEARCH_INDEX.IS_DEFAULT_SEARCH
       }
     }
   }

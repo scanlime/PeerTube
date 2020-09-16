@@ -51,8 +51,9 @@ import {
   MVideoPlaylistFull,
   MVideoPlaylistFullSummary,
   MVideoPlaylistIdWithElements
-} from '../../typings/models/video/video-playlist'
-import { MThumbnail } from '../../typings/models/video/thumbnail'
+} from '../../types/models/video/video-playlist'
+import { MThumbnail } from '../../types/models/video/thumbnail'
+import { MAccountId, MChannelId } from '@server/types/models'
 
 enum ScopeNames {
   AVAILABLE_FOR_LIST = 'AVAILABLE_FOR_LIST',
@@ -230,7 +231,7 @@ export class VideoPlaylistModel extends Model<VideoPlaylistModel> {
 
   @AllowNull(true)
   @Is('VideoPlaylistDescription', value => throwIfNotValid(value, isVideoPlaylistDescriptionValid, 'description', true))
-  @Column
+  @Column(DataType.STRING(CONSTRAINTS_FIELDS.VIDEO_PLAYLISTS.DESCRIPTION.max))
   description: string
 
   @AllowNull(false)
@@ -340,15 +341,24 @@ export class VideoPlaylistModel extends Model<VideoPlaylistModel> {
       })
   }
 
-  static listPublicUrlsOfForAP (accountId: number, start: number, count: number) {
+  static listPublicUrlsOfForAP (options: { account?: MAccountId, channel?: MChannelId }, start: number, count: number) {
+    const where = {
+      privacy: VideoPlaylistPrivacy.PUBLIC
+    }
+
+    if (options.account) {
+      Object.assign(where, { ownerAccountId: options.account.id })
+    }
+
+    if (options.channel) {
+      Object.assign(where, { videoChannelId: options.channel.id })
+    }
+
     const query = {
       attributes: [ 'url' ],
       offset: start,
       limit: count,
-      where: {
-        ownerAccountId: accountId,
-        privacy: VideoPlaylistPrivacy.PUBLIC
-      }
+      where
     }
 
     return VideoPlaylistModel.findAndCountAll(query)
@@ -480,6 +490,14 @@ export class VideoPlaylistModel extends Model<VideoPlaylistModel> {
     return join(STATIC_PATHS.THUMBNAILS, this.Thumbnail.filename)
   }
 
+  getWatchUrl () {
+    return WEBSERVER.URL + '/videos/watch/playlist/' + this.uuid
+  }
+
+  getEmbedStaticPath () {
+    return '/video-playlists/embed/' + this.uuid
+  }
+
   setAsRefreshed () {
     this.changed('updatedAt', true)
 
@@ -510,6 +528,7 @@ export class VideoPlaylistModel extends Model<VideoPlaylistModel> {
       },
 
       thumbnailPath: this.getThumbnailStaticPath(),
+      embedPath: this.getEmbedStaticPath(),
 
       type: {
         id: this.type,
@@ -522,7 +541,9 @@ export class VideoPlaylistModel extends Model<VideoPlaylistModel> {
       updatedAt: this.updatedAt,
 
       ownerAccount: this.OwnerAccount.toFormattedSummaryJSON(),
-      videoChannel: this.VideoChannel ? this.VideoChannel.toFormattedSummaryJSON() : null
+      videoChannel: this.VideoChannel
+        ? this.VideoChannel.toFormattedSummaryJSON()
+        : null
     }
   }
 

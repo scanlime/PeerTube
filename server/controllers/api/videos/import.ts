@@ -3,12 +3,14 @@ import * as magnetUtil from 'magnet-uri'
 import { auditLoggerFactory, getAuditIdFromRes, VideoImportAuditView } from '../../../helpers/audit-logger'
 import { asyncMiddleware, asyncRetryTransactionMiddleware, authenticate, videoImportAddValidator } from '../../../middlewares'
 import { MIMETYPES } from '../../../initializers/constants'
-import { getYoutubeDLInfo, YoutubeDLInfo } from '../../../helpers/youtube-dl'
+import { getYoutubeDLInfo, YoutubeDLInfo, getYoutubeDLSubs } from '../../../helpers/youtube-dl'
 import { createReqFiles } from '../../../helpers/express-utils'
 import { logger } from '../../../helpers/logger'
 import { VideoImportCreate, VideoImportState, VideoPrivacy, VideoState } from '../../../../shared'
 import { VideoModel } from '../../../models/video/video'
-import { getVideoActivityPubUrl } from '../../../lib/activitypub'
+import { VideoCaptionModel } from '../../../models/video/video-caption'
+import { moveAndProcessCaptionFile } from '../../../helpers/captions-utils'
+import { getVideoActivityPubUrl } from '../../../lib/activitypub/url'
 import { TagModel } from '../../../models/video/tag'
 import { VideoImportModel } from '../../../models/video/video-import'
 import { JobQueue } from '../../../lib/job-queue/job-queue'
@@ -21,18 +23,19 @@ import { move, readFile } from 'fs-extra'
 import { autoBlacklistVideoIfNeeded } from '../../../lib/video-blacklist'
 import { CONFIG } from '../../../initializers/config'
 import { sequelizeTypescript } from '../../../initializers/database'
-import { createVideoMiniatureFromExisting } from '../../../lib/thumbnail'
+import { createVideoMiniatureFromExisting, createVideoMiniatureFromUrl } from '../../../lib/thumbnail'
 import { ThumbnailType } from '../../../../shared/models/videos/thumbnail.type'
 import {
   MChannelAccountDefault,
   MThumbnail,
   MUser,
   MVideoAccountDefault,
+  MVideoCaptionVideo,
   MVideoTag,
   MVideoThumbnailAccountDefault,
   MVideoWithBlacklistLight
-} from '@server/typings/models'
-import { MVideoImport, MVideoImportFormattable } from '@server/typings/models/video/video-import'
+} from '@server/types/models'
+import { MVideoImport, MVideoImportFormattable } from '@server/types/models/video/video-import'
 
 const auditLogger = auditLoggerFactory('video-imports')
 const videoImportsRouter = express.Router()
@@ -65,7 +68,7 @@ export {
 function addVideoImport (req: express.Request, res: express.Response) {
   if (req.body.targetUrl) return addYoutubeDLImport(req, res)
 
-  const file = req.files && req.files['torrentfile'] ? req.files['torrentfile'][0] : undefined
+  const file = req.files?.['torrentfile']?.[0]
   if (req.body.magnetUri || file) return addTorrentImport(req, res, file)
 }
 
@@ -136,6 +139,7 @@ async function addYoutubeDLImport (req: express.Request, res: express.Response) 
   const targetUrl = body.targetUrl
   const user = res.locals.oauth.token.User
 
+  // Get video infos
   let youtubeDLInfo: YoutubeDLInfo
   try {
     youtubeDLInfo = await getYoutubeDLInfo(targetUrl)
@@ -149,8 +153,25 @@ async function addYoutubeDLImport (req: express.Request, res: express.Response) 
 
   const video = buildVideo(res.locals.videoChannel.id, body, youtubeDLInfo)
 
-  const thumbnailModel = await processThumbnail(req, video)
-  const previewModel = await processPreview(req, video)
+  let thumbnailModel: MThumbnail
+
+  // Process video thumbnail from request.files
+  thumbnailModel = await processThumbnail(req, video)
+
+  // Process video thumbnail from url if processing from request.files failed
+  if (!thumbnailModel && youtubeDLInfo.thumbnailUrl) {
+    thumbnailModel = await processThumbnailFromUrl(youtubeDLInfo.thumbnailUrl, video)
+  }
+
+  let previewModel: MThumbnail
+
+  // Process video preview from request.files
+  previewModel = await processPreview(req, video)
+
+  // Process video preview from url if processing from request.files failed
+  if (!previewModel && youtubeDLInfo.thumbnailUrl) {
+    previewModel = await processPreviewFromUrl(youtubeDLInfo.thumbnailUrl, video)
+  }
 
   const tags = body.tags || youtubeDLInfo.tags
   const videoImportAttributes = {
@@ -168,13 +189,36 @@ async function addYoutubeDLImport (req: express.Request, res: express.Response) 
     user
   })
 
+  // Get video subtitles
+  try {
+    const subtitles = await getYoutubeDLSubs(targetUrl)
+
+    logger.info('Will create %s subtitles from youtube import %s.', subtitles.length, targetUrl)
+
+    for (const subtitle of subtitles) {
+      const videoCaption = new VideoCaptionModel({
+        videoId: video.id,
+        language: subtitle.language
+      }) as MVideoCaptionVideo
+      videoCaption.Video = video
+
+      // Move physical file
+      await moveAndProcessCaptionFile(subtitle, videoCaption)
+
+      await sequelizeTypescript.transaction(async t => {
+        await VideoCaptionModel.insertOrReplaceLanguage(video.id, subtitle.language, null, t)
+      })
+    }
+  } catch (err) {
+    logger.warn('Cannot get video subtitles.', { err })
+  }
+
   // Create job to import the video
   const payload = {
     type: 'youtube-dl' as 'youtube-dl',
     videoImportId: videoImport.id,
-    thumbnailUrl: youtubeDLInfo.thumbnailUrl,
-    downloadThumbnail: !thumbnailModel,
-    downloadPreview: !previewModel,
+    generateThumbnail: !thumbnailModel,
+    generatePreview: !previewModel,
     fileExt: youtubeDLInfo.fileExt
       ? `.${youtubeDLInfo.fileExt}`
       : '.mp4'
@@ -192,7 +236,7 @@ function buildVideo (channelId: number, body: VideoImportCreate, importData: You
     remote: false,
     category: body.category || importData.category,
     licence: body.licence || importData.licence,
-    language: body.language || undefined,
+    language: body.language || importData.language,
     commentsEnabled: body.commentsEnabled !== false, // If the value is not "false", the default is "true"
     downloadEnabled: body.downloadEnabled !== false,
     waitTranscoding: body.waitTranscoding || false,
@@ -203,7 +247,7 @@ function buildVideo (channelId: number, body: VideoImportCreate, importData: You
     privacy: body.privacy || VideoPrivacy.PRIVATE,
     duration: 0, // duration will be set by the import job
     channelId: channelId,
-    originallyPublishedAt: importData.originallyPublishedAt
+    originallyPublishedAt: body.originallyPublishedAt || importData.originallyPublishedAt
   }
   const video = new VideoModel(videoData)
   video.url = getVideoActivityPubUrl(video)
@@ -231,6 +275,24 @@ async function processPreview (req: express.Request, video: VideoModel) {
   }
 
   return undefined
+}
+
+async function processThumbnailFromUrl (url: string, video: VideoModel) {
+  try {
+    return createVideoMiniatureFromUrl(url, video, ThumbnailType.MINIATURE)
+  } catch (err) {
+    logger.warn('Cannot generate video thumbnail %s for %s.', url, video.url, { err })
+    return undefined
+  }
+}
+
+async function processPreviewFromUrl (url: string, video: VideoModel) {
+  try {
+    return createVideoMiniatureFromUrl(url, video, ThumbnailType.PREVIEW)
+  } catch (err) {
+    logger.warn('Cannot generate video preview %s for %s.', url, video.url, { err })
+    return undefined
+  }
 }
 
 function insertIntoDB (parameters: {

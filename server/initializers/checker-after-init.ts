@@ -1,12 +1,11 @@
 import * as config from 'config'
 import { isProdInstance, isTestInstance } from '../helpers/core-utils'
 import { UserModel } from '../models/account/user'
-import { ApplicationModel } from '../models/application/application'
+import { getServerActor, ApplicationModel } from '../models/application/application'
 import { OAuthClientModel } from '../models/oauth/oauth-client'
 import { URL } from 'url'
 import { CONFIG, isEmailEnabled } from './config'
 import { logger } from '../helpers/logger'
-import { getServerActor } from '../helpers/utils'
 import { RecentlyAddedStrategy } from '../../shared/models/redundancy'
 import { isArray } from '../helpers/custom-validators/misc'
 import { uniq } from 'lodash'
@@ -108,6 +107,10 @@ function checkConfig () {
     }
   }
 
+  if (CONFIG.STORAGE.VIDEOS_DIR === CONFIG.STORAGE.REDUNDANCY_DIR) {
+    logger.warn('Redundancy directory should be different than the videos folder.')
+  }
+
   // Transcoding
   if (CONFIG.TRANSCODING.ENABLED) {
     if (CONFIG.TRANSCODING.WEBTORRENT.ENABLED === false && CONFIG.TRANSCODING.HLS.ENABLED === false) {
@@ -115,8 +118,21 @@ function checkConfig () {
     }
   }
 
-  if (CONFIG.STORAGE.VIDEOS_DIR === CONFIG.STORAGE.REDUNDANCY_DIR) {
-    logger.warn('Redundancy directory should be different than the videos folder.')
+  // Broadcast message
+  if (CONFIG.BROADCAST_MESSAGE.ENABLED) {
+    const currentLevel = CONFIG.BROADCAST_MESSAGE.LEVEL
+    const available = [ 'info', 'warning', 'error' ]
+
+    if (available.includes(currentLevel) === false) {
+      return 'Broadcast message level should be ' + available.join(' or ') + ' instead of ' + currentLevel
+    }
+  }
+
+  // Search index
+  if (CONFIG.SEARCH.SEARCH_INDEX.ENABLED === true) {
+    if (CONFIG.SEARCH.REMOTE_URI.USERS === false) {
+      return 'You cannot enable search index without enabling remote URI search for users.'
+    }
   }
 
   return null

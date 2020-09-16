@@ -164,14 +164,23 @@ function getUsersList (url: string, accessToken: string) {
           .expect('Content-Type', /json/)
 }
 
-function getUsersListPaginationAndSort (url: string, accessToken: string, start: number, count: number, sort: string, search?: string) {
+function getUsersListPaginationAndSort (
+  url: string,
+  accessToken: string,
+  start: number,
+  count: number,
+  sort: string,
+  search?: string,
+  blocked?: boolean
+) {
   const path = '/api/v1/users'
 
   const query = {
     start,
     count,
     sort,
-    search
+    search,
+    blocked
   }
 
   return request(url)
@@ -216,7 +225,7 @@ function unblockUser (url: string, userId: number | string, accessToken: string,
     .expect(expectedStatus)
 }
 
-function updateMyUser (options: { url: string, accessToken: string } & UserUpdateMe) {
+function updateMyUser (options: { url: string, accessToken: string, statusCodeExpected?: number } & UserUpdateMe) {
   const path = '/api/v1/users/me'
 
   const toSend: UserUpdateMe = omit(options, 'url', 'accessToken')
@@ -226,7 +235,7 @@ function updateMyUser (options: { url: string, accessToken: string } & UserUpdat
     path,
     token: options.accessToken,
     fields: toSend,
-    statusCodeExpected: 204
+    statusCodeExpected: options.statusCodeExpected || 204
   })
 }
 

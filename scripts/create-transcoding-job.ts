@@ -3,10 +3,10 @@ registerTSPaths()
 
 import * as program from 'commander'
 import { VideoModel } from '../server/models/video/video'
-import { initDatabaseModels } from '../server/initializers'
+import { initDatabaseModels } from '../server/initializers/database'
 import { JobQueue } from '../server/lib/job-queue'
-import { VideoTranscodingPayload } from '../server/lib/job-queue/handlers/video-transcoding'
 import { computeResolutionsToTranscode } from '@server/helpers/ffmpeg-utils'
+import { VideoTranscodingPayload } from '@shared/models'
 
 program
   .option('-v, --video [videoUUID]', 'Video UUID')

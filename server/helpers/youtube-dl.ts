@@ -1,4 +1,4 @@
-import { CONSTRAINTS_FIELDS, VIDEO_CATEGORIES } from '../initializers/constants'
+import { CONSTRAINTS_FIELDS, VIDEO_CATEGORIES, VIDEO_LANGUAGES, VIDEO_LICENCES } from '../initializers/constants'
 import { logger } from './logger'
 import { generateVideoImportTmpPath } from './utils'
 import { join } from 'path'
@@ -12,6 +12,7 @@ export type YoutubeDLInfo = {
   name?: string
   description?: string
   category?: number
+  language?: string
   licence?: number
   nsfw?: boolean
   tags?: string[]
@@ -19,6 +20,12 @@ export type YoutubeDLInfo = {
   fileExt?: string
   originallyPublishedAt?: Date
 }
+
+export type YoutubeDLSubs = {
+  language: string
+  filename: string
+  path: string
+}[]
 
 const processOptions = {
   maxBuffer: 1024 * 1024 * 10 // 10MB
@@ -39,6 +46,40 @@ function getYoutubeDLInfo (url: string, opts?: string[]): Promise<YoutubeDLInfo>
           if (obj.name && obj.name.length < CONSTRAINTS_FIELDS.VIDEOS.NAME.min) obj.name += ' video'
 
           return res(obj)
+        })
+      })
+      .catch(err => rej(err))
+  })
+}
+
+function getYoutubeDLSubs (url: string, opts?: object): Promise<YoutubeDLSubs> {
+  return new Promise<YoutubeDLSubs>((res, rej) => {
+    const cwd = CONFIG.STORAGE.TMP_DIR
+    const options = opts || { all: true, format: 'vtt', cwd }
+
+    safeGetYoutubeDL()
+      .then(youtubeDL => {
+        youtubeDL.getSubs(url, options, (err, files) => {
+          if (err) return rej(err)
+          if (!files) return []
+
+          logger.debug('Get subtitles from youtube dl.', { url, files })
+
+          const subtitles = files.reduce((acc, filename) => {
+            const matched = filename.match(/\.([a-z]{2})\.(vtt|ttml)/i)
+            if (!matched || !matched[1]) return acc
+
+            return [
+              ...acc,
+              {
+                language: matched[1],
+                path: join(cwd, filename),
+                filename
+              }
+            ]
+          }, [])
+
+          return res(subtitles)
         })
       })
       .catch(err => rej(err))
@@ -185,6 +226,7 @@ function buildOriginallyPublishedAt (obj: any) {
 export {
   updateYoutubeDLBinary,
   downloadYoutubeDLVideo,
+  getYoutubeDLSubs,
   getYoutubeDLInfo,
   safeGetYoutubeDL,
   buildOriginallyPublishedAt
@@ -211,12 +253,13 @@ function normalizeObject (obj: any) {
   return newObj
 }
 
-function buildVideoInfo (obj: any) {
+function buildVideoInfo (obj: any): YoutubeDLInfo {
   return {
     name: titleTruncation(obj.title),
     description: descriptionTruncation(obj.description),
     category: getCategory(obj.categories),
     licence: getLicence(obj.license),
+    language: getLanguage(obj.language),
     nsfw: isNSFW(obj),
     tags: getTags(obj.tags),
     thumbnailUrl: obj.thumbnail || undefined,
@@ -261,6 +304,11 @@ function getLicence (licence: string) {
 
   if (licence.includes('Creative Commons Attribution')) return 1
 
+  for (const key of Object.keys(VIDEO_LICENCES)) {
+    const peertubeLicence = VIDEO_LICENCES[key]
+    if (peertubeLicence.toLowerCase() === licence.toLowerCase()) return parseInt(key, 10)
+  }
+
   return undefined
 }
 
@@ -278,6 +326,10 @@ function getCategory (categories: string[]) {
   }
 
   return undefined
+}
+
+function getLanguage (language: string) {
+  return VIDEO_LANGUAGES[language] ? language : undefined
 }
 
 function wrapWithProxyOptions (options: string[]) {

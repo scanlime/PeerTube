@@ -1,27 +1,26 @@
-import { PluginModel } from '../../models/server/plugin'
-import { logger } from '../../helpers/logger'
+import { createReadStream, createWriteStream } from 'fs'
+import { outputFile, readJSON } from 'fs-extra'
 import { basename, join } from 'path'
-import { CONFIG } from '../../initializers/config'
-import { isLibraryCodeValid, isPackageJSONValid } from '../../helpers/custom-validators/plugins'
+import { MOAuthTokenUser, MUser } from '@server/types/models'
+import { RegisterServerHookOptions } from '@shared/models/plugins/register-server-hook.model'
+import { getHookType, internalRunHook } from '../../../shared/core-utils/plugins/hooks'
 import {
   ClientScript,
   PluginPackageJson,
   PluginTranslationPaths as PackagePluginTranslations
 } from '../../../shared/models/plugins/plugin-package-json.model'
-import { createReadStream, createWriteStream } from 'fs'
-import { PLUGIN_GLOBAL_CSS_PATH } from '../../initializers/constants'
-import { PluginType } from '../../../shared/models/plugins/plugin.type'
-import { installNpmPlugin, installNpmPluginFromDisk, removeNpmPlugin } from './yarn'
-import { outputFile, readJSON } from 'fs-extra'
-import { ServerHook, ServerHookName, serverHookObject } from '../../../shared/models/plugins/server-hook.model'
-import { getHookType, internalRunHook } from '../../../shared/core-utils/plugins/hooks'
-import { RegisterServerOptions } from '../../typings/plugins/register-server-option.model'
-import { PluginLibrary } from '../../typings/plugins'
-import { ClientHtml } from '../client-html'
-import { RegisterServerHookOptions } from '../../../shared/models/plugins/register-server-hook.model'
-import { RegisterServerSettingOptions } from '../../../shared/models/plugins/register-server-setting.model'
 import { PluginTranslation } from '../../../shared/models/plugins/plugin-translation.model'
-import { buildRegisterHelpers, reinitVideoConstants } from './register-helpers'
+import { PluginType } from '../../../shared/models/plugins/plugin.type'
+import { ServerHook, ServerHookName } from '../../../shared/models/plugins/server-hook.model'
+import { isLibraryCodeValid, isPackageJSONValid } from '../../helpers/custom-validators/plugins'
+import { logger } from '../../helpers/logger'
+import { CONFIG } from '../../initializers/config'
+import { PLUGIN_GLOBAL_CSS_PATH } from '../../initializers/constants'
+import { PluginModel } from '../../models/server/plugin'
+import { PluginLibrary, RegisterServerAuthExternalOptions, RegisterServerAuthPassOptions, RegisterServerOptions } from '../../types/plugins'
+import { ClientHtml } from '../client-html'
+import { RegisterHelpersStore } from './register-helpers-store'
+import { installNpmPlugin, installNpmPluginFromDisk, removeNpmPlugin } from './yarn'
 
 export interface RegisteredPlugin {
   npmName: string
@@ -40,6 +39,7 @@ export interface RegisteredPlugin {
   css: string[]
 
   // Only if this is a plugin
+  registerHelpersStore?: RegisterHelpersStore
   unregister?: Function
 }
 
@@ -59,7 +59,7 @@ export class PluginManager implements ServerHook {
   private static instance: PluginManager
 
   private registeredPlugins: { [name: string]: RegisteredPlugin } = {}
-  private settings: { [name: string]: RegisterServerSettingOptions[] } = {}
+
   private hooks: { [name: string]: HookInformationValue[] } = {}
   private translations: PluginLocalesTranslations = {}
 
@@ -76,7 +76,7 @@ export class PluginManager implements ServerHook {
     return this.registeredPlugins[npmName]
   }
 
-  getRegisteredPlugin (name: string) {
+  getRegisteredPluginByShortName (name: string) {
     const npmName = PluginModel.buildNpmName(name, PluginType.PLUGIN)
     const registered = this.getRegisteredPluginOrTheme(npmName)
 
@@ -85,7 +85,7 @@ export class PluginManager implements ServerHook {
     return registered
   }
 
-  getRegisteredTheme (name: string) {
+  getRegisteredThemeByShortName (name: string) {
     const npmName = PluginModel.buildNpmName(name, PluginType.THEME)
     const registered = this.getRegisteredPluginOrTheme(npmName)
 
@@ -102,12 +102,97 @@ export class PluginManager implements ServerHook {
     return this.getRegisteredPluginsOrThemes(PluginType.THEME)
   }
 
+  getIdAndPassAuths () {
+    return this.getRegisteredPlugins()
+      .map(p => ({
+        npmName: p.npmName,
+        name: p.name,
+        version: p.version,
+        idAndPassAuths: p.registerHelpersStore.getIdAndPassAuths()
+      }))
+      .filter(v => v.idAndPassAuths.length !== 0)
+  }
+
+  getExternalAuths () {
+    return this.getRegisteredPlugins()
+      .map(p => ({
+        npmName: p.npmName,
+        name: p.name,
+        version: p.version,
+        externalAuths: p.registerHelpersStore.getExternalAuths()
+      }))
+      .filter(v => v.externalAuths.length !== 0)
+  }
+
   getRegisteredSettings (npmName: string) {
-    return this.settings[npmName] || []
+    const result = this.getRegisteredPluginOrTheme(npmName)
+    if (!result || result.type !== PluginType.PLUGIN) return []
+
+    return result.registerHelpersStore.getSettings()
+  }
+
+  getRouter (npmName: string) {
+    const result = this.getRegisteredPluginOrTheme(npmName)
+    if (!result || result.type !== PluginType.PLUGIN) return null
+
+    return result.registerHelpersStore.getRouter()
   }
 
   getTranslations (locale: string) {
     return this.translations[locale] || {}
+  }
+
+  async isTokenValid (token: MOAuthTokenUser, type: 'access' | 'refresh') {
+    const auth = this.getAuth(token.User.pluginAuth, token.authName)
+    if (!auth) return true
+
+    if (auth.hookTokenValidity) {
+      try {
+        const { valid } = await auth.hookTokenValidity({ token, type })
+
+        if (valid === false) {
+          logger.info('Rejecting %s token validity from auth %s of plugin %s', type, token.authName, token.User.pluginAuth)
+        }
+
+        return valid
+      } catch (err) {
+        logger.warn('Cannot run check token validity from auth %s of plugin %s.', token.authName, token.User.pluginAuth, { err })
+        return true
+      }
+    }
+
+    return true
+  }
+
+  // ###################### External events ######################
+
+  onLogout (npmName: string, authName: string, user: MUser) {
+    const auth = this.getAuth(npmName, authName)
+
+    if (auth?.onLogout) {
+      logger.info('Running onLogout function from auth %s of plugin %s', authName, npmName)
+
+      try {
+        auth.onLogout(user)
+      } catch (err) {
+        logger.warn('Cannot run onLogout function from auth %s of plugin %s.', authName, npmName, { err })
+      }
+    }
+  }
+
+  onSettingsChanged (name: string, settings: any) {
+    const registered = this.getRegisteredPluginByShortName(name)
+    if (!registered) {
+      logger.error('Cannot find plugin %s to call on settings changed.', name)
+    }
+
+    for (const cb of registered.registerHelpersStore.getOnSettingsChangedCallbacks()) {
+      try {
+        cb(settings)
+      } catch (err) {
+        logger.error('Cannot run on settings changed callback for %s.', registered.npmName, { err })
+      }
+    }
   }
 
   // ###################### Hooks ######################
@@ -164,7 +249,6 @@ export class PluginManager implements ServerHook {
     }
 
     delete this.registeredPlugins[plugin.npmName]
-    delete this.settings[plugin.npmName]
 
     this.deleteTranslations(plugin.npmName)
 
@@ -176,7 +260,8 @@ export class PluginManager implements ServerHook {
         this.hooks[key] = this.hooks[key].filter(h => h.npmName !== npmName)
       }
 
-      reinitVideoConstants(plugin.npmName)
+      const store = plugin.registerHelpersStore
+      store.reinitVideoConstants(plugin.npmName)
 
       logger.info('Regenerating registered plugin CSS to global file.')
       await this.regeneratePluginGlobalCSS()
@@ -282,8 +367,11 @@ export class PluginManager implements ServerHook {
     this.sanitizeAndCheckPackageJSONOrThrow(packageJSON, plugin.type)
 
     let library: PluginLibrary
+    let registerHelpersStore: RegisterHelpersStore
     if (plugin.type === PluginType.PLUGIN) {
-      library = await this.registerPlugin(plugin, pluginPath, packageJSON)
+      const result = await this.registerPlugin(plugin, pluginPath, packageJSON)
+      library = result.library
+      registerHelpersStore = result.registerStore
     }
 
     const clientScripts: { [id: string]: ClientScript } = {}
@@ -302,6 +390,7 @@ export class PluginManager implements ServerHook {
       staticDirs: packageJSON.staticDirs,
       clientScripts,
       css: packageJSON.css,
+      registerHelpersStore: registerHelpersStore || undefined,
       unregister: library ? library.unregister : undefined
     }
 
@@ -320,15 +409,15 @@ export class PluginManager implements ServerHook {
       throw new Error('Library code is not valid (miss register or unregister function)')
     }
 
-    const registerHelpers = this.getRegisterHelpers(npmName, plugin)
-    library.register(registerHelpers)
+    const { registerOptions, registerStore } = this.getRegisterHelpers(npmName, plugin)
+    library.register(registerOptions)
            .catch(err => logger.error('Cannot register plugin %s.', npmName, { err }))
 
     logger.info('Add plugin %s CSS to global file.', npmName)
 
     await this.addCSSToGlobalFile(pluginPath, packageJSON.css)
 
-    return library
+    return { library, registerStore }
   }
 
   // ###################### Translations ######################
@@ -411,6 +500,16 @@ export class PluginManager implements ServerHook {
     return join(CONFIG.STORAGE.PLUGINS_DIR, 'node_modules', npmName)
   }
 
+  private getAuth (npmName: string, authName: string) {
+    const plugin = this.getRegisteredPluginOrTheme(npmName)
+    if (!plugin || plugin.type !== PluginType.PLUGIN) return null
+
+    let auths: (RegisterServerAuthPassOptions | RegisterServerAuthExternalOptions)[] = plugin.registerHelpersStore.getIdAndPassAuths()
+    auths = auths.concat(plugin.registerHelpersStore.getExternalAuths())
+
+    return auths.find(a => a.authName === authName)
+  }
+
   // ###################### Private getters ######################
 
   private getRegisteredPluginsOrThemes (type: PluginType) {
@@ -428,35 +527,27 @@ export class PluginManager implements ServerHook {
 
   // ###################### Generate register helpers ######################
 
-  private getRegisterHelpers (npmName: string, plugin: PluginModel): RegisterServerOptions {
-    const registerHook = (options: RegisterServerHookOptions) => {
-      if (serverHookObject[options.target] !== true) {
-        logger.warn('Unknown hook %s of plugin %s. Skipping.', options.target, npmName)
-        return
-      }
-
+  private getRegisterHelpers (
+    npmName: string,
+    plugin: PluginModel
+  ): { registerStore: RegisterHelpersStore, registerOptions: RegisterServerOptions } {
+    const onHookAdded = (options: RegisterServerHookOptions) => {
       if (!this.hooks[options.target]) this.hooks[options.target] = []
 
       this.hooks[options.target].push({
-        npmName,
+        npmName: npmName,
         pluginName: plugin.name,
         handler: options.handler,
         priority: options.priority || 0
       })
     }
 
-    const registerSetting = (options: RegisterServerSettingOptions) => {
-      if (!this.settings[npmName]) this.settings[npmName] = []
+    const registerHelpersStore = new RegisterHelpersStore(npmName, plugin, onHookAdded.bind(this))
 
-      this.settings[npmName].push(options)
+    return {
+      registerStore: registerHelpersStore,
+      registerOptions: registerHelpersStore.buildRegisterHelpers()
     }
-
-    const registerHelpers = buildRegisterHelpers(npmName, plugin)
-
-    return Object.assign(registerHelpers, {
-      registerHook,
-      registerSetting
-    })
   }
 
   private sanitizeAndCheckPackageJSONOrThrow (packageJSON: PluginPackageJson, pluginType: PluginType) {

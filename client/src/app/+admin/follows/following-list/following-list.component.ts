@@ -1,30 +1,28 @@
-import { Component, OnInit } from '@angular/core'
-import { Notifier } from '@app/core'
 import { SortMeta } from 'primeng/api'
-import { ActorFollow } from '../../../../../../shared/models/actors/follow.model'
-import { ConfirmService } from '../../../core/confirm/confirm.service'
-import { RestPagination, RestTable } from '../../../shared'
-import { FollowService } from '@app/shared/instance/follow.service'
-import { I18n } from '@ngx-translate/i18n-polyfill'
+import { Component, OnInit, ViewChild } from '@angular/core'
+import { ConfirmService, Notifier, RestPagination, RestTable } from '@app/core'
+import { InstanceFollowService } from '@app/shared/shared-instance'
+import { BatchDomainsModalComponent } from '@app/shared/shared-moderation'
+import { ActorFollow } from '@shared/models'
 
 @Component({
   selector: 'my-followers-list',
   templateUrl: './following-list.component.html',
-  styleUrls: [ './following-list.component.scss' ]
+  styleUrls: [ '../follows.component.scss', './following-list.component.scss' ]
 })
 export class FollowingListComponent extends RestTable implements OnInit {
+  @ViewChild('batchDomainsModal') batchDomainsModal: BatchDomainsModalComponent
+
   following: ActorFollow[] = []
   totalRecords = 0
-  rowsPerPage = 10
-  sort: SortMeta = { field: 'createdAt', order: 1 }
+  sort: SortMeta = { field: 'createdAt', order: -1 }
   pagination: RestPagination = { count: this.rowsPerPage, start: 0 }
 
   constructor (
     private notifier: Notifier,
     private confirmService: ConfirmService,
-    private followService: FollowService,
-    private i18n: I18n
-  ) {
+    private followService: InstanceFollowService
+    ) {
     super()
   }
 
@@ -36,16 +34,35 @@ export class FollowingListComponent extends RestTable implements OnInit {
     return 'FollowingListComponent'
   }
 
+  addDomainsToFollow () {
+    this.batchDomainsModal.openModal()
+  }
+
+  httpEnabled () {
+    return window.location.protocol === 'https:'
+  }
+
+  async addFollowing (hosts: string[]) {
+    this.followService.follow(hosts).subscribe(
+      () => {
+        this.notifier.success($localize`Follow request(s) sent!`)
+        this.loadData()
+      },
+
+      err => this.notifier.error(err.message)
+    )
+  }
+
   async removeFollowing (follow: ActorFollow) {
     const res = await this.confirmService.confirm(
-      this.i18n('Do you really want to unfollow {{host}}?', { host: follow.following.host }),
-      this.i18n('Unfollow')
+      $localize`Do you really want to unfollow ${follow.following.host}?`,
+      $localize`Unfollow`
     )
     if (res === false) return
 
     this.followService.unfollow(follow).subscribe(
       () => {
-        this.notifier.success(this.i18n('You are not following {{host}} anymore.', { host: follow.following.host }))
+        this.notifier.success($localize`You are not following ${follow.following.host} anymore.`)
         this.loadData()
       },
 

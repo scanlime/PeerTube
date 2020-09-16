@@ -4,7 +4,7 @@ import { ActorModel } from '../activitypub/actor'
 import { throwIfNotValid } from '../utils'
 import { ServerBlocklistModel } from './server-blocklist'
 import * as Bluebird from 'bluebird'
-import { MServer, MServerFormattable } from '@server/typings/models/server'
+import { MServer, MServerFormattable } from '@server/types/models/server'
 
 @Table({
   tableName: 'server',
@@ -69,6 +69,13 @@ export class ServerModel extends Model<ServerModel> {
     }
 
     return ServerModel.findOne(query)
+  }
+
+  static async loadOrCreateByHost (host: string) {
+    let server = await ServerModel.loadByHost(host)
+    if (!server) server = await ServerModel.create({ host })
+
+    return server
   }
 
   isBlocked () {

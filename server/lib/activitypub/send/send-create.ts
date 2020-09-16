@@ -6,7 +6,6 @@ import { broadcastToActors, broadcastToFollowers, sendVideoRelatedActivity, unic
 import { audiencify, getActorsInvolvedInVideo, getAudience, getAudienceFromFollowersOf, getVideoCommentAudience } from '../audience'
 import { logger } from '../../../helpers/logger'
 import { VideoPlaylistPrivacy } from '../../../../shared/models/videos/playlist/video-playlist-privacy.model'
-import { getServerActor } from '../../../helpers/utils'
 import {
   MActorLight,
   MCommentOwnerVideo,
@@ -15,8 +14,9 @@ import {
   MVideoPlaylistFull,
   MVideoRedundancyFileVideo,
   MVideoRedundancyStreamingPlaylistVideo
-} from '../../../typings/models'
-import { ContextType } from '@server/helpers/activitypub'
+} from '../../../types/models'
+import { getServerActor } from '@server/models/application/application'
+import { ContextType } from '@shared/models/activitypub/context'
 
 async function sendCreateVideo (video: MVideoAP, t: Transaction) {
   if (!video.hasPrivacyForFederation()) return undefined

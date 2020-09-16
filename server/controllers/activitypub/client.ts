@@ -1,4 +1,5 @@
 import * as express from 'express'
+import * as cors from 'cors'
 import { VideoPrivacy, VideoRateType } from '../../../shared/models/videos'
 import { activityPubCollectionPagination, activityPubContextify } from '../../helpers/activitypub'
 import { ROUTE_CACHE_LIFETIME, WEBSERVER } from '../../initializers/constants'
@@ -23,22 +24,23 @@ import { cacheRoute } from '../../middlewares/cache'
 import { activityPubResponse } from './utils'
 import { AccountVideoRateModel } from '../../models/account/account-video-rate'
 import {
-  getRateUrl,
   getVideoCommentsActivityPubUrl,
   getVideoDislikesActivityPubUrl,
   getVideoLikesActivityPubUrl,
   getVideoSharesActivityPubUrl
-} from '../../lib/activitypub'
+} from '../../lib/activitypub/url'
 import { VideoCaptionModel } from '../../models/video/video-caption'
 import { videoFileRedundancyGetValidator, videoPlaylistRedundancyGetValidator } from '../../middlewares/validators/redundancy'
-import { getServerActor } from '../../helpers/utils'
 import { buildDislikeActivity } from '../../lib/activitypub/send/send-dislike'
 import { videoPlaylistElementAPGetValidator, videoPlaylistsGetValidator } from '../../middlewares/validators/videos/video-playlists'
 import { VideoPlaylistModel } from '../../models/video/video-playlist'
 import { VideoPlaylistPrivacy } from '../../../shared/models/videos/playlist/video-playlist-privacy.model'
-import { MAccountId, MActorId, MVideoAPWithoutCaption, MVideoId } from '@server/typings/models'
+import { MAccountId, MActorId, MVideoAPWithoutCaption, MVideoId, MChannelId } from '@server/types/models'
+import { getServerActor } from '@server/models/application/application'
+import { getRateUrl } from '@server/lib/activitypub/video-rates'
 
 const activityPubClientRouter = express.Router()
+activityPubClientRouter.use(cors())
 
 // Intercept ActivityPub client requests
 
@@ -135,6 +137,11 @@ activityPubClientRouter.get('/video-channels/:name/following',
   asyncMiddleware(localVideoChannelValidator),
   asyncMiddleware(videoChannelFollowingController)
 )
+activityPubClientRouter.get('/video-channels/:name/playlists',
+  executeIfActivityPub,
+  asyncMiddleware(localVideoChannelValidator),
+  asyncMiddleware(videoChannelPlaylistsController)
+)
 
 activityPubClientRouter.get('/redundancy/videos/:videoId/:resolution([0-9]+)(-:fps([0-9]+))?',
   executeIfActivityPub,
@@ -152,7 +159,7 @@ activityPubClientRouter.get('/video-playlists/:playlistId',
   asyncMiddleware(videoPlaylistsGetValidator('all')),
   asyncMiddleware(videoPlaylistController)
 )
-activityPubClientRouter.get('/video-playlists/:playlistId/:videoId',
+activityPubClientRouter.get('/video-playlists/:playlistId/videos/:playlistElementId',
   executeIfActivityPub,
   asyncMiddleware(videoPlaylistElementAPGetValidator),
   videoPlaylistElementController
@@ -188,7 +195,14 @@ async function accountFollowingController (req: express.Request, res: express.Re
 
 async function accountPlaylistsController (req: express.Request, res: express.Response) {
   const account = res.locals.account
-  const activityPubResult = await actorPlaylists(req, account)
+  const activityPubResult = await actorPlaylists(req, { account })
+
+  return activityPubResponse(activityPubContextify(activityPubResult), res)
+}
+
+async function videoChannelPlaylistsController (req: express.Request, res: express.Response) {
+  const channel = res.locals.videoChannel
+  const activityPubResult = await actorPlaylists(req, { channel })
 
   return activityPubResponse(activityPubContextify(activityPubResult), res)
 }
@@ -271,7 +285,7 @@ async function videoCommentsController (req: express.Request, res: express.Respo
   const video = res.locals.onlyImmutableVideo
 
   const handler = async (start: number, count: number) => {
-    const result = await VideoCommentModel.listAndCountByVideoId(video.id, start, count)
+    const result = await VideoCommentModel.listAndCountByVideoForAP(video, start, count)
     return {
       total: result.count,
       data: result.rows.map(r => r.url)
@@ -379,9 +393,9 @@ async function actorFollowers (req: express.Request, actor: MActorId) {
   return activityPubCollectionPagination(WEBSERVER.URL + req.path, handler, req.query.page)
 }
 
-async function actorPlaylists (req: express.Request, account: MAccountId) {
+async function actorPlaylists (req: express.Request, options: { account: MAccountId } | { channel: MChannelId }) {
   const handler = (start: number, count: number) => {
-    return VideoPlaylistModel.listPublicUrlsOfForAP(account.id, start, count)
+    return VideoPlaylistModel.listPublicUrlsOfForAP(options, start, count)
   }
 
   return activityPubCollectionPagination(WEBSERVER.URL + req.path, handler, req.query.page)

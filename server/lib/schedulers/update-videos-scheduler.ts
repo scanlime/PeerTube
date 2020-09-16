@@ -2,11 +2,11 @@ import { logger } from '../../helpers/logger'
 import { AbstractScheduler } from './abstract-scheduler'
 import { ScheduleVideoUpdateModel } from '../../models/video/schedule-video-update'
 import { retryTransactionWrapper } from '../../helpers/database-utils'
-import { federateVideoIfNeeded } from '../activitypub'
+import { federateVideoIfNeeded } from '../activitypub/videos'
 import { SCHEDULER_INTERVALS_MS } from '../../initializers/constants'
 import { Notifier } from '../notifier'
 import { sequelizeTypescript } from '../../initializers/database'
-import { MVideoFullLight } from '@server/typings/models'
+import { MVideoFullLight } from '@server/types/models'
 
 export class UpdateVideosScheduler extends AbstractScheduler {
 

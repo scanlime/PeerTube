@@ -1,20 +1,16 @@
+import { Hotkey, HotkeysService } from 'angular2-hotkeys'
 import { Observable, ReplaySubject, Subject, throwError as observableThrowError } from 'rxjs'
 import { catchError, map, mergeMap, share, tap } from 'rxjs/operators'
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http'
 import { Injectable } from '@angular/core'
 import { Router } from '@angular/router'
 import { Notifier } from '@app/core/notification/notifier.service'
-import { OAuthClientLocal, MyUser as UserServerModel, UserRefreshToken } from '../../../../../shared'
-import { User } from '../../../../../shared/models/users'
-import { UserLogin } from '../../../../../shared/models/users/user-login.model'
+import { objectToUrlEncoded, peertubeLocalStorage } from '@root-helpers/index'
+import { MyUser as UserServerModel, OAuthClientLocal, User, UserLogin, UserRefreshToken } from '@shared/models'
 import { environment } from '../../../environments/environment'
-import { RestExtractor } from '../../shared/rest/rest-extractor.service'
+import { RestExtractor } from '../rest/rest-extractor.service'
 import { AuthStatus } from './auth-status.model'
 import { AuthUser } from './auth-user.model'
-import { objectToUrlEncoded } from '@app/shared/misc/utils'
-import { peertubeLocalStorage } from '@app/shared/misc/peertube-web-storage'
-import { I18n } from '@ngx-translate/i18n-polyfill'
-import { Hotkey, HotkeysService } from 'angular2-hotkeys'
 
 interface UserLoginWithUsername extends UserLogin {
   access_token: string
@@ -29,6 +25,7 @@ type UserLoginWithUserInformation = UserLoginWithUsername & User
 export class AuthService {
   private static BASE_CLIENT_URL = environment.apiUrl + '/api/v1/oauth-clients/local'
   private static BASE_TOKEN_URL = environment.apiUrl + '/api/v1/users/token'
+  private static BASE_REVOKE_TOKEN_URL = environment.apiUrl + '/api/v1/users/revoke-token'
   private static BASE_USER_INFORMATION_URL = environment.apiUrl + '/api/v1/users/me'
   private static LOCAL_STORAGE_OAUTH_CLIENT_KEYS = {
     CLIENT_ID: 'client_id',
@@ -50,9 +47,8 @@ export class AuthService {
     private notifier: Notifier,
     private hotkeysService: HotkeysService,
     private restExtractor: RestExtractor,
-    private router: Router,
-    private i18n: I18n
-  ) {
+    private router: Router
+    ) {
     this.loginChanged = new Subject<AuthStatus>()
     this.loginChangedSource = this.loginChanged.asObservable()
 
@@ -64,19 +60,19 @@ export class AuthService {
       new Hotkey('m s', (event: KeyboardEvent): boolean => {
         this.router.navigate([ '/videos/subscriptions' ])
         return false
-      }, undefined, this.i18n('Go to my subscriptions')),
+      }, undefined, $localize`Go to my subscriptions`),
       new Hotkey('m v', (event: KeyboardEvent): boolean => {
         this.router.navigate([ '/my-account/videos' ])
         return false
-      }, undefined, this.i18n('Go to my videos')),
+      }, undefined, $localize`Go to my videos`),
       new Hotkey('m i', (event: KeyboardEvent): boolean => {
         this.router.navigate([ '/my-account/video-imports' ])
         return false
-      }, undefined, this.i18n('Go to my imports')),
+      }, undefined, $localize`Go to my imports`),
       new Hotkey('m c', (event: KeyboardEvent): boolean => {
         this.router.navigate([ '/my-account/video-channels' ])
         return false
-      }, undefined, this.i18n('Go to my channels'))
+      }, undefined, $localize`Go to my channels`)
     ]
   }
 
@@ -99,14 +95,12 @@ export class AuthService {
             let errorMessage = error.message
 
             if (error.status === 403) {
-              errorMessage = this.i18n('Cannot retrieve OAuth Client credentials: {{errorText}}.\n', { errorText: error.text })
-              errorMessage += this.i18n(
-                'Ensure you have correctly configured PeerTube (config/ directory), in particular the "webserver" section.'
-              )
+              errorMessage = $localize`Cannot retrieve OAuth Client credentials: ${error.text}.
+Ensure you have correctly configured PeerTube (config/ directory), in particular the "webserver" section.`
             }
 
             // We put a bigger timeout: this is an important message
-            this.notifier.error(errorMessage, this.i18n('Error'), 7000)
+            this.notifier.error(errorMessage, $localize`Error`, 7000)
           }
         )
   }
@@ -145,7 +139,7 @@ export class AuthService {
     return !!this.getAccessToken()
   }
 
-  login (username: string, password: string) {
+  login (username: string, password: string, token?: string) {
     // Form url encoded
     const body = {
       client_id: this.clientId,
@@ -156,6 +150,8 @@ export class AuthService {
       username,
       password
     }
+
+    if (token) Object.assign(body, { externalAuthToken: token })
 
     const headers = new HttpHeaders().set('Content-Type', 'application/x-www-form-urlencoded')
     return this.http.post<UserLogin>(AuthService.BASE_TOKEN_URL, objectToUrlEncoded(body), { headers })
@@ -168,7 +164,16 @@ export class AuthService {
   }
 
   logout () {
-    // TODO: make an HTTP request to revoke the tokens
+    const authHeaderValue = this.getRequestHeaderValue()
+    const headers = new HttpHeaders().set('Authorization', authHeaderValue)
+
+    this.http.post<void>(AuthService.BASE_REVOKE_TOKEN_URL, {}, { headers })
+    .subscribe(
+      () => { /* nothing to do */ },
+
+      err => console.error(err)
+    )
+
     this.user = null
 
     AuthUser.flush()
@@ -207,7 +212,7 @@ export class AuthService {
                                              this.router.navigate([ '/login' ])
 
                                              return observableThrowError({
-                                               error: this.i18n('You need to reconnect.')
+                                               error: $localize`You need to reconnect.`
                                              })
                                            }),
                                            share()

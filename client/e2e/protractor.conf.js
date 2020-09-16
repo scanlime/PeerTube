@@ -5,26 +5,31 @@ const {SpecReporter} = require('jasmine-spec-reporter')
 
 exports.config = {
   allScriptsTimeout: 25000,
-  specs: ['./src/**/*.e2e-spec.ts'],
+  specs: [ './src/**/*.e2e-spec.ts' ],
 
   seleniumAddress: 'http://hub-cloud.browserstack.com/wd/hub',
   commonCapabilities: {
     'browserstack.user': process.env.BROWSERSTACK_USER,
     'browserstack.key': process.env.BROWSERSTACK_KEY,
     'browserstack.local': true,
-    project: 'PeerTube'
+    'browserstack.console': 'verbose',
+    'browserstack.networkLogs': true,
+    'browserstack.debug': true,
+    project: 'PeerTube',
+    build: 'Main',
+    name: 'Bstack-[Protractor] Parallel Test'
   },
 
   multiCapabilities: [
     {
-      browserName: 'Chrome',
-      name: 'Latest Chrome Desktop',
-      resolution: '1280x1024'
-    },
-    {
       browserName: 'Safari',
       version: '11.1',
       name: 'Safari Desktop',
+      resolution: '1280x1024'
+    },
+    {
+      browserName: 'Chrome',
+      name: 'Latest Chrome Desktop',
       resolution: '1280x1024'
     },
     {
@@ -52,10 +57,17 @@ exports.config = {
     },
     {
       browserName: 'Safari',
-      device: 'iPhone SE',
+      device: 'iPhone 8',
       realMobile: 'true',
-      os_version: '11.2',
-      name: 'Latest Safari iPhone'
+      os_version: '12',
+      name: 'Safari iPhone'
+    },
+    {
+      browserName: 'Safari',
+      device: 'iPad 7th',
+      realMobile: 'true',
+      os_version: '13',
+      name: 'Safari iPad'
     }
   ],
 
@@ -73,7 +85,9 @@ exports.config = {
     require('ts-node').register({
       project: require('path').join(__dirname, './tsconfig.e2e.json')
     })
-    jasmine.getEnv().addReporter(new SpecReporter({   spec:  {  displayStacktrace: true    }  }))
+    jasmine.getEnv().addReporter(new SpecReporter({
+      spec: { displayStacktrace: 'raw' }
+    }))
   }
 }
 

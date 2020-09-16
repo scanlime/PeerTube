@@ -12,10 +12,16 @@
     - [Settings](#settings)
     - [Storage](#storage)
     - [Update video constants](#update-video-constants)
+    - [Add custom routes](#add-custom-routes)
+    - [Add external auth methods](#add-external-auth-methods)
   - [Client helpers (themes & plugins)](#client-helpers-themes--plugins)
-  - [Plugin static route](#plugin-static-route)
+    - [Plugin static route](#plugin-static-route)
+    - [Notifier](#notifier)
+    - [Markdown Renderer](#markdown-renderer)
+    - [Custom Modal](#custom-modal)
     - [Translate](#translate)
     - [Get public settings](#get-public-settings)
+    - [Add custom fields to video form](#add-custom-fields-to-video-form)
   - [Publishing](#publishing)
 - [Write a plugin/theme](#write-a-plugintheme)
   - [Clone the quickstart repository](#clone-the-quickstart-repository)
@@ -24,6 +30,7 @@
   - [Update package.json](#update-packagejson)
   - [Write code](#write-code)
   - [Add translations](#add-translations)
+  - [Build your plugin](#build-your-plugin)
   - [Test your plugin/theme](#test-your-plugintheme)
   - [Publish](#publish)
 - [Plugin & Theme hooks/helpers API](#plugin--theme-hookshelpers-api)
@@ -44,7 +51,7 @@ Themes are exactly the same as plugins, except that:
 ### Hooks
 
 A plugin registers functions in JavaScript to execute when PeerTube (server and client) fires events. There are 3 types of hooks:
- * `filter`: used to filter functions parameters or return values. 
+ * `filter`: used to filter functions parameters or return values.
  For example to replace words in video comments, or change the videos list behaviour
  * `action`: used to do something after a certain trigger. For example to send a hook every time a video is published
  * `static`: same than `action` but PeerTube waits their execution
@@ -66,12 +73,24 @@ Example:
 ```js
 async function register ({
   registerHook,
+
   registerSetting,
   settingsManager,
+
   storageManager,
+
   videoCategoryManager,
   videoLicenceManager,
-  videoLanguageManager
+  videoLanguageManager,
+
+  peertubeHelpers,
+
+  getRouter,
+
+  registerExternalAuth,
+  unregisterExternalAuth,
+  registerIdAndPassAuth,
+  unregisterIdAndPassAuth
 }) {
   registerHook({
     target: 'action:application.listening',
@@ -114,8 +133,8 @@ function register ({ registerHook, peertubeHelpers }) {
 
 ### Static files
 
-Plugins can declare static directories that PeerTube will serve (images for example) 
-from `/plugins/{plugin-name}/{plugin-version}/static/` 
+Plugins can declare static directories that PeerTube will serve (images for example)
+from `/plugins/{plugin-name}/{plugin-version}/static/`
 or `/themes/{theme-name}/{theme-version}/static/` routes.
 
 ### CSS
@@ -146,10 +165,18 @@ registerSetting({
   name: 'admin-name',
   label: 'Admin name',
   type: 'input',
+  // type: input | input-checkbox | input-textarea | markdown-text | markdown-enhanced
   default: 'my super name'
 })
 
 const adminName = await settingsManager.getSetting('admin-name')
+
+const result = await settingsManager.getSettings([ 'admin-name', 'admin-password' ])
+result['admin-name]
+
+settingsManager.onSettingsChange(settings => {
+  settings['admin-name])
+})
 ```
 
 #### Storage
@@ -176,17 +203,157 @@ videoCategoryManager.deleteCategory(1) // Music
 
 videoLicenceManager.addLicence(42, 'Best licence')
 videoLicenceManager.deleteLicence(7) // Public domain
+
+videoPrivacyManager.deletePrivacy(2) // Remove Unlisted video privacy
+playlistPrivacyManager.deletePlaylistPrivacy(3) // Remove Private video playlist privacy
+```
+
+#### Add custom routes
+
+You can create custom routes using an [express Router](https://expressjs.com/en/4x/api.html#router) for your plugin:
+
+```js
+const router = getRouter()
+router.get('/ping', (req, res) => res.json({ message: 'pong' }))
+```
+
+The `ping` route can be accessed using:
+ * `/plugins/:pluginName/:pluginVersion/router/ping`
+ * Or `/plugins/:pluginName/router/ping`
+
+
+#### Add external auth methods
+
+If you want to add a classic username/email and password auth method (like [LDAP](https://framagit.org/framasoft/peertube/official-plugins/-/tree/master/peertube-plugin-auth-ldap) for example):
+
+```js
+registerIdAndPassAuth({
+  authName: 'my-auth-method',
+
+  // PeerTube will try all id and pass plugins in the weight DESC order
+  // Exposing this value in the plugin settings could be interesting
+  getWeight: () => 60,
+
+  // Optional function called by PeerTube when the user clicked on the logout button
+  onLogout: user => {
+    console.log('User %s logged out.', user.username')
+  },
+
+  // Optional function called by PeerTube when the access token or refresh token are generated/refreshed
+  hookTokenValidity: ({ token, type }) => {
+    if (type === 'access') return { valid: true }
+    if (type === 'refresh') return { valid: false }
+  },
+
+  // Used by PeerTube when the user tries to authenticate
+  login: ({ id, password }) => {
+    if (id === 'user' && password === 'super password') {
+      return {
+        username: 'user'
+        email: 'user@example.com'
+        role: 2
+        displayName: 'User display name'
+      }
+    }
+
+    // Auth failed
+    return null
+  }
+})
+
+// Unregister this auth method
+unregisterIdAndPassAuth('my-auth-method')
+```
+
+You can also add an external auth method (like [OpenID](https://framagit.org/framasoft/peertube/official-plugins/-/tree/master/peertube-plugin-auth-openid-connect), [SAML2](https://framagit.org/framasoft/peertube/official-plugins/-/tree/master/peertube-plugin-auth-saml2) etc):
+
+```js
+// result contains the userAuthenticated auth method you can call to authenticate a user
+const result = registerExternalAuth({
+  authName: 'my-auth-method',
+
+  // Will be displayed in a button next to the login form
+  authDisplayName: () => 'Auth method'
+
+  // If the user click on the auth button, PeerTube will forward the request in this function
+  onAuthRequest: (req, res) => {
+    res.redirect('https://external-auth.example.com/auth')
+  },
+
+  // Same than registerIdAndPassAuth option
+  // onLogout: ...
+
+  // Same than registerIdAndPassAuth option
+  // hookTokenValidity: ...
+})
+
+router.use('/external-auth-callback', (req, res) => {
+  // Forward the request to PeerTube
+  result.userAuthenticated({
+    req,
+    res,
+    username: 'user'
+    email: 'user@example.com'
+    role: 2
+    displayName: 'User display name'
+  })
+})
+
+// Unregister this external auth method
+unregisterExternalAuth('my-auth-method)
 ```
 
 ### Client helpers (themes & plugins)
 
-### Plugin static route
+#### Plugin static route
 
 To get your plugin static route:
 
 ```js
 const baseStaticUrl = peertubeHelpers.getBaseStaticRoute()
 const imageUrl = baseStaticUrl + '/images/chocobo.png'
+```
+
+#### Notifier
+
+To notify the user with the PeerTube ToastModule:
+
+```js
+const { notifier } = peertubeHelpers
+notifier.success('Success message content.')
+notifier.error('Error message content.')
+```
+
+#### Markdown Renderer
+
+To render a formatted markdown text to HTML:
+
+```js
+const { markdownRenderer } = peertubeHelpers
+
+await markdownRenderer.textMarkdownToHTML('**My Bold Text**')
+// return <strong>My Bold Text</strong>
+
+await markdownRenderer.enhancedMarkdownToHTML('![alt-img](http://.../my-image.jpg)')
+// return <img alt=alt-img src=http://.../my-image.jpg />
+```
+
+#### Custom Modal
+
+To show a custom modal:
+
+```js
+ peertubeHelpers.showModal({
+   title: 'My custom modal title',
+   content: '<p>My custom modal content</p>',
+   // Optionals parameters :
+   // show close icon
+   close: true,
+   // show cancel button and call action() after hiding modal
+   cancel: { value: 'cancel', action: () => {} },
+   // show confirm button and call action() after hiding modal
+   confirm: { value: 'confirm', action: () => {} },
+ })
 ```
 
 #### Translate
@@ -209,10 +376,72 @@ peertubeHelpers.getSettings()
       console.error('Matomo settings are not set.')
       return
     }
-    
+
     // ...
   })
-``` 
+```
+
+#### Add custom fields to video form
+
+To add custom fields in the video form (in *Plugin settings* tab):
+
+```js
+async function register ({ registerVideoField, peertubeHelpers }) {
+  const descriptionHTML = await peertubeHelpers.translate(descriptionSource)
+  const commonOptions = {
+    name: 'my-field-name,
+    label: 'My added field',
+    descriptionHTML: 'Optional description',
+    type: 'input-textarea',
+    default: ''
+  }
+
+  for (const type of [ 'upload', 'import-url', 'import-torrent', 'update' ]) {
+    registerVideoField(commonOptions, { type })
+  }
+}
+```
+
+PeerTube will send this field value in `body.pluginData['my-field-name']` and fetch it from `video.pluginData['my-field-name']`.
+
+So for example, if you want to store an additional metadata for videos, register the following hooks in **server**:
+
+```js
+async function register ({
+  registerHook,
+  storageManager
+}) {
+  const fieldName = 'my-field-name'
+
+  // Store data associated to this video
+  registerHook({
+    target: 'action:api.video.updated',
+    handler: ({ video, body }) => {
+      if (!body.pluginData) return
+
+      const value = body.pluginData[fieldName]
+      if (!value) return
+
+      storageManager.storeData(fieldName + '-' + video.id, value)
+    }
+  })
+
+  // Add your custom value to the video, so the client autofill your field using the previously stored value
+  registerHook({
+    target: 'filter:api.video.get.result',
+    handler: async (video) => {
+      if (!video) return video
+      if (!video.pluginData) video.pluginData = {}
+
+      const result = await storageManager.getData(fieldName + '-' + video.id)
+      video.pluginData[fieldName] = result
+
+      return video
+    }
+  })
+}
+
+```
 
 
 ### Publishing
@@ -275,9 +504,9 @@ Update the `package.json` fields:
    * `author`
    * `bugs`
    * `engine.peertube` (the PeerTube version compatibility, must be `>=x.y.z` and nothing else)
-   
+
 **Caution:** Don't update or remove other keys, or PeerTube will not be able to index/install your plugin.
-If you don't need static directories, use an empty `object`: 
+If you don't need static directories, use an empty `object`:
 
 ```json
 {
@@ -302,7 +531,7 @@ And if you don't need CSS or client script files, use an empty `array`:
 
 Now you can register hooks or settings, write CSS and add static directories to your plugin or your theme :)
 
-**Caution:** It's up to you to check the code you write will be compatible with the PeerTube NodeJS version, 
+**Caution:** It's up to you to check the code you write will be compatible with the PeerTube NodeJS version,
 and will be supported by web browsers.
 If you want to write modern JavaScript, please use a transpiler like [Babel](https://babeljs.io/).
 
@@ -333,30 +562,55 @@ Translation files are just objects, with the english sentence as the key and the
 }
 ```
 
+### Build your plugin
+
+If you added client scripts, you'll need to build them using webpack.
+
+Install webpack:
+
+```
+$ npm install
+```
+
+Add/update your files in the `clientFiles` array of `webpack.config.js`:
+
+```
+$ $EDITOR ./webpack.config.js
+```
+
+Build your client files:
+
+```
+$ npm run build
+```
+
+You built files are in the `dist/` directory. Check `package.json` to correctly point to them.
+
+
 ### Test your plugin/theme
 
 You'll need to have a local PeerTube instance:
- * Follow the [dev prerequisites](https://github.com/Chocobozzz/PeerTube/blob/develop/.github/CONTRIBUTING.md#prerequisites) 
+ * Follow the [dev prerequisites](https://github.com/Chocobozzz/PeerTube/blob/develop/.github/CONTRIBUTING.md#prerequisites)
  (to clone the repository, install dependencies and prepare the database)
- * Build PeerTube (`--light` to only build the english language): 
+ * Build PeerTube (`--light` to only build the english language):
 
 ```
 $ npm run build -- --light
 ```
 
  * Build the CLI:
- 
+
 ```
 $ npm run setup:cli
 ```
- 
- * Run PeerTube (you can access to your instance on http://localhost:9000): 
+
+ * Run PeerTube (you can access to your instance on http://localhost:9000):
 
 ```
 $ NODE_ENV=test npm start
 ```
 
- * Register the instance via the CLI: 
+ * Register the instance via the CLI:
 
 ```
 $ node ./dist/server/tools/peertube.js auth add -u 'http://localhost:9000' -U 'root' --password 'test'
@@ -405,10 +659,10 @@ registerHook({
 })
 ```
   * Don't try to require parent PeerTube modules, only use `peertubeHelpers`. If you need another helper or a specific hook, please [create an issue](https://github.com/Chocobozzz/PeerTube/issues/new)
-  * Don't use PeerTube dependencies. Use your own :) 
+  * Don't use PeerTube dependencies. Use your own :)
 
 If your plugin is broken with a new PeerTube release, update your code and the `peertubeEngine` field of your `package.json` field.
-This way, older PeerTube versions will still use your old plugin, and new PeerTube versions will use your updated plugin. 
+This way, older PeerTube versions will still use your old plugin, and new PeerTube versions will use your updated plugin.
 
 ### Spam/moderation plugin
 
@@ -419,7 +673,7 @@ If you want to create an antispam/moderation plugin, you could use the following
  * `filter:api.video-threads.list.result`: to change/hide the text of threads
  * `filter:api.video-thread-comments.list.result`: to change/hide the text of replies
  * `filter:video.auto-blacklist.result`: to automatically blacklist local or remote videos
- 
+
 ### Other plugin examples
 
 You can take a look to "official" PeerTube plugins if you want to take inspiration from them: https://framagit.org/framasoft/peertube/official-plugins

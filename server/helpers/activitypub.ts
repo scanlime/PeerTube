@@ -6,9 +6,8 @@ import { ACTIVITY_PUB, REMOTE_SCHEME } from '../initializers/constants'
 import { signJsonLDObject } from './peertube-crypto'
 import { pageToStartAndCount } from './core-utils'
 import { URL } from 'url'
-import { MActor, MVideoAccountLight } from '../typings/models'
-
-export type ContextType = 'All' | 'View' | 'Announce' | 'CacheFile'
+import { MActor, MVideoAccountLight } from '../types/models'
+import { ContextType } from '@shared/models/activitypub/context'
 
 function getContextData (type: ContextType) {
   const context: any[] = [
@@ -41,6 +40,9 @@ function getContextData (type: ContextType) {
         language: 'sc:inLanguage',
 
         Infohash: 'pt:Infohash',
+        Playlist: 'pt:Playlist',
+        PlaylistElement: 'pt:PlaylistElement',
+
         originallyPublishedAt: 'sc:datePublished',
         views: {
           '@type': 'sc:Number',

@@ -1,15 +1,15 @@
-import { AuthService, ServerService } from '../../../core'
-import { FormReactive } from '../../../shared'
-import { ServerConfig, USER_ROLE_LABELS, UserRole, VideoResolution } from '../../../../../../shared'
+import { Directive, OnInit } from '@angular/core'
 import { ConfigService } from '@app/+admin/config/shared/config.service'
-import { UserAdminFlag } from '@shared/models/users/user-flag.model'
-import { OnInit } from '@angular/core'
-import { User } from '@app/shared/users/user.model'
-import { ScreenService } from '@app/shared/misc/screen.service'
+import { AuthService, ScreenService, ServerService, User } from '@app/core'
+import { FormReactive } from '@app/shared/shared-forms'
+import { USER_ROLE_LABELS } from '@shared/core-utils/users'
+import { ServerConfig, UserAdminFlag, UserRole, VideoResolution } from '@shared/models'
 
+@Directive()
+// tslint:disable-next-line: directive-class-suffix
 export abstract class UserEdit extends FormReactive implements OnInit {
-  videoQuotaOptions: { value: string, label: string }[] = []
-  videoQuotaDailyOptions: { value: string, label: string }[] = []
+  videoQuotaOptions: { value: string, label: string, disabled?: boolean }[] = []
+  videoQuotaDailyOptions: { value: string, label: string, disabled?: boolean }[] = []
   username: string
   user: User
 
@@ -88,15 +88,28 @@ export abstract class UserEdit extends FormReactive implements OnInit {
   }
 
   protected buildAdminFlags (formValue: any) {
-    return formValue.byPassAutoBlacklist ? UserAdminFlag.BY_PASS_VIDEO_AUTO_BLACKLIST : UserAdminFlag.NONE
+    return formValue.byPassAutoBlock ? UserAdminFlag.BYPASS_VIDEO_AUTO_BLACKLIST : UserAdminFlag.NONE
   }
 
   protected buildQuotaOptions () {
     // These are used by a HTML select, so convert key into strings
     this.videoQuotaOptions = this.configService
-                                 .videoQuotaOptions.map(q => ({ value: q.value.toString(), label: q.label }))
+                                 .videoQuotaOptions.map(q => ({
+                                   value: q.value?.toString(),
+                                   label: q.label,
+                                   disabled: q.disabled
+                                 }))
 
     this.videoQuotaDailyOptions = this.configService
-                                      .videoQuotaDailyOptions.map(q => ({ value: q.value.toString(), label: q.label }))
+                                      .videoQuotaDailyOptions.map(q => ({
+                                        value: q.value?.toString(),
+                                        label: q.label,
+                                        disabled: q.disabled
+                                      }))
+
+    console.log(
+      this.videoQuotaOptions,
+      this.videoQuotaDailyOptions
+    )
   }
 }

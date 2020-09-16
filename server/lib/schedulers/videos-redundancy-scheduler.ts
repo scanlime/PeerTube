@@ -6,11 +6,10 @@ import { VideoRedundancyModel } from '../../models/redundancy/video-redundancy'
 import { downloadWebTorrentVideo, generateMagnetUri } from '../../helpers/webtorrent'
 import { join } from 'path'
 import { move } from 'fs-extra'
-import { getServerActor } from '../../helpers/utils'
 import { sendCreateCacheFile, sendUpdateCacheFile } from '../activitypub/send'
 import { getVideoCacheFileActivityPubUrl, getVideoCacheStreamingPlaylistActivityPubUrl } from '../activitypub/url'
 import { removeVideoRedundancy } from '../redundancy'
-import { getOrCreateVideoAndAccountAndChannel } from '../activitypub'
+import { getOrCreateVideoAndAccountAndChannel } from '../activitypub/videos'
 import { downloadPlaylistSegments } from '../hls'
 import { CONFIG } from '../../initializers/config'
 import {
@@ -23,9 +22,10 @@ import {
   MVideoRedundancyStreamingPlaylistVideo,
   MVideoRedundancyVideo,
   MVideoWithAllFiles
-} from '@server/typings/models'
+} from '@server/types/models'
 import { getVideoFilename } from '../video-paths'
 import { VideoModel } from '@server/models/video/video'
+import { getServerActor } from '@server/models/application/application'
 
 type CandidateToDuplicate = {
   redundancy: VideosRedundancyStrategy

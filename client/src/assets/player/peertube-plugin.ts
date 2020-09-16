@@ -1,4 +1,4 @@
-import videojs, { VideoJsPlayer } from 'video.js'
+import videojs from 'video.js'
 import './videojs-components/settings-menu-button'
 import {
   PeerTubePluginOptions,
@@ -36,7 +36,7 @@ class PeerTubePlugin extends Plugin {
   private mouseInControlBar = false
   private readonly savedInactivityTimeout: number
 
-  constructor (player: VideoJsPlayer, options?: PeerTubePluginOptions) {
+  constructor (player: videojs.Player, options?: PeerTubePluginOptions) {
     super(player)
 
     this.videoViewUrl = options.videoViewUrl
@@ -45,7 +45,7 @@ class PeerTubePlugin extends Plugin {
 
     this.savedInactivityTimeout = player.options_.inactivityTimeout
 
-    if (options.autoplay === true) this.player.addClass('vjs-has-autoplay')
+    if (options.autoplay) this.player.addClass('vjs-has-autoplay')
 
     this.player.on('autoplay-failure', () => {
       this.player.removeClass('vjs-has-autoplay')
@@ -233,12 +233,20 @@ class PeerTubePlugin extends Plugin {
   }
 
   private alterInactivity () {
-    if (this.menuOpened || this.mouseInControlBar) {
+    if (this.menuOpened) {
       this.player.options_.inactivityTimeout = this.savedInactivityTimeout
       return
     }
 
-    this.player.options_.inactivityTimeout = 1
+    if (!this.mouseInControlBar && !this.isTouchEnabled()) {
+      this.player.options_.inactivityTimeout = 1
+    }
+  }
+
+  private isTouchEnabled () {
+    return ('ontouchstart' in window) ||
+      navigator.maxTouchPoints > 0 ||
+      navigator.msMaxTouchPoints > 0
   }
 
   private initCaptions () {

@@ -1,14 +1,22 @@
-import { VideoModel } from '../models/video/video'
 import * as Bluebird from 'bluebird'
+import { Response } from 'express'
+import { CONFIG } from '@server/initializers/config'
+import { DEFAULT_AUDIO_RESOLUTION } from '@server/initializers/constants'
+import { JobQueue } from '@server/lib/job-queue'
 import {
+  isStreamingPlaylist,
+  MStreamingPlaylistVideo,
+  MVideo,
   MVideoAccountLightBlacklistAllFiles,
+  MVideoFile,
   MVideoFullLight,
   MVideoIdThumbnail,
+  MVideoImmutable,
   MVideoThumbnail,
-  MVideoWithRights,
-  MVideoImmutable
-} from '@server/typings/models'
-import { Response } from 'express'
+  MVideoWithRights
+} from '@server/types/models'
+import { VideoPrivacy, VideoTranscodingPayload } from '@shared/models'
+import { VideoModel } from '../models/video/video'
 
 type VideoFetchType = 'all' | 'only-video' | 'only-video-with-rights' | 'id' | 'none' | 'only-immutable-attributes'
 
@@ -62,10 +70,63 @@ function getVideoWithAttributes (res: Response) {
   return res.locals.videoAll || res.locals.onlyVideo || res.locals.onlyVideoWithRights
 }
 
+function addOptimizeOrMergeAudioJob (video: MVideo, videoFile: MVideoFile) {
+  let dataInput: VideoTranscodingPayload
+
+  if (videoFile.isAudio()) {
+    dataInput = {
+      type: 'merge-audio' as 'merge-audio',
+      resolution: DEFAULT_AUDIO_RESOLUTION,
+      videoUUID: video.uuid,
+      isNewVideo: true
+    }
+  } else {
+    dataInput = {
+      type: 'optimize' as 'optimize',
+      videoUUID: video.uuid,
+      isNewVideo: true
+    }
+  }
+
+  return JobQueue.Instance.createJobWithPromise({ type: 'video-transcoding', payload: dataInput })
+}
+
+function extractVideo (videoOrPlaylist: MVideo | MStreamingPlaylistVideo) {
+  return isStreamingPlaylist(videoOrPlaylist)
+    ? videoOrPlaylist.Video
+    : videoOrPlaylist
+}
+
+function isPrivacyForFederation (privacy: VideoPrivacy) {
+  const castedPrivacy = parseInt(privacy + '', 10)
+
+  return castedPrivacy === VideoPrivacy.PUBLIC ||
+    (CONFIG.FEDERATION.VIDEOS.FEDERATE_UNLISTED === true && castedPrivacy === VideoPrivacy.UNLISTED)
+}
+
+function getPrivaciesForFederation () {
+  return (CONFIG.FEDERATION.VIDEOS.FEDERATE_UNLISTED === true)
+    ? [ { privacy: VideoPrivacy.PUBLIC }, { privacy: VideoPrivacy.UNLISTED } ]
+    : [ { privacy: VideoPrivacy.PUBLIC } ]
+}
+
+function getExtFromMimetype (mimeTypes: { [id: string]: string | string[] }, mimeType: string) {
+  const value = mimeTypes[mimeType]
+
+  if (Array.isArray(value)) return value[0]
+
+  return value
+}
+
 export {
   VideoFetchType,
   VideoFetchByUrlType,
   fetchVideo,
   getVideoWithAttributes,
-  fetchVideoByUrl
+  fetchVideoByUrl,
+  addOptimizeOrMergeAudioJob,
+  extractVideo,
+  getExtFromMimetype,
+  isPrivacyForFederation,
+  getPrivaciesForFederation
 }

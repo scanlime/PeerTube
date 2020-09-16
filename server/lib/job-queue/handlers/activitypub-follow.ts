@@ -10,14 +10,8 @@ import { ActorFollowModel } from '../../../models/activitypub/actor-follow'
 import { ActorModel } from '../../../models/activitypub/actor'
 import { Notifier } from '../../notifier'
 import { sequelizeTypescript } from '../../../initializers/database'
-import { MActor, MActorFollowActors, MActorFull } from '../../../typings/models'
-
-export type ActivitypubFollowPayload = {
-  followerActorId: number
-  name: string
-  host: string
-  isAutoFollow?: boolean
-}
+import { MActor, MActorFollowActors, MActorFull } from '../../../types/models'
+import { ActivitypubFollowPayload } from '@shared/models'
 
 async function processActivityPubFollow (job: Bull.Job) {
   const payload = job.data as ActivitypubFollowPayload
@@ -32,6 +26,11 @@ async function processActivityPubFollow (job: Bull.Job) {
     const sanitizedHost = sanitizeHost(host, REMOTE_SCHEME.HTTP)
     const actorUrl = await loadActorUrlOrGetFromWebfinger(payload.name + '@' + sanitizedHost)
     targetActor = await getOrCreateActorAndServerAndModel(actorUrl, 'all')
+  }
+
+  if (payload.assertIsChannel && !targetActor.VideoChannel) {
+    logger.warn('Do not follow %s@%s because it is not a channel.', payload.name, host)
+    return
   }
 
   const fromActor = await ActorModel.load(payload.followerActorId)

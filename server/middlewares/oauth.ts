@@ -1,17 +1,8 @@
 import * as express from 'express'
-import * as OAuthServer from 'express-oauth-server'
-import { OAUTH_LIFETIME } from '../initializers/constants'
 import { logger } from '../helpers/logger'
 import { Socket } from 'socket.io'
 import { getAccessToken } from '../lib/oauth-model'
-
-const oAuthServer = new OAuthServer({
-  useErrorHandler: true,
-  accessTokenLifetime: OAUTH_LIFETIME.ACCESS_TOKEN,
-  refreshTokenLifetime: OAUTH_LIFETIME.REFRESH_TOKEN,
-  continueMiddleware: true,
-  model: require('../lib/oauth-model')
-})
+import { oAuthServer } from '@server/lib/auth'
 
 function authenticate (req: express.Request, res: express.Response, next: express.NextFunction, authenticateInQuery = false) {
   const options = authenticateInQuery ? { allowBearerTokensInQueryString: true } : {}
@@ -57,7 +48,7 @@ function authenticateSocket (socket: Socket, next: (err?: any) => void) {
 function authenticatePromiseIfNeeded (req: express.Request, res: express.Response, authenticateInQuery = false) {
   return new Promise(resolve => {
     // Already authenticated? (or tried to)
-    if (res.locals.oauth && res.locals.oauth.token.User) return resolve()
+    if (res.locals.oauth?.token.User) return resolve()
 
     if (res.locals.authenticated === false) return res.sendStatus(401)
 
@@ -73,27 +64,11 @@ function optionalAuthenticate (req: express.Request, res: express.Response, next
   return next()
 }
 
-function token (req: express.Request, res: express.Response, next: express.NextFunction) {
-  return oAuthServer.token()(req, res, err => {
-    if (err) {
-      return res.status(err.status)
-        .json({
-          error: err.message,
-          code: err.name
-        })
-        .end()
-    }
-
-    return next()
-  })
-}
-
 // ---------------------------------------------------------------------------
 
 export {
   authenticate,
   authenticateSocket,
   authenticatePromiseIfNeeded,
-  optionalAuthenticate,
-  token
+  optionalAuthenticate
 }

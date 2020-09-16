@@ -3,15 +3,15 @@ import { body, param, query } from 'express-validator'
 import { isTestInstance } from '../../helpers/core-utils'
 import { isEachUniqueHostValid, isHostValid } from '../../helpers/custom-validators/servers'
 import { logger } from '../../helpers/logger'
-import { getServerActor } from '../../helpers/utils'
 import { SERVER_ACTOR_NAME, WEBSERVER } from '../../initializers/constants'
 import { ActorFollowModel } from '../../models/activitypub/actor-follow'
 import { areValidationErrors } from './utils'
 import { ActorModel } from '../../models/activitypub/actor'
 import { loadActorUrlOrGetFromWebfinger } from '../../helpers/webfinger'
 import { isActorTypeValid, isValidActorHandle } from '../../helpers/custom-validators/activitypub/actor'
-import { MActorFollowActorsDefault } from '@server/typings/models'
+import { MActorFollowActorsDefault } from '@server/types/models'
 import { isFollowStateValid } from '@server/helpers/custom-validators/follows'
+import { getServerActor } from '@server/models/application/application'
 
 const listFollowsValidator = [
   query('state')

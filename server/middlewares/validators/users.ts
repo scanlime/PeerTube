@@ -35,13 +35,28 @@ import { isThemeNameValid } from '../../helpers/custom-validators/plugins'
 import { isThemeRegistered } from '../../lib/plugins/theme-utils'
 import { doesVideoExist } from '../../helpers/middlewares'
 import { UserRole } from '../../../shared/models/users'
-import { MUserDefault } from '@server/typings/models'
+import { MUserDefault } from '@server/types/models'
 import { Hooks } from '@server/lib/plugins/hooks'
+
+const usersListValidator = [
+  query('blocked')
+    .optional()
+    .isBoolean().withMessage('Should be a valid boolean banned state'),
+
+  (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    logger.debug('Checking usersList parameters', { parameters: req.query })
+
+    if (areValidationErrors(req, res)) return
+
+    return next()
+  }
+]
 
 const usersAddValidator = [
   body('username').custom(isUserUsernameValid).withMessage('Should have a valid username (lowercase alphanumeric characters)'),
   body('password').custom(isUserPasswordValidOrEmpty).withMessage('Should have a valid password'),
   body('email').isEmail().withMessage('Should have a valid email'),
+  body('channelName').optional().custom(isActorPreferredUsernameValid).withMessage('Should have a valid channel name'),
   body('videoQuota').custom(isUserVideoQuotaValid).withMessage('Should have a valid user quota'),
   body('videoQuotaDaily').custom(isUserVideoQuotaDailyValid).withMessage('Should have a valid daily user quota'),
   body('role')
@@ -59,6 +74,19 @@ const usersAddValidator = [
     if (authUser.role !== UserRole.ADMINISTRATOR && req.body.role !== UserRole.USER) {
       return res.status(403)
         .json({ error: 'You can only create users (and not administrators or moderators)' })
+    }
+
+    if (req.body.channelName) {
+      if (req.body.channelName === req.body.username) {
+        return res.status(400)
+          .json({ error: 'Channel name cannot be the same as user username.' })
+      }
+
+      const existing = await ActorModel.loadLocalByName(req.body.channelName)
+      if (existing) {
+        return res.status(409)
+          .json({ error: `Channel with name ${req.body.channelName} already exists.` })
+      }
     }
 
     return next()
@@ -234,14 +262,19 @@ const usersUpdateMeValidator = [
   async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     logger.debug('Checking usersUpdateMe parameters', { parameters: omit(req.body, 'password') })
 
+    const user = res.locals.oauth.token.User
+
     if (req.body.password || req.body.email) {
+      if (user.pluginAuth !== null) {
+        return res.status(400)
+                  .json({ error: 'You cannot update your email or password that is associated with an external auth system.' })
+      }
+
       if (!req.body.currentPassword) {
         return res.status(400)
                   .json({ error: 'currentPassword parameter is missing.' })
-                  .end()
       }
 
-      const user = res.locals.oauth.token.User
       if (await user.isPasswordMatch(req.body.currentPassword) !== true) {
         return res.status(401)
                   .json({ error: 'currentPassword is invalid.' })
@@ -439,6 +472,7 @@ const ensureCanManageUser = [
 // ---------------------------------------------------------------------------
 
 export {
+  usersListValidator,
   usersAddValidator,
   deleteMeValidator,
   usersRegisterValidator,

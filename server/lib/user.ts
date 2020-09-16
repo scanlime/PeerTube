@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { ActivityPubActorType } from '../../shared/models/activitypub'
 import { SERVER_ACTOR_NAME, WEBSERVER } from '../initializers/constants'
 import { AccountModel } from '../models/account/account'
-import { buildActorInstance, getAccountActivityPubUrl, setAsyncActorKeys } from './activitypub'
+import { buildActorInstance, setAsyncActorKeys } from './activitypub/actor'
 import { createLocalVideoChannel } from './video-channel'
 import { ActorModel } from '../models/activitypub/actor'
 import { UserNotificationSettingModel } from '../models/account/user-notification-setting'
@@ -12,8 +12,9 @@ import { sequelizeTypescript } from '../initializers/database'
 import { Transaction } from 'sequelize/types'
 import { Redis } from './redis'
 import { Emailer } from './emailer'
-import { MAccountDefault, MActorDefault, MChannelActor } from '../typings/models'
-import { MUser, MUserDefault, MUserId } from '../typings/models/user'
+import { MAccountDefault, MActorDefault, MChannelActor } from '../types/models'
+import { MUser, MUserDefault, MUserId } from '../types/models/user'
+import { getAccountActivityPubUrl } from './activitypub/url'
 
 type ChannelNames = { name: string, displayName: string }
 
@@ -110,8 +111,9 @@ async function sendVerifyUserEmail (user: MUser, isPendingEmail = false) {
   if (isPendingEmail) url += '&isPendingEmail=true'
 
   const email = isPendingEmail ? user.pendingEmail : user.email
+  const username = user.username
 
-  await Emailer.Instance.addVerifyEmailJob(email, url)
+  await Emailer.Instance.addVerifyEmailJob(username, email, url)
 }
 
 // ---------------------------------------------------------------------------
@@ -132,13 +134,15 @@ function createDefaultUserNotificationSettings (user: MUserId, t: Transaction | 
     newCommentOnMyVideo: UserNotificationSettingValue.WEB,
     myVideoImportFinished: UserNotificationSettingValue.WEB,
     myVideoPublished: UserNotificationSettingValue.WEB,
-    videoAbuseAsModerator: UserNotificationSettingValue.WEB | UserNotificationSettingValue.EMAIL,
+    abuseAsModerator: UserNotificationSettingValue.WEB | UserNotificationSettingValue.EMAIL,
     videoAutoBlacklistAsModerator: UserNotificationSettingValue.WEB | UserNotificationSettingValue.EMAIL,
     blacklistOnMyVideo: UserNotificationSettingValue.WEB | UserNotificationSettingValue.EMAIL,
     newUserRegistration: UserNotificationSettingValue.WEB,
     commentMention: UserNotificationSettingValue.WEB,
     newFollow: UserNotificationSettingValue.WEB,
     newInstanceFollower: UserNotificationSettingValue.WEB,
+    abuseNewMessage: UserNotificationSettingValue.WEB | UserNotificationSettingValue.EMAIL,
+    abuseStateChange: UserNotificationSettingValue.WEB | UserNotificationSettingValue.EMAIL,
     autoInstanceFollowing: UserNotificationSettingValue.WEB
   }
 

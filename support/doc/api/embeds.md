@@ -4,8 +4,8 @@ PeerTube lets you embed videos and programmatically control their playback. This
 
 ## Playground
 
-Any PeerTube embed URL (ie `https://my-instance.example.com/videos/embed/52a10666-3a18-4e73-93da-e8d3c12c305a`) can be viewed as an embedding playground which 
-allows you to test various aspects of PeerTube embeds. Simply replace `/embed` with `/test-embed` and visit the URL in a browser. 
+Any PeerTube embed URL (ie `https://my-instance.example.com/videos/embed/52a10666-3a18-4e73-93da-e8d3c12c305a`) can be viewed as an embedding playground which
+allows you to test various aspects of PeerTube embeds. Simply replace `/embed` with `/test-embed` and visit the URL in a browser.
 For instance, the playground URL for the above embed URL is `https://my-instance.example.com/videos/test-embed/52a10666-3a18-4e73-93da-e8d3c12c305a`.
 
 ## Quick Start
@@ -95,11 +95,11 @@ Get the available playback rates, where `1` represents normal speed, `0.5` is ha
 
 Get the current playback rate. See `getPlaybackRates()` for more information.
 
-## `setPlaybackRate(rate : number) : Promise<void>`
+## `setPlaybackRate(rate: number) : Promise<void>`
 
 Set the current playback rate. The passed rate should be a value as returned by `getPlaybackRates()`.
 
-## `setVolume(factor : number) : Promise<void>`
+## `setVolume(factor: number) : Promise<void>`
 
 Set the playback volume. Value should be between `0` and `1`.
 
@@ -107,13 +107,33 @@ Set the playback volume. Value should be between `0` and `1`.
 
 Get the playback volume. Returns a value between `0` and `1`.
 
+## `setCaption(id: string) : Promise<void>`
+
+Update current caption using the caption id.
+
+## `getCaptions(): Promise<{ id: string, label: string, src: string, mode: 'disabled' | 'showing' }>`
+
+Get video captions.
+
+## `playNextVideo(): Promise<void>`
+
+Play next video in playlist.
+
+## `playPreviousVideo(): Promise<void>`
+
+Play previous video in playlist.
+
+## `getCurrentPosition(): Promise<void>`
+
+Get current position in playlist (starts from 1).
+
 # Events
 
 You can subscribe to events by using `addEventListener()`. See above for details.
 
 ## Event `playbackStatusUpdate`
 
-Fired every half second to provide the current status of playback. 
+Fired every half second to provide the current status of playback.
 The parameter of the callback will resemble:
 
 ```json
@@ -124,6 +144,8 @@ The parameter of the callback will resemble:
   "playbackState": "playing"
 }
 ```
+
+`duration` field and `ended` `playbackState` are available in PeerTube >= 2.2.
 
 The `volume` field contains the volume from `0` (silent) to `1` (full volume).
 The `playbackState` can be `unstarted`, `playing`, `paused` or `ended`. More states may be added later.

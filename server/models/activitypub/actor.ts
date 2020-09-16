@@ -45,7 +45,7 @@ import {
   MActorServer,
   MActorSummaryFormattable, MActorUrl,
   MActorWithInboxes
-} from '../../typings/models'
+} from '../../types/models'
 import * as Bluebird from 'bluebird'
 import { Op, Transaction, literal } from 'sequelize'
 import { ModelCache } from '@server/models/model-cache'
@@ -123,13 +123,13 @@ export const unusedActorAttributesForAPI = [
         }
       }
     },
-    // {
-    //   fields: [ 'preferredUsername' ],
-    //   unique: true,
-    //   where: {
-    //     serverId: null
-    //   }
-    // },
+    {
+      fields: [ 'preferredUsername' ],
+      unique: true,
+      where: {
+        serverId: null
+      }
+    },
     {
       fields: [ 'inboxUrl', 'sharedInboxUrl' ]
     },

@@ -1,14 +1,11 @@
-import { Component, OnInit } from '@angular/core'
-import { peertubeLocalStorage } from '@app/shared/misc/peertube-web-storage'
-import { Notifier } from '@app/core'
 import { SortMeta } from 'primeng/api'
-import { Job, JobType } from '../../../../../../shared/index'
-import { JobState } from '../../../../../../shared/models'
-import { RestPagination, RestTable } from '../../../shared'
-import { JobService } from './job.service'
-import { I18n } from '@ngx-translate/i18n-polyfill'
+import { Component, OnInit } from '@angular/core'
+import { Notifier, RestPagination, RestTable } from '@app/core'
+import { peertubeLocalStorage } from '@root-helpers/peertube-web-storage'
+import { Job, JobState, JobType } from '@shared/models'
 import { JobStateClient } from '../../../../types/job-state-client.type'
 import { JobTypeClient } from '../../../../types/job-type-client.type'
+import { JobService } from './job.service'
 
 @Component({
   selector: 'my-jobs',
@@ -40,15 +37,13 @@ export class JobsComponent extends RestTable implements OnInit {
 
   jobs: Job[] = []
   totalRecords: number
-  rowsPerPage = 10
   sort: SortMeta = { field: 'createdAt', order: -1 }
   pagination: RestPagination = { count: this.rowsPerPage, start: 0 }
 
   constructor (
     private notifier: Notifier,
-    private jobsService: JobService,
-    private i18n: I18n
-  ) {
+    private jobsService: JobService
+    ) {
     super()
   }
 
