@@ -1,4 +1,4 @@
-/* tslint:disable:no-unused-expression */
+/* eslint-disable @typescript-eslint/no-unused-expressions,@typescript-eslint/require-await */
 
 import 'mocha'
 import * as io from 'socket.io-client'
@@ -164,7 +164,7 @@ describe('Test user notifications API validators', function () {
     const correctFields: UserNotificationSetting = {
       newVideoFromSubscription: UserNotificationSettingValue.WEB,
       newCommentOnMyVideo: UserNotificationSettingValue.WEB,
-      videoAbuseAsModerator: UserNotificationSettingValue.WEB,
+      abuseAsModerator: UserNotificationSettingValue.WEB,
       videoAutoBlacklistAsModerator: UserNotificationSettingValue.WEB,
       blacklistOnMyVideo: UserNotificationSettingValue.WEB,
       myVideoImportFinished: UserNotificationSettingValue.WEB,
@@ -173,7 +173,9 @@ describe('Test user notifications API validators', function () {
       newFollow: UserNotificationSettingValue.WEB,
       newUserRegistration: UserNotificationSettingValue.WEB,
       newInstanceFollower: UserNotificationSettingValue.WEB,
-      autoInstanceFollowing: UserNotificationSettingValue.WEB
+      autoInstanceFollowing: UserNotificationSettingValue.WEB,
+      abuseNewMessage: UserNotificationSettingValue.WEB,
+      abuseStateChange: UserNotificationSettingValue.WEB
     }
 
     it('Should fail with missing fields', async function () {

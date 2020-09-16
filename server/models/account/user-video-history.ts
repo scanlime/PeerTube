@@ -2,7 +2,7 @@ import { AllowNull, BelongsTo, Column, CreatedAt, ForeignKey, IsInt, Model, Tabl
 import { VideoModel } from '../video/video'
 import { UserModel } from './user'
 import { DestroyOptions, Op, Transaction } from 'sequelize'
-import { MUserAccountId, MUserId } from '@server/typings/models'
+import { MUserAccountId, MUserId } from '@server/types/models'
 
 @Table({
   tableName: 'userVideoHistory',
@@ -59,7 +59,7 @@ export class UserVideoHistoryModel extends Model<UserVideoHistoryModel> {
     return VideoModel.listForApi({
       start,
       count,
-      sort: '-UserVideoHistories.updatedAt',
+      sort: '-"userVideoHistory"."updatedAt"',
       nsfw: null, // All
       includeLocalVideos: true,
       withFiles: false,

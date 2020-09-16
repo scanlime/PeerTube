@@ -1,14 +1,17 @@
+import { AbusePredefinedReasonsString } from '../../moderation/abuse/abuse-reason.model'
+
 export interface ActivityIdentifierObject {
   identifier: string
   name: string
+  url?: string
 }
 
 export interface ActivityIconObject {
   type: 'Image'
   url: string
-  mediaType: 'image/jpeg'
-  width: number
-  height: number
+  mediaType: 'image/jpeg' | 'image/png'
+  width?: number
+  height?: number
 }
 
 export type ActivityVideoUrlObject = {
@@ -25,6 +28,15 @@ export type ActivityPlaylistSegmentHashesObject = {
   name: 'sha256'
   mediaType: 'application/json'
   href: string
+}
+
+export type ActivityVideoFileMetadataObject = {
+  type: 'Link'
+  rel: [ 'metadata', any ]
+  mediaType: 'application/json'
+  height: number
+  href: string
+  fps: number
 }
 
 export type ActivityPlaylistInfohashesObject = {
@@ -60,30 +72,39 @@ export type ActivityHtmlUrlObject = {
 }
 
 export interface ActivityHashTagObject {
-  type: 'Hashtag' | 'Mention'
+  type: 'Hashtag'
   href?: string
   name: string
 }
 
 export interface ActivityMentionObject {
-  type: 'Hashtag' | 'Mention'
+  type: 'Mention'
   href?: string
   name: string
 }
 
-export type ActivityTagObject = ActivityPlaylistSegmentHashesObject |
-  ActivityPlaylistInfohashesObject |
-  ActivityVideoUrlObject |
-  ActivityHashTagObject |
-  ActivityMentionObject |
-  ActivityBitTorrentUrlObject |
-  ActivityMagnetUrlObject
+export interface ActivityFlagReasonObject {
+  type: 'Hashtag'
+  name: AbusePredefinedReasonsString
+}
 
-export type ActivityUrlObject = ActivityVideoUrlObject |
-  ActivityPlaylistUrlObject |
-  ActivityBitTorrentUrlObject |
-  ActivityMagnetUrlObject |
-  ActivityHtmlUrlObject
+export type ActivityTagObject =
+  ActivityPlaylistSegmentHashesObject
+  | ActivityPlaylistInfohashesObject
+  | ActivityVideoUrlObject
+  | ActivityHashTagObject
+  | ActivityMentionObject
+  | ActivityBitTorrentUrlObject
+  | ActivityMagnetUrlObject
+  | ActivityVideoFileMetadataObject
+
+export type ActivityUrlObject =
+  ActivityVideoUrlObject
+  | ActivityPlaylistUrlObject
+  | ActivityBitTorrentUrlObject
+  | ActivityMagnetUrlObject
+  | ActivityHtmlUrlObject
+  | ActivityVideoFileMetadataObject
 
 export interface ActivityPubAttributedTo {
   type: 'Group' | 'Person'

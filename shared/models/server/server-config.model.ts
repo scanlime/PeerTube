@@ -1,5 +1,6 @@
-import { NSFWPolicyType } from '../videos/nsfw-policy.type'
 import { ClientScript } from '../plugins/plugin-package-json.model'
+import { NSFWPolicyType } from '../videos/nsfw-policy.type'
+import { BroadcastMessageLevel } from './broadcast-message-level.type'
 
 export interface ServerConfigPlugin {
   name: string
@@ -10,6 +11,22 @@ export interface ServerConfigPlugin {
 
 export interface ServerConfigTheme extends ServerConfigPlugin {
   css: string[]
+}
+
+export interface RegisteredExternalAuthConfig {
+  npmName: string
+  name: string
+  version: string
+  authName: string
+  authDisplayName: string
+}
+
+export interface RegisteredIdAndPassAuthConfig {
+  npmName: string
+  name: string
+  version: string
+  authName: string
+  weight: number
 }
 
 export interface ServerConfig {
@@ -28,8 +45,26 @@ export interface ServerConfig {
     }
   }
 
+  search: {
+    remoteUri: {
+      users: boolean
+      anonymous: boolean
+    }
+
+    searchIndex: {
+      enabled: boolean
+      url: string
+      disableLocalSearch: boolean
+      isDefaultSearch: boolean
+    }
+  }
+
   plugin: {
     registered: ServerConfigPlugin[]
+
+    registeredExternalAuths: RegisteredExternalAuthConfig[]
+
+    registeredIdAndPassAuths: RegisteredIdAndPassAuthConfig[]
   }
 
   theme: {
@@ -46,7 +81,7 @@ export interface ServerConfig {
   }
 
   signup: {
-    allowed: boolean,
+    allowed: boolean
     allowedForCurrentIP: boolean
     requiresEmailVerification: boolean
   }
@@ -97,7 +132,7 @@ export interface ServerConfig {
         max: number
       }
       extensions: string[]
-    },
+    }
     file: {
       extensions: string[]
     }
@@ -107,7 +142,7 @@ export interface ServerConfig {
     file: {
       size: {
         max: number
-      },
+      }
       extensions: string[]
     }
   }
@@ -125,5 +160,20 @@ export interface ServerConfig {
 
   tracker: {
     enabled: boolean
+  }
+
+  followings: {
+    instance: {
+      autoFollowIndex: {
+        indexUrl: string
+      }
+    }
+  }
+
+  broadcastMessage: {
+    enabled: boolean
+    message: string
+    level: BroadcastMessageLevel
+    dismissable: boolean
   }
 }

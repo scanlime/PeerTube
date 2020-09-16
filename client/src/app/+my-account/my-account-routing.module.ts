@@ -2,29 +2,21 @@ import { NgModule } from '@angular/core'
 import { RouterModule, Routes } from '@angular/router'
 import { MetaGuard } from '@ngx-meta/core'
 import { LoginGuard } from '../core'
-import { MyAccountComponent } from './my-account.component'
+import { MyAccountBlocklistComponent } from './my-account-blocklist/my-account-blocklist.component'
+import { MyAccountServerBlocklistComponent } from './my-account-blocklist/my-account-server-blocklist.component'
+import { MyAccountHistoryComponent } from './my-account-history/my-account-history.component'
+import { MyAccountNotificationsComponent } from './my-account-notifications/my-account-notifications.component'
+import { MyAccountOwnershipComponent } from './my-account-ownership/my-account-ownership.component'
 import { MyAccountSettingsComponent } from './my-account-settings/my-account-settings.component'
+import { MyAccountSubscriptionsComponent } from './my-account-subscriptions/my-account-subscriptions.component'
+import { MyAccountVideoImportsComponent } from './my-account-video-imports/my-account-video-imports.component'
+import { MyAccountVideoPlaylistCreateComponent } from './my-account-video-playlists/my-account-video-playlist-create.component'
+import { MyAccountVideoPlaylistElementsComponent } from './my-account-video-playlists/my-account-video-playlist-elements.component'
+import { MyAccountVideoPlaylistUpdateComponent } from './my-account-video-playlists/my-account-video-playlist-update.component'
+import { MyAccountVideoPlaylistsComponent } from './my-account-video-playlists/my-account-video-playlists.component'
 import { MyAccountVideosComponent } from './my-account-videos/my-account-videos.component'
-import { MyAccountVideoChannelsComponent } from '@app/+my-account/my-account-video-channels/my-account-video-channels.component'
-import { MyAccountVideoChannelCreateComponent } from '@app/+my-account/my-account-video-channels/my-account-video-channel-create.component'
-import { MyAccountVideoChannelUpdateComponent } from '@app/+my-account/my-account-video-channels/my-account-video-channel-update.component'
-import { MyAccountVideoImportsComponent } from '@app/+my-account/my-account-video-imports/my-account-video-imports.component'
-import { MyAccountSubscriptionsComponent } from '@app/+my-account/my-account-subscriptions/my-account-subscriptions.component'
-import { MyAccountOwnershipComponent } from '@app/+my-account/my-account-ownership/my-account-ownership.component'
-import { MyAccountBlocklistComponent } from '@app/+my-account/my-account-blocklist/my-account-blocklist.component'
-import { MyAccountServerBlocklistComponent } from '@app/+my-account/my-account-blocklist/my-account-server-blocklist.component'
-import { MyAccountHistoryComponent } from '@app/+my-account/my-account-history/my-account-history.component'
-import { MyAccountNotificationsComponent } from '@app/+my-account/my-account-notifications/my-account-notifications.component'
-import { MyAccountVideoPlaylistsComponent } from '@app/+my-account/my-account-video-playlists/my-account-video-playlists.component'
-import {
-  MyAccountVideoPlaylistCreateComponent
-} from '@app/+my-account/my-account-video-playlists/my-account-video-playlist-create.component'
-import {
-  MyAccountVideoPlaylistUpdateComponent
-} from '@app/+my-account/my-account-video-playlists/my-account-video-playlist-update.component'
-import {
-  MyAccountVideoPlaylistElementsComponent
-} from '@app/+my-account/my-account-video-playlists/my-account-video-playlist-elements.component'
+import { MyAccountComponent } from './my-account.component'
+import { MyAccountAbusesListComponent } from './my-account-abuses/my-account-abuses-list.component'
 
 const myAccountRoutes: Routes = [
   {
@@ -42,36 +34,16 @@ const myAccountRoutes: Routes = [
         component: MyAccountSettingsComponent,
         data: {
           meta: {
-            title: 'Account settings'
+            title: $localize`Account settings`
           }
         }
       },
 
       {
         path: 'video-channels',
-        component: MyAccountVideoChannelsComponent,
-        data: {
-          meta: {
-            title: 'Account video channels'
-          }
-        }
-      },
-      {
-        path: 'video-channels/create',
-        component: MyAccountVideoChannelCreateComponent,
-        data: {
-          meta: {
-            title: 'Create new video channel'
-          }
-        }
-      },
-      {
-        path: 'video-channels/update/:videoChannelId',
-        component: MyAccountVideoChannelUpdateComponent,
-        data: {
-          meta: {
-            title: 'Update video channel'
-          }
+        loadChildren: () => {
+          return import('./+my-account-video-channels/my-account-video-channels.module')
+            .then(m => m.MyAccountVideoChannelsModule)
         }
       },
 
@@ -80,7 +52,7 @@ const myAccountRoutes: Routes = [
         component: MyAccountVideoPlaylistsComponent,
         data: {
           meta: {
-            title: 'Account playlists'
+            title: $localize`Account playlists`
           }
         }
       },
@@ -89,7 +61,7 @@ const myAccountRoutes: Routes = [
         component: MyAccountVideoPlaylistCreateComponent,
         data: {
           meta: {
-            title: 'Create new playlist'
+            title: $localize`Create new playlist`
           }
         }
       },
@@ -98,7 +70,7 @@ const myAccountRoutes: Routes = [
         component: MyAccountVideoPlaylistElementsComponent,
         data: {
           meta: {
-            title: 'Playlist elements'
+            title: $localize`Playlist elements`
           }
         }
       },
@@ -107,7 +79,7 @@ const myAccountRoutes: Routes = [
         component: MyAccountVideoPlaylistUpdateComponent,
         data: {
           meta: {
-            title: 'Update playlist'
+            title: $localize`Update playlist`
           }
         }
       },
@@ -117,7 +89,7 @@ const myAccountRoutes: Routes = [
         component: MyAccountVideosComponent,
         data: {
           meta: {
-            title: 'Account videos'
+            title: $localize`Account videos`
           },
           reuse: {
             enabled: true,
@@ -130,7 +102,7 @@ const myAccountRoutes: Routes = [
         component: MyAccountVideoImportsComponent,
         data: {
           meta: {
-            title: 'Account video imports'
+            title: $localize`Account video imports`
           }
         }
       },
@@ -139,7 +111,7 @@ const myAccountRoutes: Routes = [
         component: MyAccountSubscriptionsComponent,
         data: {
           meta: {
-            title: 'Account subscriptions'
+            title: $localize`Account subscriptions`
           }
         }
       },
@@ -148,7 +120,7 @@ const myAccountRoutes: Routes = [
         component: MyAccountOwnershipComponent,
         data: {
           meta: {
-            title: 'Ownership changes'
+            title: $localize`Ownership changes`
           }
         }
       },
@@ -157,7 +129,7 @@ const myAccountRoutes: Routes = [
         component: MyAccountBlocklistComponent,
         data: {
           meta: {
-            title: 'Muted accounts'
+            title: $localize`Muted accounts`
           }
         }
       },
@@ -166,7 +138,7 @@ const myAccountRoutes: Routes = [
         component: MyAccountServerBlocklistComponent,
         data: {
           meta: {
-            title: 'Muted instances'
+            title: $localize`Muted servers`
           }
         }
       },
@@ -175,7 +147,7 @@ const myAccountRoutes: Routes = [
         component: MyAccountHistoryComponent,
         data: {
           meta: {
-            title: 'Videos history'
+            title: $localize`Videos history`
           },
           reuse: {
             enabled: true,
@@ -188,7 +160,16 @@ const myAccountRoutes: Routes = [
         component: MyAccountNotificationsComponent,
         data: {
           meta: {
-            title: 'Notifications'
+            title: $localize`Notifications`
+          }
+        }
+      },
+      {
+        path: 'abuses',
+        component: MyAccountAbusesListComponent,
+        data: {
+          meta: {
+            title: $localize`My abuse reports`
           }
         }
       }

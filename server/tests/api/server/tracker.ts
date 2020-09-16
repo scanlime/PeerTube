@@ -1,4 +1,4 @@
-/* tslint:disable:no-unused-expression */
+/* eslint-disable @typescript-eslint/no-unused-expressions,@typescript-eslint/require-await,@typescript-eslint/no-floating-promises */
 
 import * as magnetUtil from 'magnet-uri'
 import 'mocha'
@@ -40,21 +40,6 @@ describe('Test tracker', function () {
     }
   })
 
-  it('Should return an error when adding an incorrect infohash', function (done) {
-    this.timeout(10000)
-    const webtorrent = new WebTorrent()
-
-    const torrent = webtorrent.add(badMagnet)
-
-    torrent.on('error', done)
-    torrent.on('warning', warn => {
-      const message = typeof warn === 'string' ? warn : warn.message
-      if (message.indexOf('Unknown infoHash ') !== -1) return done()
-    })
-
-    torrent.on('done', () => done(new Error('No error on infohash')))
-  })
-
   it('Should succeed with the correct infohash', function (done) {
     this.timeout(10000)
     const webtorrent = new WebTorrent()
@@ -64,7 +49,7 @@ describe('Test tracker', function () {
     torrent.on('error', done)
     torrent.on('warning', warn => {
       const message = typeof warn === 'string' ? warn : warn.message
-      if (message.indexOf('Unknown infoHash ') !== -1) return done(new Error('Error on infohash'))
+      if (message.includes('Unknown infoHash ')) return done(new Error('Error on infohash'))
     })
 
     torrent.on('done', done)
@@ -73,7 +58,10 @@ describe('Test tracker', function () {
   it('Should disable the tracker', function (done) {
     this.timeout(20000)
 
+    const errCb = () => done(new Error('Tracker is enabled'))
+
     killallServers([ server ])
+
     reRunServer(server, { tracker: { enabled: false } })
       .then(() => {
         const webtorrent = new WebTorrent()
@@ -83,11 +71,48 @@ describe('Test tracker', function () {
         torrent.on('error', done)
         torrent.on('warning', warn => {
           const message = typeof warn === 'string' ? warn : warn.message
-          if (message.indexOf('disabled ') !== -1) return done()
+          if (message.includes('disabled ')) {
+            torrent.off('done', errCb)
+
+            return done()
+          }
         })
 
-        torrent.on('done', () => done(new Error('Tracker is enabled')))
+        torrent.on('done', errCb)
       })
+  })
+
+  it('Should return an error when adding an incorrect infohash', function (done) {
+    this.timeout(20000)
+
+    killallServers([ server ])
+
+    reRunServer(server)
+      .then(() => {
+        const webtorrent = new WebTorrent()
+
+        const torrent = webtorrent.add(badMagnet)
+
+        torrent.on('error', done)
+        torrent.on('warning', warn => {
+          const message = typeof warn === 'string' ? warn : warn.message
+          if (message.includes('Unknown infoHash ')) return done()
+        })
+
+        torrent.on('done', () => done(new Error('No error on infohash')))
+      })
+  })
+
+  it('Should block the IP after the failed infohash', function (done) {
+    const webtorrent = new WebTorrent()
+
+    const torrent = webtorrent.add(goodMagnet)
+
+    torrent.on('error', done)
+    torrent.on('warning', warn => {
+      const message = typeof warn === 'string' ? warn : warn.message
+      if (message.includes('Unsupported tracker protocol')) return done()
+    })
   })
 
   after(async function () {

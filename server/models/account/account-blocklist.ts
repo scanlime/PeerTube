@@ -1,10 +1,12 @@
-import { BelongsTo, Column, CreatedAt, ForeignKey, Model, Scopes, Table, UpdatedAt } from 'sequelize-typescript'
-import { AccountModel } from './account'
-import { getSort } from '../utils'
-import { AccountBlock } from '../../../shared/models/blocklist'
-import { Op } from 'sequelize'
 import * as Bluebird from 'bluebird'
-import { MAccountBlocklist, MAccountBlocklistAccounts, MAccountBlocklistFormattable } from '@server/typings/models'
+import { Op } from 'sequelize'
+import { BelongsTo, Column, CreatedAt, ForeignKey, Model, Scopes, Table, UpdatedAt } from 'sequelize-typescript'
+import { MAccountBlocklist, MAccountBlocklistAccounts, MAccountBlocklistFormattable } from '@server/types/models'
+import { AccountBlock } from '../../../shared/models'
+import { ActorModel } from '../activitypub/actor'
+import { ServerModel } from '../server/server'
+import { getSort, searchAttribute } from '../utils'
+import { AccountModel } from './account'
 
 enum ScopeNames {
   WITH_ACCOUNTS = 'WITH_ACCOUNTS'
@@ -75,17 +77,12 @@ export class AccountBlocklistModel extends Model<AccountBlocklistModel> {
   })
   BlockedAccount: AccountModel
 
-  static isAccountMutedBy (accountId: number, targetAccountId: number) {
-    return AccountBlocklistModel.isAccountMutedByMulti([ accountId ], targetAccountId)
-      .then(result => result[accountId])
-  }
-
   static isAccountMutedByMulti (accountIds: number[], targetAccountId: number) {
     const query = {
       attributes: [ 'accountId', 'id' ],
       where: {
         accountId: {
-          [Op.in]: accountIds // FIXME: sequelize ANY seems broken
+          [Op.in]: accountIds
         },
         targetAccountId
       },
@@ -116,15 +113,35 @@ export class AccountBlocklistModel extends Model<AccountBlocklistModel> {
     return AccountBlocklistModel.findOne(query)
   }
 
-  static listForApi (accountId: number, start: number, count: number, sort: string) {
+  static listForApi (parameters: {
+    start: number
+    count: number
+    sort: string
+    search?: string
+    accountId: number
+  }) {
+    const { start, count, sort, search, accountId } = parameters
+
     const query = {
       offset: start,
       limit: count,
-      order: getSort(sort),
-      where: {
-        accountId
-      }
+      order: getSort(sort)
     }
+
+    const where = {
+      accountId
+    }
+
+    if (search) {
+      Object.assign(where, {
+        [Op.or]: [
+          searchAttribute(search, '$BlockedAccount.name$'),
+          searchAttribute(search, '$BlockedAccount.Actor.url$')
+        ]
+      })
+    }
+
+    Object.assign(query, { where })
 
     return AccountBlocklistModel
       .scope([ ScopeNames.WITH_ACCOUNTS ])
@@ -132,6 +149,42 @@ export class AccountBlocklistModel extends Model<AccountBlocklistModel> {
       .then(({ rows, count }) => {
         return { total: count, data: rows }
       })
+  }
+
+  static listHandlesBlockedBy (accountIds: number[]): Bluebird<string[]> {
+    const query = {
+      attributes: [],
+      where: {
+        accountId: {
+          [Op.in]: accountIds
+        }
+      },
+      include: [
+        {
+          attributes: [ 'id' ],
+          model: AccountModel.unscoped(),
+          required: true,
+          as: 'BlockedAccount',
+          include: [
+            {
+              attributes: [ 'preferredUsername' ],
+              model: ActorModel.unscoped(),
+              required: true,
+              include: [
+                {
+                  attributes: [ 'host' ],
+                  model: ServerModel.unscoped(),
+                  required: true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+
+    return AccountBlocklistModel.findAll(query)
+      .then(entries => entries.map(e => `${e.BlockedAccount.Actor.preferredUsername}@${e.BlockedAccount.Actor.Server.host}`))
   }
 
   toFormattedJSON (this: MAccountBlocklistFormattable): AccountBlock {

@@ -1,6 +1,6 @@
 import * as express from 'express'
 import { logger } from '../../../helpers/logger'
-import { sequelizeTypescript } from '../../../initializers'
+import { sequelizeTypescript } from '../../../initializers/database'
 import {
   asyncMiddleware,
   asyncRetryTransactionMiddleware,
@@ -12,13 +12,13 @@ import {
   videosTerminateChangeOwnershipValidator
 } from '../../../middlewares'
 import { VideoChangeOwnershipModel } from '../../../models/video/video-change-ownership'
-import { VideoChangeOwnershipStatus, VideoPrivacy, VideoState } from '../../../../shared/models/videos'
+import { VideoChangeOwnershipStatus, VideoState } from '../../../../shared/models/videos'
 import { VideoChannelModel } from '../../../models/video/video-channel'
 import { getFormattedObjects } from '../../../helpers/utils'
-import { changeVideoChannelShare } from '../../../lib/activitypub'
+import { changeVideoChannelShare } from '../../../lib/activitypub/share'
 import { sendUpdateVideo } from '../../../lib/activitypub/send'
 import { VideoModel } from '../../../models/video/video'
-import { MVideoFullLight } from '@server/typings/models'
+import { MVideoFullLight } from '@server/types/models'
 
 const ownershipVideoRouter = express.Router()
 
@@ -111,7 +111,7 @@ async function acceptOwnership (req: express.Request, res: express.Response) {
     const targetVideoUpdated = await targetVideo.save({ transaction: t }) as MVideoFullLight
     targetVideoUpdated.VideoChannel = channel
 
-    if (targetVideoUpdated.privacy !== VideoPrivacy.PRIVATE && targetVideoUpdated.state === VideoState.PUBLISHED) {
+    if (targetVideoUpdated.hasPrivacyForFederation() && targetVideoUpdated.state === VideoState.PUBLISHED) {
       await changeVideoChannelShare(targetVideoUpdated, oldVideoChannel, t)
       await sendUpdateVideo(targetVideoUpdated, t, oldVideoChannel.Account.Actor)
     }

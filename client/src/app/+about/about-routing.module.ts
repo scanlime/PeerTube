@@ -5,6 +5,7 @@ import { AboutComponent } from './about.component'
 import { AboutInstanceComponent } from '@app/+about/about-instance/about-instance.component'
 import { AboutPeertubeComponent } from '@app/+about/about-peertube/about-peertube.component'
 import { AboutFollowsComponent } from '@app/+about/about-follows/about-follows.component'
+import { AboutInstanceResolver } from '@app/+about/about-instance/about-instance.resolver'
 
 const aboutRoutes: Routes = [
   {
@@ -22,8 +23,11 @@ const aboutRoutes: Routes = [
         component: AboutInstanceComponent,
         data: {
           meta: {
-            title: 'About this instance'
+            title: $localize`About this instance`
           }
+        },
+        resolve: {
+          instanceData: AboutInstanceResolver
         }
       },
       {
@@ -31,7 +35,7 @@ const aboutRoutes: Routes = [
         component: AboutPeertubeComponent,
         data: {
           meta: {
-            title: 'About PeerTube'
+            title: $localize`About PeerTube`
           }
         }
       },
@@ -40,7 +44,7 @@ const aboutRoutes: Routes = [
         component: AboutFollowsComponent,
         data: {
           meta: {
-            title: 'About follows'
+            title: $localize`About follows`
           }
         }
       }

@@ -1,4 +1,4 @@
-/* tslint:disable:no-unused-expression */
+/* eslint-disable @typescript-eslint/no-unused-expressions,@typescript-eslint/require-await */
 
 import { omit } from 'lodash'
 import 'mocha'
@@ -132,6 +132,24 @@ describe('Test config API validators', function () {
           enabled: true,
           indexUrl: 'https://index.example.com'
         }
+      }
+    },
+    broadcastMessage: {
+      enabled: true,
+      dismissable: true,
+      message: 'super message',
+      level: 'warning'
+    },
+    search: {
+      remoteUri: {
+        users: true,
+        anonymous: true
+      },
+      searchIndex: {
+        enabled: true,
+        url: 'https://search.joinpeertube.org',
+        disableLocalSearch: true,
+        isDefaultSearch: true
       }
     }
   }

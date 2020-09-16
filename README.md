@@ -17,6 +17,18 @@ Be part of a network of multiple small federated, interoperable video hosting pr
 </p>
 
 <p align="center">
+:rocket::rocket::rocket:
+</p>
+
+<p align="center">
+<strong>Check, share and support PeerTube's v3 roadmap on https://joinpeertube.org/roadmap</strong>
+</p>
+
+<p align="center">
+:rocket: :rocket: :rocket:
+</p>
+
+<p align="center">
   <strong>Developed with &#10084; by <a href="https://framasoft.org">Framasoft</a></strong>
 </p>
 
@@ -34,9 +46,9 @@ Be part of a network of multiple small federated, interoperable video hosting pr
   <a href="https://david-dm.org/Chocobozzz/PeerTube?path=client&type=dev">
     <img src="https://david-dm.org/Chocobozzz/PeerTube/dev-status.svg?path=client" alt="devDependency Status" />
   </a>
-  
-  <a href="https://automate.browserstack.com/public-build/cW5mYW43VDNUR1Jrb0Y5TnVoaC85Tk84SVhzSU9rS0ppWWJJYUVlRzVQRT0tLW9tVGIvK2ZmOGRld3lVVFRYTFM4aEE9PQ==--591b0056e00a2d1cbdfbcfa324634046132008ec">
-    <img src="https://automate.browserstack.com/badge.svg?badge_key=cW5mYW43VDNUR1Jrb0Y5TnVoaC85Tk84SVhzSU9rS0ppWWJJYUVlRzVQRT0tLW9tVGIvK2ZmOGRld3lVVFRYTFM4aEE9PQ==--591b0056e00a2d1cbdfbcfa324634046132008ec"/>
+
+  <a href="https://automate.browserstack.com/public-build/T2g0SVQyMTJtYVRWaEZQTE9LdU9UU1ZDSkY5dTJ6dGlNRUVIajd4QlIwST0tLVdTQ1NUZ0pUTzRZT3lyZzkvWGNSZ1E9PQ==--278d3c68ae0827ce57e245e9f5a3b8c35d6e2278%">
+    <img src="https://automate.browserstack.com/badge.svg?badge_key=T2g0SVQyMTJtYVRWaEZQTE9LdU9UU1ZDSkY5dTJ6dGlNRUVIajd4QlIwST0tLVdTQ1NUZ0pUTzRZT3lyZzkvWGNSZ1E9PQ==--278d3c68ae0827ce57e245e9f5a3b8c35d6e2278%"/>
   </a>
 </p>
 
@@ -45,8 +57,8 @@ Be part of a network of multiple small federated, interoperable video hosting pr
 
   <br />
 
-  <a href="https://framagit.org/framasoft/peertube/PeerTube/commits/develop">
-    <img alt="pipeline status" src="https://framagit.org/framasoft/peertube/PeerTube/badges/develop/pipeline.svg" />
+  <a href="https://github.com/Chocobozzz/PeerTube/actions?query=workflow%3A%22Test+Suite%22+branch%3Adevelop">
+    <img alt="test suite status" src="https://github.com/Chocobozzz/PeerTube/workflows/Test%20Suite/badge.svg" />
   </a>
 
   <a href="https://david-dm.org/Chocobozzz/PeerTube">
@@ -66,14 +78,19 @@ Be part of a network of multiple small federated, interoperable video hosting pr
 
 <p align="center">
   <a href="https://framatube.org/videos/watch/217eefeb-883d-45be-b7fc-a788ad8507d3">
-    <img src="https://lutim.cpy.re/8cZDRIEF.png" alt="screenshot" />
+    <img src="http://lutim.cpy.re/9CLXh0Ys.png" alt="screenshot" />
   </a>
 </p>
 
 Introduction
 ----------------------------------------------------------------
 
-PeerTube is a free, decentralized and federated video platform developed as an alternative to other platforms that centralize our data and attention, such as YouTube, Dailymotion or Vimeo. :clapper: But one organization hosting PeerTube alone may not have enough money to pay for bandwidth and video storage of its servers, all servers of PeerTube are interoperable as a federated network, and non-PeerTube servers can be part of the larger Vidiverse (federated video network) by talking our implementation of ActivityPub. Video load is reduced thanks to P2P (BitTorrent) in the web browser via <a href="https://github.com/webtorrent/webtorrent">WebTorrent</a>.
+PeerTube is a free, decentralized and federated video platform developed as an alternative to other platforms that centralize our data and attention, such as YouTube, Dailymotion or Vimeo. :clapper:
+
+But one organization hosting PeerTube alone may not have enough money to pay for bandwidth and video storage of its servers,
+all servers of PeerTube are interoperable as a federated network, and non-PeerTube servers can be part of the larger Vidiverse
+(federated video network) by talking our implementation of ActivityPub.
+Video load is reduced thanks to P2P in the web browser using <a href="https://github.com/webtorrent/webtorrent">WebTorrent</a> or <a href="https://github.com/novage/p2p-media-loader">p2p-media-loader</a>.
 
 To learn more, see:
 * This [two-minute video](https://framatube.org/videos/watch/217eefeb-883d-45be-b7fc-a788ad8507d3) (hosted on PeerTube) explaining what PeerTube is and how it works
@@ -136,7 +153,7 @@ You can also join the cheerful bunch that makes our community:
   * Matrix (bridged on IRC and [Discord](https://discord.gg/wj8DDUT)) : **[#peertube:matrix.org](https://matrix.to/#/#peertube:matrix.org)**
 * Forum:
   * Framacolibri: [https://framacolibri.org/c/peertube](https://framacolibri.org/c/peertube)
-    
+
 Feel free to reach out if you have any questions or ideas! :speech_balloon:
 
 :package: Create your own instance
@@ -149,7 +166,7 @@ Feel free to reach out if you have any questions or ideas! :speech_balloon:
   * **Redis >= 2.8.18**
   * **NodeJS >= 10.x**
   * **yarn >= 1.x**
-  * **FFmpeg >= 3.x**
+  * **FFmpeg >= 4.1**
 
 See the [production guide](https://github.com/Chocobozzz/PeerTube/blob/develop/support/doc/production.md), which is the recommended way to install or upgrade PeerTube. For hardware requirements, see [Should I have a big server to run PeerTube?](https://github.com/Chocobozzz/PeerTube/blob/develop/FAQ.md#should-i-have-a-big-server-to-run-peertube) in the FAQ.
 
@@ -170,11 +187,9 @@ See [how to create your own instance](https://github.com/Chocobozzz/PeerTube/blo
 
 See the more general [admin documentation](https://docs.joinpeertube.org/#/admin-following-instances).
 
-#### Tools
+### Tools documentation
 
- * [Import videos (YouTube, Dailymotion, Vimeo...)](https://github.com/Chocobozzz/PeerTube/blob/develop/support/doc/tools.md)
- * [Upload videos from the CLI](https://github.com/Chocobozzz/PeerTube/blob/support/doc/tools.md)
- * [Admin server tools (create transcoding jobs, prune storage...)](https://github.com/Chocobozzz/PeerTube/blob/support/doc/tools.md#server-tools)
+Learn how to import/upload videos from CLI or admin your PeerTube instance with the [tools documentation](https://docs.joinpeertube.org/#/maintain-tools).
 
 ### Technical documentation
 
@@ -196,11 +211,11 @@ Quonfucius, IP Solution, \_Laure\_, @lex666, 0x010C, 3dsman, 3rw4n-G3D, aallrd, 
 
 ## License
 
-Copyright (C) 2015-2019 PeerTube Contributors
+Copyright (C) 2015-2020 PeerTube Contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published
-by the Free Software Foundation, either version 3 of the License, or 
+by the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,

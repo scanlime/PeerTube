@@ -11,6 +11,7 @@ import { PluginModel } from '../../models/server/plugin'
 import { PluginManager } from './plugin-manager'
 import { logger } from '../../helpers/logger'
 import { PEERTUBE_VERSION } from '../../initializers/constants'
+import { sanitizeUrl } from '@server/helpers/core-utils'
 
 async function listAvailablePluginsFromIndex (options: PeertubePluginIndexList) {
   const { start = 0, count = 20, search, sort = 'npmName', pluginType } = options
@@ -27,11 +28,11 @@ async function listAvailablePluginsFromIndex (options: PeertubePluginIndexList) 
   const uri = CONFIG.PLUGINS.INDEX.URL + '/api/v1/plugins'
 
   try {
-    const { body } = await doRequest({ uri, qs, json: true })
+    const { body } = await doRequest<any>({ uri, qs, json: true })
 
     logger.debug('Got result from PeerTube index.', { body })
 
-    await addInstanceInformation(body)
+    addInstanceInformation(body)
 
     return body as ResultList<PeerTubePluginIndex>
   } catch (err) {
@@ -40,7 +41,7 @@ async function listAvailablePluginsFromIndex (options: PeertubePluginIndexList) 
   }
 }
 
-async function addInstanceInformation (result: ResultList<PeerTubePluginIndex>) {
+function addInstanceInformation (result: ResultList<PeerTubePluginIndex>) {
   for (const d of result.data) {
     d.installed = PluginManager.Instance.isRegistered(d.npmName)
     d.name = PluginModel.normalizePluginName(d.npmName)
@@ -55,9 +56,9 @@ async function getLatestPluginsVersion (npmNames: string[]): Promise<PeertubePlu
     currentPeerTubeEngine: PEERTUBE_VERSION
   }
 
-  const uri = CONFIG.PLUGINS.INDEX.URL + '/api/v1/plugins/latest-version'
+  const uri = sanitizeUrl(CONFIG.PLUGINS.INDEX.URL) + '/api/v1/plugins/latest-version'
 
-  const { body } = await doRequest({ uri, body: bodyRequest, json: true, method: 'POST' })
+  const { body } = await doRequest<any>({ uri, body: bodyRequest, json: true, method: 'POST' })
 
   return body
 }

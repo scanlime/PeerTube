@@ -1,19 +1,14 @@
 @import '_variables';
 @import '_mixins';
 
-.user-quota {
-  font-size: 15px;
-  margin-top: 20px;
+.account-title {
+  @include settings-big-title;
 
-  .user-quota-label {
-    margin-right: 5px;
-    font-weight: $font-semibold;
+  &.account-title-danger {
+    color: lighten($color: #c54130, $amount: 10);
   }
 }
 
-.account-title {
-  @include in-content-small-title;
-
-  margin-top: 55px;
-  margin-bottom: 30px;
+.form-group {
+  max-width: 500px;
 }

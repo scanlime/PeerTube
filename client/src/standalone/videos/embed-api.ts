@@ -1,7 +1,7 @@
 import './embed.scss'
 
 import * as Channel from 'jschannel'
-import { PeerTubeResolution } from '../player/definitions'
+import { PeerTubeResolution, PeerTubeTextTrack } from '../player/definitions'
 import { PeerTubeEmbed } from './embed'
 
 /**
@@ -11,7 +11,7 @@ import { PeerTubeEmbed } from './embed'
 export class PeerTubeEmbedApi {
   private channel: Channel.MessagingChannel
   private isReady = false
-  private resolutions: PeerTubeResolution[] = null
+  private resolutions: PeerTubeResolution[] = []
 
   constructor (private embed: PeerTubeEmbed) {
   }
@@ -26,7 +26,7 @@ export class PeerTubeEmbedApi {
   }
 
   private get element () {
-    return this.embed.videoElement
+    return this.embed.playerElement
   }
 
   private constructChannel () {
@@ -35,29 +35,67 @@ export class PeerTubeEmbedApi {
     channel.bind('play', (txn, params) => this.embed.player.play())
     channel.bind('pause', (txn, params) => this.embed.player.pause())
     channel.bind('seek', (txn, time) => this.embed.player.currentTime(time))
+
     channel.bind('setVolume', (txn, value) => this.embed.player.volume(value))
     channel.bind('getVolume', (txn, value) => this.embed.player.volume())
+
     channel.bind('isReady', (txn, params) => this.isReady)
+
     channel.bind('setResolution', (txn, resolutionId) => this.setResolution(resolutionId))
     channel.bind('getResolutions', (txn, params) => this.resolutions)
+
+    channel.bind('getCaptions', (txn, params) => this.getCaptions())
+    channel.bind('setCaption', (txn, id) => this.setCaption(id)),
+
     channel.bind('setPlaybackRate', (txn, playbackRate) => this.embed.player.playbackRate(playbackRate))
     channel.bind('getPlaybackRate', (txn, params) => this.embed.player.playbackRate())
-    channel.bind('getPlaybackRates', (txn, params) => this.embed.playerOptions.playbackRates)
+    channel.bind('getPlaybackRates', (txn, params) => this.embed.player.options_.playbackRates)
 
+    channel.bind('playNextVideo', (txn, params) => this.embed.playNextVideo())
+    channel.bind('playPreviousVideo', (txn, params) => this.embed.playPreviousVideo())
+    channel.bind('getCurrentPosition', (txn, params) => this.embed.getCurrentPosition())
     this.channel = channel
   }
 
   private setResolution (resolutionId: number) {
-    if (resolutionId === -1 && this.embed.player.webtorrent().isAutoResolutionForbidden()) return
+    console.log('set resolution %d', resolutionId)
 
-    // Auto resolution
-    if (resolutionId === -1) {
-      this.embed.player.webtorrent().enableAutoResolution()
+    if (this.isWebtorrent()) {
+      if (resolutionId === -1 && this.embed.player.webtorrent().isAutoResolutionPossible() === false) return
+
+      // Auto resolution
+      if (resolutionId === -1) {
+        this.embed.player.webtorrent().enableAutoResolution()
+        return
+      }
+
+      this.embed.player.webtorrent().disableAutoResolution()
+      this.embed.player.webtorrent().updateResolution(resolutionId)
+
       return
     }
 
-    this.embed.player.webtorrent().disableAutoResolution()
-    this.embed.player.webtorrent().updateResolution(resolutionId)
+    this.embed.player.p2pMediaLoader().getHLSJS().nextLevel = resolutionId
+  }
+
+  private getCaptions (): PeerTubeTextTrack[] {
+    return this.embed.player.textTracks().tracks_.map(t => {
+      return {
+        id: t.id,
+        src: t.src,
+        label: t.label,
+        mode: t.mode as any
+      }
+    })
+  }
+
+  private setCaption (id: string) {
+    const tracks = this.embed.player.textTracks().tracks_
+
+    for (const track of tracks) {
+      if (track.id === id) track.mode = 'showing'
+      else track.mode = 'disabled'
+    }
   }
 
   /**
@@ -69,7 +107,7 @@ export class PeerTubeEmbedApi {
   }
 
   private setupStateTracking () {
-    let currentState: 'playing' | 'paused' | 'unstarted' = 'unstarted'
+    let currentState: 'playing' | 'paused' | 'unstarted' | 'ended' = 'unstarted'
 
     setInterval(() => {
       const position = this.element.currentTime
@@ -80,6 +118,7 @@ export class PeerTubeEmbedApi {
         params: {
           position,
           volume,
+          duration: this.embed.player.duration(),
           playbackState: currentState
         }
       })
@@ -95,16 +134,31 @@ export class PeerTubeEmbedApi {
       this.channel.notify({ method: 'playbackStatusChange', params: 'paused' })
     })
 
+    this.element.addEventListener('ended', ev => {
+      currentState = 'ended'
+      this.channel.notify({ method: 'playbackStatusChange', params: 'ended' })
+    })
+
     // PeerTube specific capabilities
 
-    if (this.embed.player.webtorrent) {
+    if (this.isWebtorrent()) {
       this.embed.player.webtorrent().on('autoResolutionUpdate', () => this.loadWebTorrentResolutions())
       this.embed.player.webtorrent().on('videoFileUpdate', () => this.loadWebTorrentResolutions())
+    } else {
+      this.embed.player.p2pMediaLoader().on('resolutionChange', () => this.loadP2PMediaLoaderResolutions())
     }
+
+    this.embed.player.on('volumechange', () => {
+      this.channel.notify({
+        method: 'volumeChange',
+        params: this.embed.player.volume()
+      })
+    })
   }
 
   private loadWebTorrentResolutions () {
-    const resolutions = []
+    this.resolutions = []
+
     const currentResolutionId = this.embed.player.webtorrent().getCurrentResolutionId()
 
     for (const videoFile of this.embed.player.webtorrent().videoFiles) {
@@ -113,18 +167,46 @@ export class PeerTubeEmbedApi {
         label += videoFile.fps
       }
 
-      resolutions.push({
+      this.resolutions.push({
         id: videoFile.resolution.id,
         label,
         src: videoFile.magnetUri,
-        active: videoFile.resolution.id === currentResolutionId
+        active: videoFile.resolution.id === currentResolutionId,
+        height: videoFile.resolution.id
       })
     }
 
-    this.resolutions = resolutions
     this.channel.notify({
       method: 'resolutionUpdate',
       params: this.resolutions
     })
+  }
+
+  private loadP2PMediaLoaderResolutions () {
+    this.resolutions = []
+
+    const qualityLevels = this.embed.player.qualityLevels()
+    const currentResolutionId = this.embed.player.qualityLevels().selectedIndex
+
+    for (let i = 0; i < qualityLevels.length; i++) {
+      const level = qualityLevels[i]
+
+      this.resolutions.push({
+        id: level.id,
+        label: level.height + 'p',
+        active: level.id === currentResolutionId,
+        width: level.width,
+        height: level.height
+      })
+    }
+
+    this.channel.notify({
+      method: 'resolutionUpdate',
+      params: this.resolutions
+    })
+  }
+
+  private isWebtorrent () {
+    return this.embed.player.webtorrent
   }
 }

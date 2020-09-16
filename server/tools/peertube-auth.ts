@@ -1,3 +1,5 @@
+// eslint-disable @typescript-eslint/no-unnecessary-type-assertion
+
 import { registerTSPaths } from '../helpers/register-ts-paths'
 registerTSPaths()
 
@@ -5,9 +7,8 @@ import * as program from 'commander'
 import * as prompt from 'prompt'
 import { getNetrc, getSettings, writeSettings } from './cli'
 import { isUserUsernameValid } from '../helpers/custom-validators/users'
-import { getAccessToken, login } from '../../shared/extra-utils'
-
-const Table = require('cli-table')
+import { getAccessToken } from '../../shared/extra-utils'
+import * as CliTable3 from 'cli-table3'
 
 async function delInstance (url: string) {
   const [ settings, netrc ] = await Promise.all([ getSettings(), getNetrc() ])
@@ -27,7 +28,7 @@ async function delInstance (url: string) {
 async function setInstance (url: string, username: string, password: string, isDefault: boolean) {
   const [ settings, netrc ] = await Promise.all([ getSettings(), getNetrc() ])
 
-  if (settings.remotes.indexOf(url) === -1) {
+  if (settings.remotes.includes(url) === false) {
     settings.remotes.push(url)
   }
 
@@ -108,10 +109,10 @@ program
   .action(async () => {
     const [ settings, netrc ] = await Promise.all([ getSettings(), getNetrc() ])
 
-    const table = new Table({
-      head: ['instance', 'login'],
-      colWidths: [30, 30]
-    })
+    const table = new CliTable3({
+      head: [ 'instance', 'login' ],
+      colWidths: [ 30, 30 ]
+    }) as any
 
     settings.remotes.forEach(element => {
       if (!netrc.machines[element]) return
@@ -132,7 +133,7 @@ program
   .description('set an existing entry as default')
   .action(async url => {
     const settings = await getSettings()
-    const instanceExists = settings.remotes.indexOf(url) !== -1
+    const instanceExists = settings.remotes.includes(url)
 
     if (instanceExists) {
       settings.default = settings.remotes.indexOf(url)
@@ -148,10 +149,10 @@ program
 program.on('--help', function () {
   console.log('  Examples:')
   console.log()
-  console.log('    $ peertube add -u https://peertube.cpy.re -U "PEERTUBE_USER" --password "PEERTUBE_PASSWORD"')
-  console.log('    $ peertube add -u https://peertube.cpy.re -U root')
-  console.log('    $ peertube list')
-  console.log('    $ peertube del https://peertube.cpy.re')
+  console.log('    $ peertube auth add -u https://peertube.cpy.re -U "PEERTUBE_USER" --password "PEERTUBE_PASSWORD"')
+  console.log('    $ peertube auth add -u https://peertube.cpy.re -U root')
+  console.log('    $ peertube auth list')
+  console.log('    $ peertube auth del https://peertube.cpy.re')
   console.log()
 })
 

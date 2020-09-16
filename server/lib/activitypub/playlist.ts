@@ -15,12 +15,14 @@ import { VideoPlaylistElementModel } from '../../models/video/video-playlist-ele
 import { VideoPlaylistPrivacy } from '../../../shared/models/videos/playlist/video-playlist-privacy.model'
 import { sequelizeTypescript } from '../../initializers/database'
 import { createPlaylistMiniatureFromUrl } from '../thumbnail'
-import { FilteredModelAttributes } from '../../typings/sequelize'
-import { MAccountDefault, MAccountId, MVideoId } from '../../typings/models'
-import { MVideoPlaylist, MVideoPlaylistId, MVideoPlaylistOwner } from '../../typings/models/video/video-playlist'
+import { FilteredModelAttributes } from '../../types/sequelize'
+import { MAccountDefault, MAccountId, MVideoId } from '../../types/models'
+import { MVideoPlaylist, MVideoPlaylistId, MVideoPlaylistOwner } from '../../types/models/video/video-playlist'
 
 function playlistObjectToDBAttributes (playlistObject: PlaylistObject, byAccount: MAccountId, to: string[]) {
-  const privacy = to.indexOf(ACTIVITY_PUB.PUBLIC) !== -1 ? VideoPlaylistPrivacy.PUBLIC : VideoPlaylistPrivacy.UNLISTED
+  const privacy = to.includes(ACTIVITY_PUB.PUBLIC)
+    ? VideoPlaylistPrivacy.PUBLIC
+    : VideoPlaylistPrivacy.UNLISTED
 
   return {
     name: playlistObject.name,
@@ -205,7 +207,7 @@ async function fetchRemoteVideoPlaylist (playlistUrl: string): Promise<{ statusC
 
   logger.info('Fetching remote playlist %s.', playlistUrl)
 
-  const { response, body } = await doRequest(options)
+  const { response, body } = await doRequest<any>(options)
 
   if (isPlaylistObjectValid(body) === false || checkUrlsSameHost(body.id, playlistUrl) !== true) {
     logger.debug('Remote video playlist JSON is not valid.', { body })

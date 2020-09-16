@@ -1,5 +1,5 @@
 import * as express from 'express'
-import { getFormattedObjects, getServerActor } from '../../helpers/utils'
+import { getFormattedObjects } from '../../helpers/utils'
 import {
   asyncMiddleware,
   asyncRetryTransactionMiddleware,
@@ -40,7 +40,8 @@ import { JobQueue } from '../../lib/job-queue'
 import { CONFIG } from '../../initializers/config'
 import { sequelizeTypescript } from '../../initializers/database'
 import { createPlaylistMiniatureFromExisting } from '../../lib/thumbnail'
-import { MVideoPlaylistFull, MVideoPlaylistThumbnail, MVideoThumbnail } from '@server/typings/models'
+import { MVideoPlaylistFull, MVideoPlaylistThumbnail, MVideoThumbnail } from '@server/types/models'
+import { getServerActor } from '@server/models/application/application'
 
 const reqThumbnailFile = createReqFiles([ 'thumbnailfile' ], MIMETYPES.IMAGE.MIMETYPE_EXT, { thumbnailfile: CONFIG.STORAGE.TMP_DIR })
 
@@ -144,7 +145,6 @@ function getVideoPlaylist (req: express.Request, res: express.Response) {
 
   if (videoPlaylist.isOutdated()) {
     JobQueue.Instance.createJob({ type: 'activitypub-refresher', payload: { type: 'video-playlist', url: videoPlaylist.url } })
-            .catch(err => logger.error('Cannot create AP refresher job for playlist %s.', videoPlaylist.url, { err }))
   }
 
   return res.json(videoPlaylist.toFormattedJSON())
@@ -297,13 +297,15 @@ async function addVideoInPlaylist (req: express.Request, res: express.Response) 
     const position = await VideoPlaylistElementModel.getNextPositionOf(videoPlaylist.id, t)
 
     const playlistElement = await VideoPlaylistElementModel.create({
-      url: getVideoPlaylistElementActivityPubUrl(videoPlaylist, video),
       position,
       startTimestamp: body.startTimestamp || null,
       stopTimestamp: body.stopTimestamp || null,
       videoPlaylistId: videoPlaylist.id,
       videoId: video.id
     }, { transaction: t })
+
+    playlistElement.url = getVideoPlaylistElementActivityPubUrl(videoPlaylist, playlistElement)
+    await playlistElement.save({ transaction: t })
 
     videoPlaylist.changed('updatedAt', true)
     await videoPlaylist.save({ transaction: t })
@@ -464,7 +466,13 @@ async function regeneratePlaylistThumbnail (videoPlaylist: MVideoPlaylistThumbna
 async function generateThumbnailForPlaylist (videoPlaylist: MVideoPlaylistThumbnail, video: MVideoThumbnail) {
   logger.info('Generating default thumbnail to playlist %s.', videoPlaylist.url)
 
-  const inputPath = join(CONFIG.STORAGE.THUMBNAILS_DIR, video.getMiniature().filename)
+  const videoMiniature = video.getMiniature()
+  if (!videoMiniature) {
+    logger.info('Cannot generate thumbnail for playlist %s because video %s does not have any.', videoPlaylist.url, video.url)
+    return
+  }
+
+  const inputPath = join(CONFIG.STORAGE.THUMBNAILS_DIR, videoMiniature.filename)
   const thumbnailModel = await createPlaylistMiniatureFromExisting(inputPath, videoPlaylist, true, true)
 
   thumbnailModel.videoPlaylistId = videoPlaylist.id

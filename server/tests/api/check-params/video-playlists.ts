@@ -1,4 +1,4 @@
-/* tslint:disable:no-unused-expression */
+/* eslint-disable @typescript-eslint/no-unused-expressions,@typescript-eslint/require-await */
 
 import 'mocha'
 import {
@@ -36,7 +36,6 @@ describe('Test video playlists API validator', function () {
   let privatePlaylistUUID: string
   let watchLaterPlaylistId: number
   let videoId: number
-  let videoId2: number
   let playlistElementId: number
 
   // ---------------------------------------------------------------
@@ -51,10 +50,9 @@ describe('Test video playlists API validator', function () {
 
     userAccessToken = await generateUserAccessToken(server, 'user1')
     videoId = (await uploadVideoAndGetId({ server, videoName: 'video 1' })).id
-    videoId2 = (await uploadVideoAndGetId({ server, videoName: 'video 2' })).id
 
     {
-      const res = await getAccountPlaylistsListWithToken(server.url, server.accessToken, 'root',0, 5, VideoPlaylistType.WATCH_LATER)
+      const res = await getAccountPlaylistsListWithToken(server.url, server.accessToken, 'root', 0, 5, VideoPlaylistType.WATCH_LATER)
       watchLaterPlaylistId = res.body.data[0].id
     }
 
@@ -348,11 +346,6 @@ describe('Test video playlists API validator', function () {
       const res = await addVideoInPlaylist(params)
       playlistElementId = res.body.videoPlaylistElement.id
     })
-
-    it('Should fail if the video was already added in the playlist', async function () {
-      const params = getBase({}, { expectedStatus: 409 })
-      await addVideoInPlaylist(params)
-    })
   })
 
   describe('When updating an element in a playlist', function () {
@@ -449,7 +442,7 @@ describe('Test video playlists API validator', function () {
       videoId3 = (await uploadVideoAndGetId({ server, videoName: 'video 3' })).id
       videoId4 = (await uploadVideoAndGetId({ server, videoName: 'video 4' })).id
 
-      for (let id of [ videoId3, videoId4 ]) {
+      for (const id of [ videoId3, videoId4 ]) {
         await addVideoInPlaylist({
           url: server.url,
           token: server.accessToken,
@@ -476,7 +469,7 @@ describe('Test video playlists API validator', function () {
       }
 
       {
-        const params = getBase({}, {  playlistId: 42, expectedStatus: 404 })
+        const params = getBase({}, { playlistId: 42, expectedStatus: 404 })
         await reorderVideosPlaylist(params)
       }
     })

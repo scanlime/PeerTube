@@ -1,7 +1,6 @@
 import { Component, ElementRef, ViewChild } from '@angular/core'
-import { Notifier } from '@app/core'
+import { Notifier, UserService } from '@app/core'
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap'
-import { UserService } from '@app/shared'
 
 @Component({
   selector: 'my-welcome-modal',
@@ -18,7 +17,8 @@ export class WelcomeModalComponent {
   ) { }
 
   show () {
-    this.modalService.open(this.modal,{
+    this.modalService.open(this.modal, {
+      centered: true,
       backdrop: 'static',
       keyboard: false,
       size: 'lg'

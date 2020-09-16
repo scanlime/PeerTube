@@ -1,10 +1,10 @@
-/* tslint:disable:no-unused-expression */
+/* eslint-disable @typescript-eslint/no-unused-expressions,@typescript-eslint/require-await */
 
 import * as chai from 'chai'
 import 'mocha'
 import { snakeCase } from 'lodash'
 import { objectConverter, parseBytes } from '../../helpers/core-utils'
-import { isNumeric } from 'validator'
+import validator from 'validator'
 
 const expect = chai.expect
 
@@ -53,7 +53,7 @@ describe('Parse Bytes', function () {
     }
 
     function valueConverter (v: any) {
-      if (isNumeric(v + '')) return parseInt('' + v, 10)
+      if (validator.isNumeric(v + '')) return parseInt('' + v, 10)
 
       return v
     }

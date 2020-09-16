@@ -1,4 +1,4 @@
-import * as validator from 'validator'
+import validator from 'validator'
 import { exists } from './misc'
 import { CONSTRAINTS_FIELDS } from '../../initializers/constants'
 import { VideoBlacklistType } from '../../../shared/models/videos'
@@ -10,7 +10,8 @@ function isVideoBlacklistReasonValid (value: string) {
 }
 
 function isVideoBlacklistTypeValid (value: any) {
-  return exists(value) && validator.isInt('' + value) && VideoBlacklistType[value] !== undefined
+  return exists(value) &&
+    (value === VideoBlacklistType.AUTO_BEFORE_PUBLISHED || value === VideoBlacklistType.MANUAL)
 }
 
 // ---------------------------------------------------------------------------

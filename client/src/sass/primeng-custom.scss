@@ -7,37 +7,54 @@
 @mixin glyphicon-light {
   font-family: 'Glyphicons Halflings';
   text-decoration: none !important;
-  color: var(--mainForegroundColor) !important;
+  color: pvar(--mainForegroundColor) !important;
+  font-display: swap;
+}
+
+my-edit-button,
+my-delete-button,
+my-button {
+  height: max-content;
+}
+
+// focus box-shadow for primeng
+.ui-inputtext:enabled:focus:not(.ui-state-error) {
+  box-shadow: #{$focus-box-shadow-form} pvar(--mainColorLightest) !important;
 }
 
 // data table customizations
 p-table {
   .ui-table-caption {
     border: none !important;
-    background-color: var(--mainBackgroundColor) !important;
+    background-color: pvar(--mainBackgroundColor) !important;
 
     .caption {
       height: 40px;
-      display: flex;
+      width: 100%;
+      display: inline-flex;
       align-items: center;
+
+      .input-group-text {
+        background-color: transparent;
+      }
     }
   }
 
   th {
-    background-color: var(--mainBackgroundColor) !important;
+    background-color: pvar(--mainBackgroundColor) !important;
     outline: 0;
   }
 
   td, th {
     font-family: $main-fonts;
     font-size: 15px !important;
-    color: var(--mainForegroundColor) !important;
+    color: pvar(--mainForegroundColor) !important;
   }
 
   td {
     padding-left: 15px !important;
 
-    &:not(.action-cell) {
+    &:not(.action-cell):not(.expand-cell) {
       overflow: hidden !important;
       text-overflow: ellipsis !important;
       white-space: nowrap !important;
@@ -46,14 +63,14 @@ p-table {
 
   tr {
     outline: 0;
-    background-color: var(--mainBackgroundColor) !important;
+    background-color: pvar(--mainBackgroundColor) !important;
     height: 46px;
 
     &.ui-state-highlight {
-      background-color: var(--submenuColor) !important;
+      background-color: pvar(--submenuColor) !important;
 
       td, td > a {
-        color: var(--mainForegroundColor) !important;
+        color: pvar(--mainForegroundColor) !important;
       }
     }
   }
@@ -61,16 +78,7 @@ p-table {
   .ui-table-tbody {
     tr {
       &:hover {
-        background-color: var(--submenuColor) !important;
-
-        .action-cell {
-          .dropdown-root,
-          my-edit-button,
-          my-delete-button,
-          my-button {
-            display: block !important;
-          }
-        }
+        background-color: pvar(--submenuColor) !important;
       }
 
       td {
@@ -84,6 +92,11 @@ p-table {
       &:last-child td {
         border-bottom: none !important;
       }
+
+      &:focus + tr > td,
+      &:focus > td {
+        box-shadow: none !important;
+      }
     }
 
     .expander {
@@ -96,16 +109,16 @@ p-table {
   th {
     border: none !important;
     border-bottom: 1px solid !important;
-    border-color: var(--submenuColor) !important;
+    border-color: pvar(--submenuColor) !important;
     text-align: left !important;
     padding: 5px 0 5px 15px !important;
     font-weight: $font-semibold !important;
-    color: var(--mainForegroundColor) !important;
+    color: pvar(--mainForegroundColor) !important;
 
     &.ui-sortable-column:hover {
-      background-color: var(--submenuColor) !important;
+      background-color: pvar(--submenuColor) !important;
       border: 1px solid !important;
-      border-color: var(--submenuColor) !important;
+      border-color: pvar(--submenuColor) !important;
       border-width: 0 1px !important;
 
       &:first-child {
@@ -114,7 +127,7 @@ p-table {
     }
 
     &.ui-state-highlight {
-      background-color: var(--submenuColor) !important;
+      background-color: pvar(--submenuColor) !important;
 
       .pi {
         @extend .glyphicon;
@@ -123,16 +136,16 @@ p-table {
         font-size: 11px !important;
         top: 0 !important;
 
-        &.pi-sort-up {
+        &.pi-sort-amount-up-alt {
           @extend .glyphicon-triangle-top;
 
-          color: var(--mainForegroundColor) !important;
+          color: pvar(--mainForegroundColor) !important;
         }
 
-        &.pi-sort-down {
+        &.pi-sort-amount-down {
           @extend .glyphicon-triangle-bottom;
 
-          color: var(--mainForegroundColor) !important;
+          color: pvar(--mainForegroundColor) !important;
         }
       }
     }
@@ -147,29 +160,46 @@ p-table {
     my-edit-button,
     my-delete-button,
     my-button {
-      display: none !important;
-
-      &.show {
-        display: block !important;
-      }
-    }
-
-    my-edit-button + my-delete-button {
+      display: inline-block !important;
       margin-left: 5px;
+
+      :first-child {
+        margin-left: 0
+      }
     }
   }
 
   p-paginator {
     .ui-paginator-bottom {
-      background-color: var(--mainBackgroundColor) !important;
+      background-color: pvar(--mainBackgroundColor) !important;
       position: relative;
       border: none;
       border-top: 1px solid !important;
-      border-color: var(--submenuColor) !important;
+      border-color: pvar(--submenuColor) !important;
       height: 40px;
       display: flex;
       justify-content: center;
       align-items: center;
+
+      .ui-dropdown {
+        position: absolute;
+        top: 3px;
+        left: 0;
+
+        &.ui-state-focus {
+          box-shadow: #{$focus-box-shadow-form} pvar(--mainColorLightest);
+        }
+
+        .ui-dropdown-label {
+          color: pvar(--inputPlaceholderColor);
+        }
+      }
+
+      .ui-paginator-current {
+        position: absolute;
+        right: 0;
+        color: pvar(--inputPlaceholderColor);
+      }
 
       .ui-paginator-first,
       .ui-paginator-prev,
@@ -181,6 +211,11 @@ p-table {
         outline: none;
         font-size: 13px;
         top: -1px;
+
+        &.focus-within,
+        &:focus {
+          box-shadow: #{$focus-box-shadow-form} pvar(--mainColorLightest);
+        }
 
         &.ui-state-disabled:hover {
           background-color: #fff !important;
@@ -210,8 +245,15 @@ p-table {
       .ui-paginator-pages {
         height: auto !important;
 
+        .ui-paginator-page {
+          &.focus-within,
+          &:focus {
+            box-shadow: #{$focus-box-shadow-form} pvar(--mainColorLightest) !important;
+          }
+        }
+
         a {
-          color: var(--mainForegroundColor) !important;
+          color: pvar(--mainForegroundColor) !important;
           font-weight: $font-semibold !important;
           margin: 0 5px !important;
           outline: 0 !important;
@@ -223,7 +265,7 @@ p-table {
           &.ui-state-active {
             &, &:hover, &:active, &:focus {
               color: #fff !important;
-              background-color: var(--mainColor) !important;
+              background-color: pvar(--mainColor) !important;
             }
           }
         }
@@ -232,40 +274,32 @@ p-table {
   }
 }
 
-// multiselect customizations
-p-multiselect {
-  .ui-multiselect-label {
-    font-size: 15px !important;
-    padding: 4px 30px 4px 12px !important;
+// overflow data table
+@mixin overflow-datatable ($table-min-width, $horizontal-margins, $mobile-paginator: true) {
+  p-table {
+    .ui-table-wrapper {
+      overflow-x: auto;
+      max-width: calc(100vw - #{$horizontal-margins * 2});
 
-    $width: 338px;
-    width: $width !important;
-
-    @media screen and (max-width: $width) {
-      width: 100% !important;
+      table {
+        min-width: $table-min-width;
+      }
     }
-  }
 
-  .pi.pi-chevron-down{
-    margin-left: 0 !important;
+    @if $mobile-paginator {
+      p-paginator .ui-paginator-bottom {
+        display: block;
 
-    &::after {
-      @include select-arrow-down;
+        .ui-paginator-current {
+          position: relative;
+          display: block;
+        }
 
-      right: 0;
-      margin-top: 6px;
+        a, .ui-paginator-pages {
+          vertical-align: middle;
+        }
+      }
     }
-  }
-
-  .ui-chkbox-icon {
-    //position: absolute !important;
-    width: 18px;
-    height: 18px;
-    //left: 0;
-
-    //&::after {
-    //  left: -2px !important;
-    //}
   }
 }
 
@@ -324,6 +358,10 @@ p-calendar .ui-datepicker {
   }
 }
 
+p-tablecheckbox:hover div .ui-chkbox-box {
+  box-shadow: 0 0 0 .1rem rgba(87, 85, 217, .2);
+}
+
 .ui-chkbox {
 
   &, .ui-chkbox-box {
@@ -333,8 +371,8 @@ p-calendar .ui-datepicker {
 
   .ui-chkbox-box {
     &.ui-state-active {
-      border-color: var(--mainColor) !important;
-      background-color: var(--mainColor) !important;
+      border-color: pvar(--mainColor) !important;
+      background-color: pvar(--mainColor) !important;
     }
 
     .ui-chkbox-icon {
@@ -350,8 +388,8 @@ p-calendar .ui-datepicker {
         height: 12px;
         opacity: 0;
         transform: rotate(45deg) scale(0);
-        border-right: 2px solid var(--mainBackgroundColor);
-        border-bottom: 2px solid var(--mainBackgroundColor);
+        border-right: 2px solid pvar(--mainBackgroundColor);
+        border-bottom: 2px solid pvar(--mainBackgroundColor);
       }
 
       &.pi-check:after {
@@ -363,38 +401,73 @@ p-calendar .ui-datepicker {
 }
 
 p-inputswitch {
+  height: 26px;
+
   .ui-inputswitch-checked .ui-inputswitch-slider {
-    background-color: var(--mainColor) !important;
+    background-color: pvar(--mainColor) !important;
+  }
+
+  &.small {
+    height: 20px;
+
+    .ui-inputswitch {
+      width: 2.5em !important;
+      height: 1.45em !important;
+
+      .ui-inputswitch-slider::before {
+        height: 1em !important;
+        width: 1em !important;
+      }
+    }
+
+    .ui-inputswitch-checked .ui-inputswitch-slider::before {
+      transform: translateX(1em) !important;
+    }
   }
 }
 
 p-toast {
   .ui-toast {
-    // Modal is 10005
-    z-index: 10010 !important;
+    z-index: z(notification) !important;
+
+    .ui-toast-close-icon {
+      font-family: "Glyphicons Halflings";
+      opacity: 0;
+
+      &:after {
+        content: "\e014";
+      }
+    }
+
+    &:hover .ui-toast-close-icon {
+      opacity: .3;
+    }
   }
 
   .ui-toast-message {
     font-family: $main-fonts;
+    background-color: pvar(--mainBackgroundColor) !important;
+    color: pvar(--mainForegroundColor) !important;
+    border-radius: 5px;
+    box-sizing: border-box;
+    border: 1px solid #EBEEF5 !important;
+    box-shadow: 0 2px 12px 0 rgba(0, 0 , 0, .1);
+    overflow: hidden;
 
-    &.ui-toast-message-success {
-      color: #fff !important;
-      background-color: #8BC34A !important;
+    &.ui-toast-message-success .glyphicon {
+      color: #8BC34A !important;
     }
 
-    &.ui-toast-message-error {
-      color: #fff !important;
-      background-color: #F44336 !important;
+    &.ui-toast-message-error .glyphicon {
+      color: #F44336 !important;
     }
 
-    &.ui-toast-message-info {
-      color: #fff !important;
-      background-color: #03A9F4 !important;
+    &.ui-toast-message-warn .glyphicon {
+      color: #F1680D !important;
     }
 
-    &.ui-toast-message-info {
-      color: #fff !important;
-      background-color: #03A9F4 !important;
+    &.ui-toast-message-info .glyphicon {
+      color: #03A9F4 !important;
     }
 
     .notification-block {

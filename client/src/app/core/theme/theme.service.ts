@@ -1,17 +1,16 @@
+import { first } from 'rxjs/operators'
 import { Injectable } from '@angular/core'
-import { AuthService } from '@app/core/auth'
-import { ServerService } from '@app/core/server'
+import { UserLocalStorageKeys } from '@root-helpers/users'
+import { ServerConfig, ServerConfigTheme } from '@shared/models'
 import { environment } from '../../../environments/environment'
-import { PluginService } from '@app/core/plugins/plugin.service'
-import { ServerConfigTheme } from '@shared/models'
-import { peertubeLocalStorage } from '@app/shared/misc/peertube-local-storage'
+import { AuthService } from '../auth'
+import { PluginService } from '../plugins/plugin.service'
+import { ServerService } from '../server'
+import { UserService } from '../users/user.service'
+import { LocalStorageService } from '../wrappers/storage.service'
 
 @Injectable()
 export class ThemeService {
-
-  private static KEYS = {
-    LAST_ACTIVE_THEME: 'last_active_theme'
-  }
 
   private oldThemeName: string
   private themes: ServerConfigTheme[] = []
@@ -19,19 +18,26 @@ export class ThemeService {
   private themeFromLocalStorage: ServerConfigTheme
   private themeDOMLinksFromLocalStorage: HTMLLinkElement[] = []
 
+  private serverConfig: ServerConfig
+
   constructor (
     private auth: AuthService,
+    private userService: UserService,
     private pluginService: PluginService,
-    private server: ServerService
+    private server: ServerService,
+    private localStorageService: LocalStorageService
   ) {}
 
   initialize () {
     // Try to load from local storage first, so we don't have to wait network requests
     this.loadAndSetFromLocalStorage()
 
-    this.server.configLoaded
-        .subscribe(() => {
-          const themes = this.server.getConfig().theme.registered
+    this.serverConfig = this.server.getTmpConfig()
+    this.server.getConfig()
+        .subscribe(config => {
+          this.serverConfig = config
+
+          const themes = this.serverConfig.theme.registered
 
           this.removeThemeFromLocalStorageIfNeeded(themes)
           this.injectThemes(themes)
@@ -71,12 +77,12 @@ export class ThemeService {
   private getCurrentTheme () {
     if (this.themeFromLocalStorage) return this.themeFromLocalStorage.name
 
-    if (this.auth.isLoggedIn()) {
-      const theme = this.auth.getUser().theme
-      if (theme !== 'instance-default') return theme
-    }
+    const theme = this.auth.isLoggedIn()
+      ? this.auth.getUser().theme
+      : this.userService.getAnonymousUser().theme
 
-    return this.server.getConfig().theme.default
+    if (theme !== 'instance-default') return theme
+    return this.serverConfig.theme.default
   }
 
   private loadTheme (name: string) {
@@ -105,9 +111,9 @@ export class ThemeService {
 
       this.pluginService.reloadLoadedScopes()
 
-      peertubeLocalStorage.setItem(ThemeService.KEYS.LAST_ACTIVE_THEME, JSON.stringify(theme))
+      this.localStorageService.setItem(UserLocalStorageKeys.LAST_ACTIVE_THEME, JSON.stringify(theme), false)
     } else {
-      peertubeLocalStorage.removeItem(ThemeService.KEYS.LAST_ACTIVE_THEME)
+      this.localStorageService.removeItem(UserLocalStorageKeys.LAST_ACTIVE_THEME, false)
     }
 
     this.oldThemeName = currentTheme
@@ -120,14 +126,19 @@ export class ThemeService {
 
     if (!this.auth.isLoggedIn()) {
       this.updateCurrentTheme()
+
+      this.localStorageService.watch([ UserLocalStorageKeys.THEME ]).subscribe(
+        () => this.updateCurrentTheme()
+      )
     }
 
     this.auth.userInformationLoaded
+      .pipe(first())
       .subscribe(() => this.updateCurrentTheme())
   }
 
   private loadAndSetFromLocalStorage () {
-    const lastActiveThemeString = peertubeLocalStorage.getItem(ThemeService.KEYS.LAST_ACTIVE_THEME)
+    const lastActiveThemeString = this.localStorageService.getItem(UserLocalStorageKeys.LAST_ACTIVE_THEME)
     if (!lastActiveThemeString) return
 
     try {

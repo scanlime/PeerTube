@@ -1,4 +1,4 @@
-/* tslint:disable:no-unused-expression */
+/* eslint-disable @typescript-eslint/no-unused-expressions,@typescript-eslint/require-await */
 
 import * as chai from 'chai'
 import { basename, dirname, isAbsolute, join, resolve } from 'path'
@@ -10,11 +10,11 @@ import * as ffmpeg from 'fluent-ffmpeg'
 const expect = chai.expect
 let webtorrent: WebTorrent.Instance
 
-function immutableAssign <T, U> (target: T, source: U) {
+function immutableAssign<T, U> (target: T, source: U) {
   return Object.assign<{}, T, U>({}, target, source)
 }
 
-  // Default interval -> 5 minutes
+// Default interval -> 5 minutes
 function dateIsValid (dateString: string, interval = 300000) {
   const dateToCheck = new Date(dateString)
   const now = new Date()
@@ -56,25 +56,29 @@ async function testImage (url: string, imageName: string, imagePath: string, ext
   const body = res.body
 
   const data = await readFile(join(root(), 'server', 'tests', 'fixtures', imageName + extension))
-  const minLength = body.length - ((20 * body.length) / 100)
-  const maxLength = body.length + ((20 * body.length) / 100)
+  const minLength = body.length - ((30 * body.length) / 100)
+  const maxLength = body.length + ((30 * body.length) / 100)
 
-  expect(data.length).to.be.above(minLength)
-  expect(data.length).to.be.below(maxLength)
+  expect(data.length).to.be.above(minLength, "the generated image is way smaller than the recorded fixture")
+  expect(data.length).to.be.below(maxLength, "the generated image is way larger than the recorded fixture")
 }
 
 function buildAbsoluteFixturePath (path: string, customCIPath = false) {
-  if (isAbsolute(path)) {
-    return path
-  }
+  if (isAbsolute(path)) return path
 
-  if (customCIPath) {
-    if (process.env.GITLAB_CI) return join(root(), 'cached-fixtures', path)
-
-    if (process.env.TRAVIS) return join(process.env.HOME, 'fixtures', path)
+  if (customCIPath && process.env.GITHUB_WORKSPACE) {
+    return join(process.env.GITHUB_WORKSPACE, 'fixtures', path)
   }
 
   return join(root(), 'server', 'tests', 'fixtures', path)
+}
+
+function areHttpImportTestsDisabled () {
+  const disabled = process.env.DISABLE_HTTP_IMPORT_TESTS === 'true'
+
+  if (disabled) console.log('Import tests are disabled')
+
+  return disabled
 }
 
 async function generateHighBitrateVideo () {
@@ -89,11 +93,33 @@ async function generateHighBitrateVideo () {
     // a large file in the repo. The video needs to have a certain minimum length so
     // that FFmpeg properly applies bitrate limits.
     // https://stackoverflow.com/a/15795112
-    return new Promise<string>(async (res, rej) => {
+    return new Promise<string>((res, rej) => {
       ffmpeg()
         .outputOptions([ '-f rawvideo', '-video_size 1920x1080', '-i /dev/urandom' ])
         .outputOptions([ '-ac 2', '-f s16le', '-i /dev/urandom', '-t 10' ])
         .outputOptions([ '-maxrate 10M', '-bufsize 10M' ])
+        .output(tempFixturePath)
+        .on('error', rej)
+        .on('end', () => res(tempFixturePath))
+        .run()
+    })
+  }
+
+  return tempFixturePath
+}
+
+async function generateVideoWithFramerate (fps = 60) {
+  const tempFixturePath = buildAbsoluteFixturePath(`video_${fps}fps.mp4`, true)
+
+  await ensureDir(dirname(tempFixturePath))
+
+  const exists = await pathExists(tempFixturePath)
+  if (!exists) {
+    return new Promise<string>((res, rej) => {
+      ffmpeg()
+        .outputOptions([ '-f rawvideo', '-video_size 1280x720', '-i /dev/urandom' ])
+        .outputOptions([ '-ac 2', '-f s16le', '-i /dev/urandom', '-t 10' ])
+        .outputOptions([ `-r ${fps}` ])
         .output(tempFixturePath)
         .on('error', rej)
         .on('end', () => res(tempFixturePath))
@@ -109,11 +135,13 @@ async function generateHighBitrateVideo () {
 export {
   dateIsValid,
   wait,
+  areHttpImportTestsDisabled,
   buildServerDirectory,
   webtorrentAdd,
   immutableAssign,
   testImage,
   buildAbsoluteFixturePath,
   root,
-  generateHighBitrateVideo
+  generateHighBitrateVideo,
+  generateVideoWithFramerate
 }

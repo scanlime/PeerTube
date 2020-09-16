@@ -1,21 +1,28 @@
-import { Component, OnDestroy, OnInit } from '@angular/core'
-import { ActivatedRoute } from '@angular/router'
-import { AccountService } from '@app/shared/account/account.service'
-import { Account } from '@app/shared/account/account.model'
-import { RestExtractor, UserService } from '@app/shared'
-import { catchError, distinctUntilChanged, map, switchMap, tap } from 'rxjs/operators'
 import { Subscription } from 'rxjs'
-import { AuthService, Notifier, RedirectService } from '@app/core'
-import { User, UserRight } from '../../../../shared'
-import { I18n } from '@ngx-translate/i18n-polyfill'
+import { catchError, distinctUntilChanged, map, switchMap, tap } from 'rxjs/operators'
+import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core'
+import { ActivatedRoute } from '@angular/router'
+import { AuthService, Notifier, RedirectService, RestExtractor, ScreenService, UserService } from '@app/core'
+import { Account, AccountService, DropdownAction, ListOverflowItem, VideoChannel, VideoChannelService } from '@app/shared/shared-main'
+import { AccountReportComponent } from '@app/shared/shared-moderation'
+import { User, UserRight } from '@shared/models'
 
 @Component({
   templateUrl: './accounts.component.html',
   styleUrls: [ './accounts.component.scss' ]
 })
 export class AccountsComponent implements OnInit, OnDestroy {
+  @ViewChild('accountReportModal') accountReportModal: AccountReportComponent
+
   account: Account
-  user: User
+  accountUser: User
+  videoChannels: VideoChannel[] = []
+  links: ListOverflowItem[] = []
+
+  isAccountManageable = false
+  accountFollowerTitle = ''
+
+  prependModerationActions: DropdownAction<any>[]
 
   private routeSub: Subscription
 
@@ -23,31 +30,51 @@ export class AccountsComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private userService: UserService,
     private accountService: AccountService,
+    private videoChannelService: VideoChannelService,
     private notifier: Notifier,
     private restExtractor: RestExtractor,
     private redirectService: RedirectService,
     private authService: AuthService,
-    private i18n: I18n
-  ) {}
+    private screenService: ScreenService
+  ) {
+  }
 
   ngOnInit () {
     this.routeSub = this.route.params
-      .pipe(
-        map(params => params[ 'accountId' ]),
-        distinctUntilChanged(),
-        switchMap(accountId => this.accountService.getAccount(accountId)),
-        tap(account => this.getUserIfNeeded(account)),
-        catchError(err => this.restExtractor.redirectTo404IfNotFound(err, [ 400, 404 ]))
-      )
-      .subscribe(
-        account => this.account = account,
+                        .pipe(
+                          map(params => params[ 'accountId' ]),
+                          distinctUntilChanged(),
+                          switchMap(accountId => this.accountService.getAccount(accountId)),
+                          tap(account => this.onAccount(account)),
+                          switchMap(account => this.videoChannelService.listAccountVideoChannels(account)),
+                          catchError(err => this.restExtractor.redirectTo404IfNotFound(err, [ 400, 404 ]))
+                        )
+                        .subscribe(
+                          videoChannels => this.videoChannels = videoChannels.data,
 
-        err => this.notifier.error(err.message)
-      )
+                          err => this.notifier.error(err.message)
+                        )
+
+    this.links = [
+      { label: $localize`VIDEO CHANNELS`, routerLink: 'video-channels' },
+      { label: $localize`VIDEOS`, routerLink: 'videos' },
+      { label: $localize`ABOUT`, routerLink: 'about' }
+    ]
   }
 
   ngOnDestroy () {
     if (this.routeSub) this.routeSub.unsubscribe()
+  }
+
+  get naiveAggregatedSubscribers () {
+    return this.videoChannels.reduce(
+      (acc, val) => acc + val.followersCount,
+      this.account.followersCount // accumulator starts with the base number of subscribers the account has
+    )
+  }
+
+  get isInSmallView () {
+    return this.screenService.isInSmallView()
   }
 
   onUserChanged () {
@@ -59,21 +86,58 @@ export class AccountsComponent implements OnInit, OnDestroy {
   }
 
   activateCopiedMessage () {
-    this.notifier.success(this.i18n('Username copied'))
+    this.notifier.success($localize`Username copied`)
+  }
+
+  subscribersDisplayFor (count: number) {
+    if (count === 1) return $localize`1 subscriber`
+
+    return $localize`${count} subscribers`
+  }
+
+  private onAccount (account: Account) {
+    this.prependModerationActions = undefined
+
+    this.account = account
+
+    if (this.authService.isLoggedIn()) {
+      this.authService.userInformationLoaded.subscribe(
+        () => {
+          this.isAccountManageable = this.account.userId && this.account.userId === this.authService.getUser().id
+
+          const followers = this.subscribersDisplayFor(account.followersCount)
+          this.accountFollowerTitle = $localize`${followers} direct account followers`
+
+          // It's not our account, we can report it
+          if (!this.isAccountManageable) {
+            this.prependModerationActions = [
+              {
+                label: $localize`Report this account`,
+                handler: () => this.showReportModal()
+              }
+            ]
+          }
+        }
+      )
+    }
+
+    this.getUserIfNeeded(account)
+  }
+
+  private showReportModal () {
+    this.accountReportModal.show()
   }
 
   private getUserIfNeeded (account: Account) {
-    if (!account.userId) return
-    if (!this.authService.isLoggedIn()) return
+    if (!account.userId || !this.authService.isLoggedIn()) return
 
     const user = this.authService.getUser()
     if (user.hasRight(UserRight.MANAGE_USERS)) {
-      this.userService.getUser(account.userId)
-          .subscribe(
-            user => this.user = user,
+      this.userService.getUser(account.userId).subscribe(
+        accountUser => this.accountUser = accountUser,
 
-            err => this.notifier.error(err.message)
-          )
+        err => this.notifier.error(err.message)
+      )
     }
   }
 }

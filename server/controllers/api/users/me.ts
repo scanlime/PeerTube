@@ -1,9 +1,15 @@
-import * as express from 'express'
 import 'multer'
-import { UserUpdateMe, UserVideoRate as FormattedUserVideoRate } from '../../../../shared'
+import * as express from 'express'
+import { UserUpdateMe, UserVideoRate as FormattedUserVideoRate, VideoSortField } from '../../../../shared'
+import { UserVideoQuota } from '../../../../shared/models/users/user-video-quota.model'
+import { createReqFiles } from '../../../helpers/express-utils'
 import { getFormattedObjects } from '../../../helpers/utils'
+import { CONFIG } from '../../../initializers/config'
 import { MIMETYPES } from '../../../initializers/constants'
+import { sequelizeTypescript } from '../../../initializers/database'
 import { sendUpdateActor } from '../../../lib/activitypub/send'
+import { updateActorAvatarFile } from '../../../lib/avatar'
+import { sendVerifyUserEmail } from '../../../lib/user'
 import {
   asyncMiddleware,
   asyncRetryTransactionMiddleware,
@@ -11,23 +17,17 @@ import {
   paginationValidator,
   setDefaultPagination,
   setDefaultSort,
+  setDefaultVideosSort,
   usersUpdateMeValidator,
   usersVideoRatingValidator
 } from '../../../middlewares'
 import { deleteMeValidator, videoImportsSortValidator, videosSortValidator } from '../../../middlewares/validators'
+import { updateAvatarValidator } from '../../../middlewares/validators/avatar'
+import { AccountModel } from '../../../models/account/account'
 import { AccountVideoRateModel } from '../../../models/account/account-video-rate'
 import { UserModel } from '../../../models/account/user'
 import { VideoModel } from '../../../models/video/video'
-import { VideoSortField } from '../../../../client/src/app/shared/video/sort-field.type'
-import { createReqFiles } from '../../../helpers/express-utils'
-import { UserVideoQuota } from '../../../../shared/models/users/user-video-quota.model'
-import { updateAvatarValidator } from '../../../middlewares/validators/avatar'
-import { updateActorAvatarFile } from '../../../lib/avatar'
 import { VideoImportModel } from '../../../models/video/video-import'
-import { AccountModel } from '../../../models/account/account'
-import { CONFIG } from '../../../initializers/config'
-import { sequelizeTypescript } from '../../../initializers/database'
-import { sendVerifyUserEmail } from '../../../lib/user'
 
 const reqAvatarFile = createReqFiles([ 'avatarfile' ], MIMETYPES.IMAGE.MIMETYPE_EXT, { avatarfile: CONFIG.STORAGE.TMP_DIR })
 
@@ -39,7 +39,7 @@ meRouter.get('/me',
 )
 meRouter.delete('/me',
   authenticate,
-  asyncMiddleware(deleteMeValidator),
+  deleteMeValidator,
   asyncMiddleware(deleteMe)
 )
 
@@ -61,7 +61,7 @@ meRouter.get('/me/videos',
   authenticate,
   paginationValidator,
   videosSortValidator,
-  setDefaultSort,
+  setDefaultVideosSort,
   setDefaultPagination,
   asyncMiddleware(getUserVideos)
 )
@@ -99,7 +99,8 @@ async function getUserVideos (req: express.Request, res: express.Response) {
     user.Account.id,
     req.query.start as number,
     req.query.count as number,
-    req.query.sort as VideoSortField
+    req.query.sort as VideoSortField,
+    req.query.search as string
   )
 
   const additionalAttributes = {
@@ -125,14 +126,13 @@ async function getUserVideoImports (req: express.Request, res: express.Response)
 
 async function getUserInformation (req: express.Request, res: express.Response) {
   // We did not load channels in res.locals.user
-  const user = await UserModel.loadByUsernameAndPopulateChannels(res.locals.oauth.token.user.username)
+  const user = await UserModel.loadForMeAPI(res.locals.oauth.token.user.username)
 
-  return res.json(user.toFormattedJSON())
+  return res.json(user.toMeFormattedJSON())
 }
 
 async function getUserVideoQuotaUsed (req: express.Request, res: express.Response) {
-  // We did not load channels in res.locals.user
-  const user = await UserModel.loadByUsernameAndPopulateChannels(res.locals.oauth.token.user.username)
+  const user = res.locals.oauth.token.user
   const videoQuotaUsed = await UserModel.getOriginalVideoFileTotalFromUser(user)
   const videoQuotaUsedDaily = await UserModel.getOriginalVideoFileTotalDailyFromUser(user)
 
@@ -176,6 +176,7 @@ async function updateMe (req: express.Request, res: express.Response) {
   if (body.webTorrentEnabled !== undefined) user.webTorrentEnabled = body.webTorrentEnabled
   if (body.autoPlayVideo !== undefined) user.autoPlayVideo = body.autoPlayVideo
   if (body.autoPlayNextVideo !== undefined) user.autoPlayNextVideo = body.autoPlayNextVideo
+  if (body.autoPlayNextVideoPlaylist !== undefined) user.autoPlayNextVideoPlaylist = body.autoPlayNextVideoPlaylist
   if (body.videosHistoryEnabled !== undefined) user.videosHistoryEnabled = body.videosHistoryEnabled
   if (body.videoLanguages !== undefined) user.videoLanguages = body.videoLanguages
   if (body.theme !== undefined) user.theme = body.theme
@@ -213,7 +214,7 @@ async function updateMe (req: express.Request, res: express.Response) {
 }
 
 async function updateMyAvatar (req: express.Request, res: express.Response) {
-  const avatarPhysicalFile = req.files[ 'avatarfile' ][ 0 ]
+  const avatarPhysicalFile = req.files['avatarfile'][0]
   const user = res.locals.oauth.token.user
 
   const userAccount = await AccountModel.load(user.Account.id)

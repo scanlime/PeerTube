@@ -9,14 +9,14 @@ import { UserUpdateMe } from '../../models/users'
 import { omit } from 'lodash'
 
 type CreateUserArgs = {
-  url: string,
-  accessToken: string,
-  username: string,
-  password: string,
-  videoQuota?: number,
-  videoQuotaDaily?: number,
-  role?: UserRole,
-  adminFlags?: UserAdminFlag,
+  url: string
+  accessToken: string
+  username: string
+  password: string
+  videoQuota?: number
+  videoQuotaDaily?: number
+  role?: UserRole
+  adminFlags?: UserAdminFlag
   specialStatus?: number
 }
 function createUser (parameters: CreateUserArgs) {
@@ -74,8 +74,8 @@ function registerUser (url: string, username: string, password: string, specialS
 }
 
 function registerUserWithChannel (options: {
-  url: string,
-  user: { username: string, password: string, displayName?: string },
+  url: string
+  user: { username: string, password: string, displayName?: string }
   channel: { name: string, displayName: string }
 }) {
   const path = '/api/v1/users/register'
@@ -130,11 +130,12 @@ function getMyUserVideoQuotaUsed (url: string, accessToken: string, specialStatu
           .expect('Content-Type', /json/)
 }
 
-function getUserInformation (url: string, accessToken: string, userId: number) {
+function getUserInformation (url: string, accessToken: string, userId: number, withStats = false) {
   const path = '/api/v1/users/' + userId
 
   return request(url)
     .get(path)
+    .query({ withStats })
     .set('Accept', 'application/json')
     .set('Authorization', 'Bearer ' + accessToken)
     .expect(200)
@@ -163,14 +164,23 @@ function getUsersList (url: string, accessToken: string) {
           .expect('Content-Type', /json/)
 }
 
-function getUsersListPaginationAndSort (url: string, accessToken: string, start: number, count: number, sort: string, search?: string) {
+function getUsersListPaginationAndSort (
+  url: string,
+  accessToken: string,
+  start: number,
+  count: number,
+  sort: string,
+  search?: string,
+  blocked?: boolean
+) {
   const path = '/api/v1/users'
 
   const query = {
     start,
     count,
     sort,
-    search
+    search,
+    blocked
   }
 
   return request(url)
@@ -215,7 +225,7 @@ function unblockUser (url: string, userId: number | string, accessToken: string,
     .expect(expectedStatus)
 }
 
-function updateMyUser (options: { url: string, accessToken: string } & UserUpdateMe) {
+function updateMyUser (options: { url: string, accessToken: string, statusCodeExpected?: number } & UserUpdateMe) {
   const path = '/api/v1/users/me'
 
   const toSend: UserUpdateMe = omit(options, 'url', 'accessToken')
@@ -225,13 +235,13 @@ function updateMyUser (options: { url: string, accessToken: string } & UserUpdat
     path,
     token: options.accessToken,
     fields: toSend,
-    statusCodeExpected: 204
+    statusCodeExpected: options.statusCodeExpected || 204
   })
 }
 
 function updateMyAvatar (options: {
-  url: string,
-  accessToken: string,
+  url: string
+  accessToken: string
   fixture: string
 }) {
   const path = '/api/v1/users/me/avatar/pick'
@@ -241,14 +251,14 @@ function updateMyAvatar (options: {
 
 function updateUser (options: {
   url: string
-  userId: number,
-  accessToken: string,
-  email?: string,
-  emailVerified?: boolean,
-  videoQuota?: number,
-  videoQuotaDaily?: number,
-  password?: string,
-  adminFlags?: UserAdminFlag,
+  userId: number
+  accessToken: string
+  email?: string
+  emailVerified?: boolean
+  videoQuota?: number
+  videoQuotaDaily?: number
+  password?: string
+  adminFlags?: UserAdminFlag
   role?: UserRole
 }) {
   const path = '/api/v1/users/' + options.userId

@@ -1,9 +1,8 @@
 import { Component, ElementRef, OnInit, ViewChild } from '@angular/core'
-import { LogsService } from '@app/+admin/system/logs/logs.service'
 import { Notifier } from '@app/core'
-import { LogRow } from '@app/+admin/system/logs/log-row.model'
-import { I18n } from '@ngx-translate/i18n-polyfill'
-import { LogLevel } from '@shared/models/server/log-level.type'
+import { LogLevel } from '@shared/models'
+import { LogRow } from './log-row.model'
+import { LogsService } from './logs.service'
 
 @Component({
   templateUrl: './logs.component.html',
@@ -17,19 +16,21 @@ export class LogsComponent implements OnInit {
   logs: LogRow[] = []
   timeChoices: { id: string, label: string }[] = []
   levelChoices: { id: LogLevel, label: string }[] = []
+  logTypeChoices: { id: 'audit' | 'standard', label: string }[] = []
 
   startDate: string
   level: LogLevel
+  logType: 'audit' | 'standard'
 
   constructor (
     private logsService: LogsService,
-    private notifier: Notifier,
-    private i18n: I18n
-  ) { }
+    private notifier: Notifier
+    ) { }
 
   ngOnInit (): void {
     this.buildTimeChoices()
     this.buildLevelChoices()
+    this.buildLogTypeChoices()
 
     this.load()
   }
@@ -42,7 +43,7 @@ export class LogsComponent implements OnInit {
   load () {
     this.loading = true
 
-    this.logsService.getLogs(this.level, this.startDate)
+    this.logsService.getLogs({ isAuditLog: this.isAuditLog(), level: this.level, startDate: this.startDate })
         .subscribe(
           logs => {
             this.logs = logs
@@ -58,6 +59,10 @@ export class LogsComponent implements OnInit {
         )
   }
 
+  isAuditLog () {
+    return this.logType === 'audit'
+  }
+
   buildTimeChoices () {
     const lastHour = new Date()
     lastHour.setHours(lastHour.getHours() - 1)
@@ -71,15 +76,15 @@ export class LogsComponent implements OnInit {
     this.timeChoices = [
       {
         id: lastWeek.toISOString(),
-        label: this.i18n('Last week')
+        label: $localize`Last week`
       },
       {
         id: lastDay.toISOString(),
-        label: this.i18n('Last day')
+        label: $localize`Last day`
       },
       {
         id: lastHour.toISOString(),
-        label: this.i18n('Last hour')
+        label: $localize`Last hour`
       }
     ]
 
@@ -90,22 +95,37 @@ export class LogsComponent implements OnInit {
     this.levelChoices = [
       {
         id: 'debug',
-        label: this.i18n('Debug')
+        label: $localize`Debug`
       },
       {
         id: 'info',
-        label: this.i18n('Info')
+        label: $localize`Info`
       },
       {
         id: 'warn',
-        label: this.i18n('Warning')
+        label: $localize`Warning`
       },
       {
         id: 'error',
-        label: this.i18n('Error')
+        label: $localize`Error`
       }
     ]
 
     this.level = 'warn'
+  }
+
+  buildLogTypeChoices () {
+    this.logTypeChoices = [
+      {
+        id: 'standard',
+        label: $localize`Standard logs`
+      },
+      {
+        id: 'audit',
+        label: $localize`Audit logs`
+      }
+    ]
+
+    this.logType = 'audit'
   }
 }

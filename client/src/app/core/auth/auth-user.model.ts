@@ -1,121 +1,50 @@
-import { peertubeLocalStorage } from '@app/shared/misc/peertube-local-storage'
-import { UserRight } from '../../../../../shared/models/users/user-right.enum'
-import { User as ServerUserModel } from '../../../../../shared/models/users/user.model'
-// Do not use the barrel (dependency loop)
-import { hasUserRight, UserRole } from '../../../../../shared/models/users/user-role'
-import { User } from '../../shared/users/user.model'
-import { NSFWPolicyType } from '../../../../../shared/models/videos/nsfw-policy.type'
+import { Observable, of } from 'rxjs'
+import { map } from 'rxjs/operators'
+import { User } from '@app/core/users/user.model'
+import {
+  flushUserInfoFromLocalStorage,
+  getUserInfoFromLocalStorage,
+  saveUserInfoIntoLocalStorage,
+  TokenOptions,
+  Tokens
+} from '@root-helpers/users'
+import { hasUserRight } from '@shared/core-utils/users'
+import {
+  MyUser as ServerMyUserModel,
+  MyUserSpecialPlaylist,
+  User as ServerUserModel,
+  UserRight,
+  UserRole,
+  UserVideoQuota
+} from '@shared/models'
 
-export type TokenOptions = {
-  accessToken: string
-  refreshToken: string
-  tokenType: string
-}
-
-// Private class only used by User
-class Tokens {
-  private static KEYS = {
-    ACCESS_TOKEN: 'access_token',
-    REFRESH_TOKEN: 'refresh_token',
-    TOKEN_TYPE: 'token_type'
-  }
-
-  accessToken: string
-  refreshToken: string
-  tokenType: string
-
-  static load () {
-    const accessTokenLocalStorage = peertubeLocalStorage.getItem(this.KEYS.ACCESS_TOKEN)
-    const refreshTokenLocalStorage = peertubeLocalStorage.getItem(this.KEYS.REFRESH_TOKEN)
-    const tokenTypeLocalStorage = peertubeLocalStorage.getItem(this.KEYS.TOKEN_TYPE)
-
-    if (accessTokenLocalStorage && refreshTokenLocalStorage && tokenTypeLocalStorage) {
-      return new Tokens({
-        accessToken: accessTokenLocalStorage,
-        refreshToken: refreshTokenLocalStorage,
-        tokenType: tokenTypeLocalStorage
-      })
-    }
-
-    return null
-  }
-
-  static flush () {
-    peertubeLocalStorage.removeItem(this.KEYS.ACCESS_TOKEN)
-    peertubeLocalStorage.removeItem(this.KEYS.REFRESH_TOKEN)
-    peertubeLocalStorage.removeItem(this.KEYS.TOKEN_TYPE)
-  }
-
-  constructor (hash?: TokenOptions) {
-    if (hash) {
-      this.accessToken = hash.accessToken
-      this.refreshToken = hash.refreshToken
-
-      if (hash.tokenType === 'bearer') {
-        this.tokenType = 'Bearer'
-      } else {
-        this.tokenType = hash.tokenType
-      }
-    }
-  }
-
-  save () {
-    peertubeLocalStorage.setItem(Tokens.KEYS.ACCESS_TOKEN, this.accessToken)
-    peertubeLocalStorage.setItem(Tokens.KEYS.REFRESH_TOKEN, this.refreshToken)
-    peertubeLocalStorage.setItem(Tokens.KEYS.TOKEN_TYPE, this.tokenType)
-  }
-}
-
-export class AuthUser extends User {
-  private static KEYS = {
-    ID: 'id',
-    ROLE: 'role',
-    EMAIL: 'email',
-    VIDEOS_HISTORY_ENABLED: 'videos-history-enabled',
-    USERNAME: 'username',
-    NSFW_POLICY: 'nsfw_policy',
-    WEBTORRENT_ENABLED: 'peertube-videojs-' + 'webtorrent_enabled',
-    AUTO_PLAY_VIDEO: 'auto_play_video'
-  }
-
+export class AuthUser extends User implements ServerMyUserModel {
   tokens: Tokens
+  specialPlaylists: MyUserSpecialPlaylist[]
+
+  canSeeVideosLink = true
 
   static load () {
-    const usernameLocalStorage = peertubeLocalStorage.getItem(this.KEYS.USERNAME)
-    if (usernameLocalStorage) {
-      return new AuthUser(
-        {
-          id: parseInt(peertubeLocalStorage.getItem(this.KEYS.ID), 10),
-          username: peertubeLocalStorage.getItem(this.KEYS.USERNAME),
-          email: peertubeLocalStorage.getItem(this.KEYS.EMAIL),
-          role: parseInt(peertubeLocalStorage.getItem(this.KEYS.ROLE), 10) as UserRole,
-          nsfwPolicy: peertubeLocalStorage.getItem(this.KEYS.NSFW_POLICY) as NSFWPolicyType,
-          webTorrentEnabled: peertubeLocalStorage.getItem(this.KEYS.WEBTORRENT_ENABLED) === 'true',
-          autoPlayVideo: peertubeLocalStorage.getItem(this.KEYS.AUTO_PLAY_VIDEO) === 'true',
-          videosHistoryEnabled: peertubeLocalStorage.getItem(this.KEYS.VIDEOS_HISTORY_ENABLED) === 'true'
-        },
-        Tokens.load()
-      )
-    }
+    const tokens = Tokens.load()
+    if (!tokens) return null
 
-    return null
+    const userInfo = getUserInfoFromLocalStorage()
+    if (!userInfo) return null
+
+    return new AuthUser(userInfo, tokens)
   }
 
   static flush () {
-    peertubeLocalStorage.removeItem(this.KEYS.USERNAME)
-    peertubeLocalStorage.removeItem(this.KEYS.ID)
-    peertubeLocalStorage.removeItem(this.KEYS.ROLE)
-    peertubeLocalStorage.removeItem(this.KEYS.NSFW_POLICY)
-    peertubeLocalStorage.removeItem(this.KEYS.WEBTORRENT_ENABLED)
-    peertubeLocalStorage.removeItem(this.KEYS.VIDEOS_HISTORY_ENABLED)
-    peertubeLocalStorage.removeItem(this.KEYS.AUTO_PLAY_VIDEO)
-    peertubeLocalStorage.removeItem(this.KEYS.EMAIL)
+    flushUserInfoFromLocalStorage()
+
     Tokens.flush()
   }
 
-  constructor (userHash: Partial<ServerUserModel>, hashTokens: TokenOptions) {
+  constructor (userHash: Partial<ServerMyUserModel>, hashTokens: TokenOptions) {
     super(userHash)
+
     this.tokens = new Tokens(hashTokens)
+    this.specialPlaylists = userHash.specialPlaylists
   }
 
   getAccessToken () {
@@ -149,13 +78,38 @@ export class AuthUser extends User {
   }
 
   save () {
-    peertubeLocalStorage.setItem(AuthUser.KEYS.ID, this.id.toString())
-    peertubeLocalStorage.setItem(AuthUser.KEYS.USERNAME, this.username)
-    peertubeLocalStorage.setItem(AuthUser.KEYS.EMAIL, this.email)
-    peertubeLocalStorage.setItem(AuthUser.KEYS.ROLE, this.role.toString())
-    peertubeLocalStorage.setItem(AuthUser.KEYS.NSFW_POLICY, this.nsfwPolicy.toString())
-    peertubeLocalStorage.setItem(AuthUser.KEYS.WEBTORRENT_ENABLED, JSON.stringify(this.webTorrentEnabled))
-    peertubeLocalStorage.setItem(AuthUser.KEYS.AUTO_PLAY_VIDEO, JSON.stringify(this.autoPlayVideo))
+    saveUserInfoIntoLocalStorage({
+      id: this.id,
+      username: this.username,
+      email: this.email,
+      role: this.role,
+      nsfwPolicy: this.nsfwPolicy,
+      webTorrentEnabled: this.webTorrentEnabled,
+      autoPlayVideo: this.autoPlayVideo
+    })
+
     this.tokens.save()
+  }
+
+  computeCanSeeVideosLink (quotaObservable: Observable<UserVideoQuota>): Observable<boolean> {
+    if (!this.isUploadDisabled()) {
+      this.canSeeVideosLink = true
+      return of(this.canSeeVideosLink)
+    }
+
+    // Check if the user has videos
+    return quotaObservable.pipe(
+      map(({ videoQuotaUsed }) => {
+        if (videoQuotaUsed !== 0) {
+          // User already uploaded videos, so it can see the link
+          this.canSeeVideosLink = true
+        } else {
+          // No videos, no upload so the user don't need to see the videos link
+          this.canSeeVideosLink = false
+        }
+
+        return this.canSeeVideosLink
+      })
+    )
   }
 }

@@ -2,8 +2,8 @@ import { getOrCreateVideoAndAccountAndChannel } from '../videos'
 import { forwardVideoRelatedActivity } from '../send/utils'
 import { Redis } from '../../redis'
 import { ActivityCreate, ActivityView, ViewObject } from '../../../../shared/models/activitypub'
-import { APProcessorOptions } from '../../../typings/activitypub-processor.model'
-import { MActorSignature } from '../../../typings/models'
+import { APProcessorOptions } from '../../../types/activitypub-processor.model'
+import { MActorSignature } from '../../../types/models'
 
 async function processViewActivity (options: APProcessorOptions<ActivityCreate | ActivityView>) {
   const { activity, byActor } = options
@@ -23,7 +23,8 @@ async function processCreateView (activity: ActivityView | ActivityCreate, byAct
 
   const options = {
     videoObject,
-    fetchType: 'only-video' as 'only-video'
+    fetchType: 'only-immutable-attributes' as 'only-immutable-attributes',
+    allowRefresh: false as false
   }
   const { video } = await getOrCreateVideoAndAccountAndChannel(options)
 

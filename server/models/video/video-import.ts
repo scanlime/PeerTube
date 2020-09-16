@@ -21,7 +21,7 @@ import { VideoImport, VideoImportState } from '../../../shared'
 import { isVideoMagnetUriValid } from '../../helpers/custom-validators/videos'
 import { UserModel } from '../account/user'
 import * as Bluebird from 'bluebird'
-import { MVideoImportDefault, MVideoImportFormattable } from '@server/typings/models/video/video-import'
+import { MVideoImportDefault, MVideoImportFormattable } from '@server/types/models/video/video-import'
 
 @DefaultScope(() => ({
   include: [
@@ -129,6 +129,7 @@ export class VideoImportModel extends Model<VideoImportModel> {
       distinct: true,
       include: [
         {
+          attributes: [ 'id' ],
           model: UserModel.unscoped(), // FIXME: Without this, sequelize try to COUNT(DISTINCT(*)) which is an invalid SQL query
           required: true
         }

@@ -1,7 +1,7 @@
 import * as express from 'express'
 import { asyncMiddleware } from '../middlewares'
 import { ROUTE_CACHE_LIFETIME, WEBSERVER } from '../initializers/constants'
-import * as sitemapModule from 'sitemap'
+import { SitemapStream, streamToPromise } from 'sitemap'
 import { VideoModel } from '../models/video/video'
 import { VideoChannelModel } from '../models/video/video-channel'
 import { AccountModel } from '../models/account/account'
@@ -14,7 +14,7 @@ const botsRouter = express.Router()
 // Special route that add OpenGraph and oEmbed tags
 // Do not use a template engine for a so little thing
 botsRouter.use('/sitemap.xml',
-  asyncMiddleware(cacheRoute(ROUTE_CACHE_LIFETIME.SITEMAP)),
+  asyncMiddleware(cacheRoute()(ROUTE_CACHE_LIFETIME.SITEMAP)),
   asyncMiddleware(getSitemap)
 )
 
@@ -33,12 +33,14 @@ async function getSitemap (req: express.Request, res: express.Response) {
   urls = urls.concat(await getSitemapVideoChannelUrls())
   urls = urls.concat(await getSitemapAccountUrls())
 
-  const sitemap = sitemapModule.createSitemap({
-    hostname: WEBSERVER.URL,
-    urls: urls
-  })
+  const sitemapStream = new SitemapStream({ hostname: WEBSERVER.URL })
 
-  const xml = sitemap.toXML()
+  for (const urlObj of urls) {
+    sitemapStream.write(urlObj)
+  }
+  sitemapStream.end()
+
+  const xml = await streamToPromise(sitemapStream)
 
   res.header('Content-Type', 'application/xml')
   res.send(xml)
@@ -61,17 +63,18 @@ async function getSitemapAccountUrls () {
 }
 
 async function getSitemapLocalVideoUrls () {
-  const resultList = await VideoModel.listForApi({
+  const { data } = await VideoModel.listForApi({
     start: 0,
     count: undefined,
     sort: 'createdAt',
     includeLocalVideos: true,
     nsfw: buildNSFWFilter(),
     filter: 'local',
-    withFiles: false
+    withFiles: false,
+    countVideos: false
   })
 
-  return resultList.data.map(v => ({
+  return data.map(v => ({
     url: WEBSERVER.URL + '/videos/watch/' + v.uuid,
     video: [
       {

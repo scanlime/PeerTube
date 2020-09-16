@@ -2,67 +2,79 @@
 
 set -eu
 
-pre_build_hook () {
-  mkdir "./src/pending_locale" > /dev/null || true
-  mv ./src/locale/angular.*.xlf "./src/pending_locale"
+declare -A languages
+defaultLanguage="en-US"
 
-  if [ ! -z ${1+x} ]; then
-    mv "./src/pending_locale/angular.$1.xlf" "./src/locale"
-  fi
-}
-
-post_build_hook () {
-  mv ./src/pending_locale/* "./src/locale"
-  rmdir "./src/pending_locale/"
-}
-
-# Previous build failed
-if [ ! -f "client/src/locale/angular.fr-FR.xlf" ]; then
-    git checkout -- client/src/locale/
-    rm -r client/src/pending_locale
-fi
+# Supported languages
+languages=(
+    ["ar"]="ar"
+    ["en"]="en-US"
+    ["vi"]="vi-VN"
+    ["hu"]="hu-HU"
+    ["th"]="th-TH"
+    ["fi"]="fi-FI"
+    ["nl"]="nl-NL"
+    ["gd"]="gd"
+    ["el"]="el-GR"
+    ["es"]="es-ES"
+    ["oc"]="oc"
+    ["pt"]="pt-BR"
+    ["pt-PT"]="pt-PT"
+    ["sv"]="sv-SE"
+    ["pl"]="pl-PL"
+    ["ru"]="ru-RU"
+    ["zh-Hans"]="zh-Hans-CN"
+    ["zh-Hant"]="zh-Hant-TW"
+    ["fr"]="fr-FR"
+    ["ja"]="ja-JP"
+    ["eu"]="eu-ES"
+    ["ca"]="ca-ES"
+    ["cs"]="cs-CZ"
+    ["eo"]="eo"
+    ["de"]="de-DE"
+    ["it"]="it-IT"
+    ["kab"]="kab"
+)
 
 cd client
 
 rm -rf ./dist ./compiled
 
-pre_build_hook
-
-defaultLanguage="en-US"
-npm run ng build -- --output-path "dist/$defaultLanguage/" --deploy-url "/client/$defaultLanguage/" --prod --stats-json
-mv "./dist/$defaultLanguage/assets" "./dist"
-mv "./dist/$defaultLanguage/manifest.webmanifest" "./dist/manifest.webmanifest"
-
-post_build_hook
-
 # Don't build other languages if --light arg is provided
-if [ -z ${1+x} ] || [ "$1" != "--light" ]; then
-    if [ ! -z ${1+x} ] && [ "$1" == "--light-fr" ]; then
-        languages=("fr-FR")
-    else
-        # Supported languages
-        languages=(
-            "fi-FI" "nl-NL" "gd" "el-GR" "es-ES" "oc" "pt-BR" "pt-PT" "sv-SE" "pl-PL" "ru-RU" "zh-Hans-CN" "zh-Hant-TW"
-            "fr-FR" "ja-JP" "eu-ES" "ca-ES" "cs-CZ" "eo" "de-DE" "it-IT"
-        )
+if [ -z ${1+x} ] || ([ "$1" != "--light" ] && [ "$1" != "--analyze-bundle" ] && [ "$1" != "--i18n" ]); then
+    npm run ng build -- --prod --output-path "dist/build"
+
+    for key in "${!languages[@]}"; do
+        lang=${languages[$key]}
+
+        mv "dist/build/$key" "dist/$lang"
+
+        if [ "$lang" != "en-US" ]; then
+            # Do not duplicate assets
+            rm -r "./dist/$lang/assets"
+        fi
+    done
+
+    mv "./dist/$defaultLanguage/assets" "./dist"
+    mv "./dist/$defaultLanguage/manifest.webmanifest" "./dist/manifest.webmanifest"
+
+    rmdir "dist/build"
+else
+    additionalParams=""
+    if [ ! -z ${1+x} ] && [ "$1" == "--analyze-bundle" ]; then
+        additionalParams="--namedChunks=true --outputHashing=none"
+        export ANALYZE_BUNDLE=true
     fi
 
-    for lang in "${languages[@]}"; do
-        # TODO: remove when the project will use runtime translations
-        pre_build_hook "$lang"
+    if [ ! -z ${1+x} ] && [ "$1" == "--i18n" ]; then
+        additionalParams="--configuration=i18n"
+        export ANALYZE_BUNDLE=true
+    fi
 
-        npm run ng build -- --prod --i18n-file "./src/locale/angular.$lang.xlf" --i18n-format xlf --i18n-locale "$lang" \
-            --output-path "dist/$lang/" --deploy-url "/client/$lang/"
-
-        # Do not duplicate assets
-        rm -r "./dist/$lang/assets"
-
-        # TODO: remove when the project will use runtime translations
-        post_build_hook
-    done
+    npm run ng build -- --localize=false --output-path "dist/$defaultLanguage/" --deploy-url "/client/$defaultLanguage/" --prod --stats-json $additionalParams
 fi
 
-NODE_ENV=production npm run webpack -- --config webpack/webpack.video-embed.js --mode production --json > "./dist/embed-stats.json"
+cd ../ && npm run build:embed && cd client/
 
 # Copy runtime locales
 cp -r "./src/locale" "./dist/locale"

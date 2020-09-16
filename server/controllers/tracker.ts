@@ -1,14 +1,14 @@
-import { logger } from '../helpers/logger'
+import * as bitTorrentTracker from 'bittorrent-tracker'
 import * as express from 'express'
 import * as http from 'http'
-import * as bitTorrentTracker from 'bittorrent-tracker'
 import * as proxyAddr from 'proxy-addr'
 import { Server as WebSocketServer } from 'ws'
+import { Redis } from '@server/lib/redis'
+import { logger } from '../helpers/logger'
+import { CONFIG } from '../initializers/config'
 import { TRACKER_RATE_LIMITS } from '../initializers/constants'
 import { VideoFileModel } from '../models/video/video-file'
-import { parse } from 'url'
 import { VideoStreamingPlaylistModel } from '../models/video/video-streaming-playlist'
-import { CONFIG } from '../initializers/config'
 
 const TrackerServer = bitTorrentTracker.Server
 
@@ -38,23 +38,32 @@ const trackerServer = new TrackerServer({
 
     const key = ip + '-' + infoHash
 
-    peersIps[ ip ] = peersIps[ ip ] ? peersIps[ ip ] + 1 : 1
-    peersIpInfoHash[ key ] = peersIpInfoHash[ key ] ? peersIpInfoHash[ key ] + 1 : 1
+    peersIps[ip] = peersIps[ip] ? peersIps[ip] + 1 : 1
+    peersIpInfoHash[key] = peersIpInfoHash[key] ? peersIpInfoHash[key] + 1 : 1
 
-    if (CONFIG.TRACKER.REJECT_TOO_MANY_ANNOUNCES && peersIpInfoHash[ key ] > TRACKER_RATE_LIMITS.ANNOUNCES_PER_IP_PER_INFOHASH) {
-      return cb(new Error(`Too many requests (${peersIpInfoHash[ key ]} of ip ${ip} for torrent ${infoHash}`))
+    if (CONFIG.TRACKER.REJECT_TOO_MANY_ANNOUNCES && peersIpInfoHash[key] > TRACKER_RATE_LIMITS.ANNOUNCES_PER_IP_PER_INFOHASH) {
+      return cb(new Error(`Too many requests (${peersIpInfoHash[key]} of ip ${ip} for torrent ${infoHash}`))
     }
 
     try {
       if (CONFIG.TRACKER.PRIVATE === false) return cb()
 
-      const videoFileExists = await VideoFileModel.doesInfohashExist(infoHash)
+      const videoFileExists = await VideoFileModel.doesInfohashExistCached(infoHash)
       if (videoFileExists === true) return cb()
 
       const playlistExists = await VideoStreamingPlaylistModel.doesInfohashExist(infoHash)
       if (playlistExists === true) return cb()
 
-      return cb(new Error(`Unknown infoHash ${infoHash}`))
+      cb(new Error(`Unknown infoHash ${infoHash} requested by ip ${ip}`))
+
+      // Close socket connection and block IP for a few time
+      if (params.type === 'ws') {
+        Redis.Instance.setTrackerBlockIP(ip)
+          .catch(err => logger.error('Cannot set tracker block ip.', { err }))
+
+        // setTimeout to wait filter response
+        setTimeout(() => params.socket.close(), 0)
+      }
     } catch (err) {
       logger.error('Error in tracker filter.', { err })
       return cb(err)
@@ -87,11 +96,23 @@ function createWebsocketTrackerServer (app: express.Application) {
     trackerServer.onWebSocketConnection(ws)
   })
 
-  server.on('upgrade', (request, socket, head) => {
-    const pathname = parse(request.url).pathname
+  server.on('upgrade', (request: express.Request, socket, head) => {
+    if (request.url === '/tracker/socket') {
+      const ip = proxyAddr(request, CONFIG.TRUST_PROXY)
 
-    if (pathname === '/tracker/socket') {
-      wss.handleUpgrade(request, socket, head, ws => wss.emit('connection', ws, request))
+      Redis.Instance.doesTrackerBlockIPExist(ip)
+        .then(result => {
+          if (result === true) {
+            logger.debug('Blocking IP %s from tracker.', ip)
+
+            socket.write('HTTP/1.1 403 Forbidden\r\n\r\n')
+            socket.destroy()
+            return
+          }
+
+          return wss.handleUpgrade(request, socket, head, ws => wss.emit('connection', ws, request))
+        })
+        .catch(err => logger.error('Cannot check if tracker block ip exists.', { err }))
     }
 
     // Don't destroy socket, we have Socket.IO too

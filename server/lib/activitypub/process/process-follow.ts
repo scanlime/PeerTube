@@ -1,17 +1,17 @@
 import { ActivityFollow } from '../../../../shared/models/activitypub'
 import { retryTransactionWrapper } from '../../../helpers/database-utils'
 import { logger } from '../../../helpers/logger'
-import { sequelizeTypescript } from '../../../initializers'
+import { sequelizeTypescript } from '../../../initializers/database'
 import { ActorModel } from '../../../models/activitypub/actor'
 import { ActorFollowModel } from '../../../models/activitypub/actor-follow'
 import { sendAccept, sendReject } from '../send'
 import { Notifier } from '../../notifier'
 import { getAPId } from '../../../helpers/activitypub'
-import { getServerActor } from '../../../helpers/utils'
 import { CONFIG } from '../../../initializers/config'
-import { APProcessorOptions } from '../../../typings/activitypub-processor.model'
-import { MActorFollowActors, MActorSignature } from '../../../typings/models'
+import { APProcessorOptions } from '../../../types/activitypub-processor.model'
+import { MActorFollowActors, MActorSignature } from '../../../types/models'
 import { autoFollowBackIfNeeded } from '../follow'
+import { getServerActor } from '@server/models/application/application'
 
 async function processFollowActivity (options: APProcessorOptions<ActivityFollow>) {
   const { activity, byActor } = options
@@ -59,7 +59,9 @@ async function processFollow (byActor: MActorSignature, targetActorURL: string) 
       transaction: t
     })
 
-    if (actorFollow.state !== 'accepted' && CONFIG.FOLLOWERS.INSTANCE.MANUAL_APPROVAL === false) {
+    // Set the follow as accepted if the remote actor follows a channel or account
+    // Or if the instance automatically accepts followers
+    if (actorFollow.state !== 'accepted' && (isFollowingInstance === false || CONFIG.FOLLOWERS.INSTANCE.MANUAL_APPROVAL === false)) {
       actorFollow.state = 'accepted'
       await actorFollow.save({ transaction: t })
     }

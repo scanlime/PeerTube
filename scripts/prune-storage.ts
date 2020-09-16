@@ -5,7 +5,7 @@ import * as prompt from 'prompt'
 import { join } from 'path'
 import { CONFIG } from '../server/initializers/config'
 import { VideoModel } from '../server/models/video/video'
-import { initDatabaseModels } from '../server/initializers'
+import { initDatabaseModels } from '../server/initializers/database'
 import { readdir, remove } from 'fs-extra'
 import { VideoRedundancyModel } from '../server/models/redundancy/video-redundancy'
 import * as Bluebird from 'bluebird'
@@ -161,7 +161,8 @@ async function askConfirmation () {
     }
     prompt.get(schema, function (err, result) {
       if (err) return rej(err)
-      return res(result.confirm && result.confirm.match(/y/) !== null)
+
+      return res(result.confirm?.match(/y/) !== null)
     })
   })
 }

@@ -1,13 +1,13 @@
 import { ActivityAnnounce } from '../../../../shared/models/activitypub'
 import { retryTransactionWrapper } from '../../../helpers/database-utils'
-import { sequelizeTypescript } from '../../../initializers'
+import { sequelizeTypescript } from '../../../initializers/database'
 import { VideoShareModel } from '../../../models/video/video-share'
 import { forwardVideoRelatedActivity } from '../send/utils'
 import { getOrCreateVideoAndAccountAndChannel } from '../videos'
 import { Notifier } from '../../notifier'
 import { logger } from '../../../helpers/logger'
-import { APProcessorOptions } from '../../../typings/activitypub-processor.model'
-import { MActorSignature, MVideoAccountLightBlacklistAllFiles } from '../../../typings/models'
+import { APProcessorOptions } from '../../../types/activitypub-processor.model'
+import { MActorSignature, MVideoAccountLightBlacklistAllFiles } from '../../../types/models'
 
 async function processAnnounceActivity (options: APProcessorOptions<ActivityAnnounce>) {
   const { activity, byActor: actorAnnouncer } = options

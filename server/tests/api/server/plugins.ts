@@ -1,4 +1,4 @@
-/* tslint:disable:no-unused-expression */
+/* eslint-disable @typescript-eslint/no-unused-expressions,@typescript-eslint/require-await */
 
 import 'mocha'
 import * as chai from 'chai'
@@ -6,28 +6,37 @@ import {
   cleanupTests,
   closeAllSequelize,
   flushAndRunServer,
-  getConfig, getMyUserInformation, getPluginPackageJSON,
+  getConfig,
+  getMyUserInformation,
   getPlugin,
+  getPluginPackageJSON,
   getPluginRegisteredSettings,
-  getPluginsCSS,
-  installPlugin, killallServers,
+  getPublicSettings,
+  installPlugin,
+  killallServers,
   listAvailablePlugins,
-  listPlugins, reRunServer,
+  listPlugins,
+  reRunServer,
   ServerInfo,
   setAccessTokensToServers,
-  setPluginVersion, uninstallPlugin,
-  updateCustomSubConfig, updateMyUser, updatePluginPackageJSON, updatePlugin,
+  setPluginVersion,
+  uninstallPlugin,
+  updateCustomSubConfig,
+  updateMyUser,
+  updatePlugin,
+  updatePluginPackageJSON,
   updatePluginSettings,
-  wait, getPublicSettings
+  wait,
+  waitUntilLog
 } from '../../../../shared/extra-utils'
-import { PluginType } from '../../../../shared/models/plugins/plugin.type'
 import { PeerTubePluginIndex } from '../../../../shared/models/plugins/peertube-plugin-index.model'
-import { ServerConfig } from '../../../../shared/models/server'
 import { PeerTubePlugin } from '../../../../shared/models/plugins/peertube-plugin.model'
-import { User } from '../../../../shared/models/users'
 import { PluginPackageJson } from '../../../../shared/models/plugins/plugin-package-json.model'
-import { RegisteredServerSettings } from '../../../../shared/models/plugins/register-server-setting.model'
+import { PluginType } from '../../../../shared/models/plugins/plugin.type'
 import { PublicServerSetting } from '../../../../shared/models/plugins/public-server.setting'
+import { RegisteredServerSettings } from '../../../../shared/models/plugins/register-server-setting.model'
+import { ServerConfig } from '../../../../shared/models/server'
+import { User } from '../../../../shared/models/users'
 
 const expect = chai.expect
 
@@ -88,7 +97,7 @@ describe('Test plugins', function () {
       expect(res2.body.total).to.be.at.least(2)
       expect(data2).to.have.lengthOf(2)
 
-      expect(data1[0].npmName).to.not.equal(data2[ 0 ].npmName)
+      expect(data1[0].npmName).to.not.equal(data2[0].npmName)
     }
 
     {
@@ -108,12 +117,6 @@ describe('Test plugins', function () {
     }
   })
 
-  it('Should have an empty global css', async function () {
-    const res = await getPluginsCSS(server.url)
-
-    expect(res.text).to.be.empty
-  })
-
   it('Should install a plugin and a theme', async function () {
     this.timeout(30000)
 
@@ -128,12 +131,6 @@ describe('Test plugins', function () {
       accessToken: server.accessToken,
       npmName: 'peertube-theme-background-red'
     })
-  })
-
-  it('Should have the correct global css', async function () {
-    const res = await getPluginsCSS(server.url)
-
-    expect(res.text).to.contain('--mainBackgroundColor')
   })
 
   it('Should have the plugin loaded in the configuration', async function () {
@@ -247,6 +244,12 @@ describe('Test plugins', function () {
       npmName: 'peertube-plugin-hello-world',
       settings
     })
+  })
+
+  it('Should have watched settings changes', async function () {
+    this.timeout(10000)
+
+    await waitUntilLog(server, 'Settings changed!')
   })
 
   it('Should get a plugin and a theme', async function () {
@@ -369,12 +372,6 @@ describe('Test plugins', function () {
 
     expect(res.body.total).to.equal(0)
     expect(res.body.data).to.have.lengthOf(0)
-  })
-
-  it('Should have an empty global css', async function () {
-    const res = await getPluginsCSS(server.url)
-
-    expect(res.text).to.be.empty
   })
 
   it('Should list uninstalled plugins', async function () {

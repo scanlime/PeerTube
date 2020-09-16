@@ -1,4 +1,4 @@
-/* tslint:disable:no-unused-expression */
+/* eslint-disable @typescript-eslint/no-unused-expressions,@typescript-eslint/require-await */
 
 import * as chai from 'chai'
 import 'mocha'
@@ -13,16 +13,17 @@ import {
   updateVideo,
   userLogin
 } from '../../../../shared/extra-utils'
-import { killallServers, ServerInfo, uploadVideo } from '../../../../shared/extra-utils/index'
+import { ServerInfo, uploadVideo } from '../../../../shared/extra-utils/index'
 import { setAccessTokensToServers } from '../../../../shared/extra-utils/users/login'
 import { Video, VideoChannel } from '../../../../shared/models/videos'
 import { waitJobs } from '../../../../shared/extra-utils/server/jobs'
 import {
   addUserSubscription,
+  areSubscriptionsExist,
+  getUserSubscription,
   listUserSubscriptions,
   listUserSubscriptionVideos,
-  removeUserSubscription,
-  getUserSubscription, areSubscriptionsExist
+  removeUserSubscription
 } from '../../../../shared/extra-utils/users/user-subscriptions'
 
 const expect = chai.expect
@@ -95,14 +96,14 @@ describe('Test users subscriptions', function () {
 
   it('Should list subscriptions', async function () {
     {
-      const res = await listUserSubscriptions(servers[0].url, servers[0].accessToken)
+      const res = await listUserSubscriptions({ url: servers[0].url, token: servers[0].accessToken })
       expect(res.body.total).to.equal(0)
       expect(res.body.data).to.be.an('array')
       expect(res.body.data).to.have.lengthOf(0)
     }
 
     {
-      const res = await listUserSubscriptions(servers[0].url, users[0].accessToken)
+      const res = await listUserSubscriptions({ url: servers[0].url, token: users[0].accessToken, sort: 'createdAt' })
       expect(res.body.total).to.equal(2)
 
       const subscriptions: VideoChannel[] = res.body.data
@@ -116,7 +117,7 @@ describe('Test users subscriptions', function () {
 
   it('Should get subscription', async function () {
     {
-      const res = await getUserSubscription(servers[ 0 ].url, users[ 0 ].accessToken, 'user3_channel@localhost:' + servers[2].port)
+      const res = await getUserSubscription(servers[0].url, users[0].accessToken, 'user3_channel@localhost:' + servers[2].port)
       const videoChannel: VideoChannel = res.body
 
       expect(videoChannel.name).to.equal('user3_channel')
@@ -127,7 +128,7 @@ describe('Test users subscriptions', function () {
     }
 
     {
-      const res = await getUserSubscription(servers[ 0 ].url, users[ 0 ].accessToken, 'root_channel@localhost:' + servers[0].port)
+      const res = await getUserSubscription(servers[0].url, users[0].accessToken, 'root_channel@localhost:' + servers[0].port)
       const videoChannel: VideoChannel = res.body
 
       expect(videoChannel.name).to.equal('root_channel')
@@ -146,13 +147,41 @@ describe('Test users subscriptions', function () {
       'user3_channel@localhost:' + servers[0].port
     ]
 
-    const res = await areSubscriptionsExist(servers[ 0 ].url, users[ 0 ].accessToken, uris)
+    const res = await areSubscriptionsExist(servers[0].url, users[0].accessToken, uris)
     const body = res.body
 
     expect(body['user3_channel@localhost:' + servers[2].port]).to.be.true
     expect(body['root2_channel@localhost:' + servers[0].port]).to.be.false
     expect(body['root_channel@localhost:' + servers[0].port]).to.be.true
     expect(body['user3_channel@localhost:' + servers[0].port]).to.be.false
+  })
+
+  it('Should search among subscriptions', async function () {
+    {
+      const res = await listUserSubscriptions({
+        url: servers[0].url,
+        token: users[0].accessToken,
+        sort: '-createdAt',
+        search: 'user3_channel'
+      })
+      expect(res.body.total).to.equal(1)
+
+      const subscriptions = res.body.data
+      expect(subscriptions).to.have.lengthOf(1)
+    }
+
+    {
+      const res = await listUserSubscriptions({
+        url: servers[0].url,
+        token: users[0].accessToken,
+        sort: '-createdAt',
+        search: 'toto'
+      })
+      expect(res.body.total).to.equal(0)
+
+      const subscriptions = res.body.data
+      expect(subscriptions).to.have.lengthOf(0)
+    }
   })
 
   it('Should list subscription videos', async function () {

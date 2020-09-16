@@ -1,31 +1,23 @@
-import { Component, OnInit } from '@angular/core'
-import { Notifier } from '@app/core'
-import { BytesPipe } from 'ngx-pipes'
-import { AuthService } from '../../core'
-import { User } from '../../shared'
-import { UserService } from '../../shared/users'
-import { I18n } from '@ngx-translate/i18n-polyfill'
+import { ViewportScroller } from '@angular/common'
+import { AfterViewChecked, Component, OnInit } from '@angular/core'
+import { AuthService, Notifier, User, UserService } from '@app/core'
 
 @Component({
   selector: 'my-account-settings',
   templateUrl: './my-account-settings.component.html',
   styleUrls: [ './my-account-settings.component.scss' ]
 })
-export class MyAccountSettingsComponent implements OnInit {
+export class MyAccountSettingsComponent implements OnInit, AfterViewChecked {
   user: User = null
 
-  userVideoQuota = '0'
-  userVideoQuotaUsed = 0
-
-  userVideoQuotaDaily = '0'
-  userVideoQuotaUsedDaily = 0
+  private lastScrollHash: string
 
   constructor (
+    private viewportScroller: ViewportScroller,
     private userService: UserService,
     private authService: AuthService,
-    private notifier: Notifier,
-    private i18n: I18n
-  ) {}
+    private notifier: Notifier
+    ) {}
 
   get userInformationLoaded () {
     return this.authService.userInformationLoaded
@@ -33,44 +25,26 @@ export class MyAccountSettingsComponent implements OnInit {
 
   ngOnInit () {
     this.user = this.authService.getUser()
+  }
 
-    this.authService.userInformationLoaded.subscribe(
-      () => {
-        if (this.user.videoQuota !== -1) {
-          this.userVideoQuota = new BytesPipe().transform(this.user.videoQuota, 0).toString()
-        } else {
-          this.userVideoQuota = this.i18n('Unlimited')
-        }
+  ngAfterViewChecked () {
+    if (window.location.hash && window.location.hash !== this.lastScrollHash) {
+      this.viewportScroller.scrollToAnchor(window.location.hash.replace('#', ''))
 
-        if (this.user.videoQuotaDaily !== -1) {
-          this.userVideoQuotaDaily = new BytesPipe().transform(this.user.videoQuotaDaily, 0).toString()
-        } else {
-          this.userVideoQuotaDaily = this.i18n('Unlimited')
-        }
-      }
-    )
-
-    this.userService.getMyVideoQuotaUsed()
-      .subscribe(data => {
-        this.userVideoQuotaUsed = data.videoQuotaUsed
-        this.userVideoQuotaUsedDaily = data.videoQuotaUsedDaily
-      })
+      this.lastScrollHash = window.location.hash
+    }
   }
 
   onAvatarChange (formData: FormData) {
     this.userService.changeAvatar(formData)
       .subscribe(
         data => {
-          this.notifier.success(this.i18n('Avatar changed.'))
+          this.notifier.success($localize`Avatar changed.`)
 
           this.user.updateAccountAvatar(data.avatar)
         },
 
         err => this.notifier.error(err.message)
       )
-  }
-
-  hasDailyQuota () {
-    return this.user.videoQuotaDaily !== -1
   }
 }

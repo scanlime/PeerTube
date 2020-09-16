@@ -19,7 +19,7 @@ import { getSort, throwIfNotValid } from '../utils'
 import { isActivityPubUrlValid } from '../../helpers/custom-validators/activitypub/misc'
 import { CONSTRAINTS_FIELDS } from '../../initializers/constants'
 import { PlaylistElementObject } from '../../../shared/models/activitypub/objects/playlist-element-object'
-import * as validator from 'validator'
+import validator from 'validator'
 import { AggregateOptions, Op, ScopeOptions, Sequelize, Transaction } from 'sequelize'
 import { VideoPlaylistElement, VideoPlaylistElementType } from '../../../shared/models/videos/playlist/video-playlist-element.model'
 import { AccountModel } from '../account/account'
@@ -31,8 +31,8 @@ import {
   MVideoPlaylistElementFormattable,
   MVideoPlaylistElementVideoUrlPlaylistPrivacy,
   MVideoPlaylistVideoThumbnail
-} from '@server/typings/models/video/video-playlist-element'
-import { MUserAccountId } from '@server/typings/models'
+} from '@server/types/models/video/video-playlist-element'
+import { MUserAccountId } from '@server/types/models'
 
 @Table({
   tableName: 'videoPlaylistElement',
@@ -42,10 +42,6 @@ import { MUserAccountId } from '@server/typings/models'
     },
     {
       fields: [ 'videoId' ]
-    },
-    {
-      fields: [ 'videoPlaylistId', 'videoId' ],
-      unique: true
     },
     {
       fields: [ 'url' ],
@@ -60,8 +56,8 @@ export class VideoPlaylistElementModel extends Model<VideoPlaylistElementModel> 
   @UpdatedAt
   updatedAt: Date
 
-  @AllowNull(false)
-  @Is('VideoPlaylistUrl', value => throwIfNotValid(value, isActivityPubUrlValid, 'url'))
+  @AllowNull(true)
+  @Is('VideoPlaylistUrl', value => throwIfNotValid(value, isActivityPubUrlValid, 'url', true))
   @Column(DataType.STRING(CONSTRAINTS_FIELDS.VIDEO_PLAYLISTS.URL.max))
   url: string
 
@@ -120,10 +116,10 @@ export class VideoPlaylistElementModel extends Model<VideoPlaylistElementModel> 
   }
 
   static listForApi (options: {
-    start: number,
-    count: number,
-    videoPlaylistId: number,
-    serverAccount: AccountModel,
+    start: number
+    count: number
+    videoPlaylistId: number
+    serverAccount: AccountModel
     user?: MUserAccountId
   }) {
     const accountIds = [ options.serverAccount.id ]
@@ -185,12 +181,11 @@ export class VideoPlaylistElementModel extends Model<VideoPlaylistElementModel> 
     return VideoPlaylistElementModel.findByPk(playlistElementId)
   }
 
-  static loadByPlaylistAndVideoForAP (
+  static loadByPlaylistAndElementIdForAP (
     playlistId: number | string,
-    videoId: number | string
+    playlistElementId: number
   ): Bluebird<MVideoPlaylistElementVideoUrlPlaylistPrivacy> {
     const playlistWhere = validator.isUUID('' + playlistId) ? { uuid: playlistId } : { id: playlistId }
-    const videoWhere = validator.isUUID('' + videoId) ? { uuid: videoId } : { id: videoId }
 
     const query = {
       include: [
@@ -201,10 +196,12 @@ export class VideoPlaylistElementModel extends Model<VideoPlaylistElementModel> 
         },
         {
           attributes: [ 'url' ],
-          model: VideoModel.unscoped(),
-          where: videoWhere
+          model: VideoModel.unscoped()
         }
-      ]
+      ],
+      where: {
+        id: playlistElementId
+      }
     }
 
     return VideoPlaylistElementModel.findOne(query)
@@ -309,7 +306,10 @@ export class VideoPlaylistElementModel extends Model<VideoPlaylistElementModel> 
     // Owned video, don't filter it
     if (accountId && video.VideoChannel.Account.id === accountId) return VideoPlaylistElementType.REGULAR
 
-    if (video.privacy === VideoPrivacy.PRIVATE) return VideoPlaylistElementType.PRIVATE
+    // Internal video?
+    if (video.privacy === VideoPrivacy.INTERNAL && accountId) return VideoPlaylistElementType.REGULAR
+
+    if (video.privacy === VideoPrivacy.PRIVATE || video.privacy === VideoPrivacy.INTERNAL) return VideoPlaylistElementType.PRIVATE
 
     if (video.isBlacklisted() || video.isBlocked()) return VideoPlaylistElementType.UNAVAILABLE
     if (video.nsfw === true && displayNSFW === false) return VideoPlaylistElementType.UNAVAILABLE

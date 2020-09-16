@@ -5,9 +5,8 @@ import { jsonld } from './custom-jsonld-signature'
 import { logger } from './logger'
 import { cloneDeep } from 'lodash'
 import { createSign, createVerify } from 'crypto'
-import { buildDigest } from '../lib/job-queue/handlers/utils/activitypub-http-utils'
 import * as bcrypt from 'bcrypt'
-import { MActor } from '../typings/models'
+import { MActor } from '../types/models'
 
 const bcryptComparePromise = promisify2<any, string, boolean>(bcrypt.compare)
 const bcryptGenSaltPromise = promisify1<number, string>(bcrypt.genSalt)
@@ -51,7 +50,7 @@ function isHTTPSignatureVerified (httpSignatureParsed: any, actor: MActor): bool
 }
 
 function parseHTTPSignature (req: Request, clockSkew?: number) {
-  return httpSignature.parse(req, { authorizationHeaderName: HTTP_SIGNATURE.HEADER_NAME, clockSkew })
+  return httpSignature.parse(req, { clockSkew })
 }
 
 // JSONLD
@@ -104,12 +103,19 @@ async function signJsonLDObject (byActor: MActor, data: any) {
   return Object.assign(data, { signature })
 }
 
+function buildDigest (body: any) {
+  const rawBody = typeof body === 'string' ? body : JSON.stringify(body)
+
+  return 'SHA-256=' + sha256(rawBody, 'base64')
+}
+
 // ---------------------------------------------------------------------------
 
 export {
   isHTTPSignatureDigestValid,
   parseHTTPSignature,
   isHTTPSignatureVerified,
+  buildDigest,
   isJsonLDSignatureVerified,
   comparePassword,
   createPrivateAndPublicKeys,

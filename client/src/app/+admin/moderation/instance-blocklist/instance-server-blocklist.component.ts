@@ -1,57 +1,15 @@
-import { Component, OnInit } from '@angular/core'
-import { Notifier } from '@app/core'
-import { I18n } from '@ngx-translate/i18n-polyfill'
-import { RestPagination, RestTable } from '@app/shared'
-import { SortMeta } from 'primeng/components/common/sortmeta'
-import { BlocklistService } from '@app/shared/blocklist'
-import { ServerBlock } from '../../../../../../shared'
+import { Component } from '@angular/core'
+import { GenericServerBlocklistComponent, BlocklistComponentType } from '@app/shared/shared-moderation'
 
 @Component({
   selector: 'my-instance-server-blocklist',
-  styleUrls: [ './instance-server-blocklist.component.scss' ],
-  templateUrl: './instance-server-blocklist.component.html'
+  styleUrls: [ '../../../shared/shared-moderation/server-blocklist.component.scss' ],
+  templateUrl: '../../../shared/shared-moderation/server-blocklist.component.html'
 })
-export class InstanceServerBlocklistComponent extends RestTable implements OnInit {
-  blockedServers: ServerBlock[] = []
-  totalRecords = 0
-  rowsPerPage = 10
-  sort: SortMeta = { field: 'createdAt', order: -1 }
-  pagination: RestPagination = { count: this.rowsPerPage, start: 0 }
+export class InstanceServerBlocklistComponent extends GenericServerBlocklistComponent {
+  mode = BlocklistComponentType.Instance
 
-  constructor (
-    private notifier: Notifier,
-    private blocklistService: BlocklistService,
-    private i18n: I18n
-  ) {
-    super()
-  }
-
-  ngOnInit () {
-    this.initialize()
-  }
-
-  unblockServer (serverBlock: ServerBlock) {
-    const host = serverBlock.blockedServer.host
-
-    this.blocklistService.unblockServerByInstance(host)
-      .subscribe(
-        () => {
-          this.notifier.success(this.i18n('Instance {{host}} unmuted by your instance.', { host }))
-
-          this.loadData()
-        }
-      )
-  }
-
-  protected loadData () {
-    return this.blocklistService.getInstanceServerBlocklist(this.pagination, this.sort)
-      .subscribe(
-        resultList => {
-          this.blockedServers = resultList.data
-          this.totalRecords = resultList.total
-        },
-
-        err => this.notifier.error(err.message)
-      )
+  getIdentifier () {
+    return 'InstanceServerBlocklistComponent'
   }
 }

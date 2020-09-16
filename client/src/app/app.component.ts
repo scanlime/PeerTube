@@ -1,40 +1,44 @@
-import { Component, OnInit, ViewChild } from '@angular/core'
+import { Hotkey, HotkeysService } from 'angular2-hotkeys'
+import { concat } from 'rxjs'
+import { filter, first, map, pairwise } from 'rxjs/operators'
+import { DOCUMENT, PlatformLocation, ViewportScroller } from '@angular/common'
+import { AfterViewInit, Component, Inject, LOCALE_ID, OnInit, ViewChild } from '@angular/core'
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser'
 import { Event, GuardsCheckStart, NavigationEnd, Router, Scroll } from '@angular/router'
-import { AuthService, RedirectService, ServerService, ThemeService } from '@app/core'
-import { is18nPath } from '../../../shared/models/i18n'
-import { ScreenService } from '@app/shared/misc/screen.service'
-import { debounceTime, filter, first, map, pairwise, skip, switchMap } from 'rxjs/operators'
-import { Hotkey, HotkeysService } from 'angular2-hotkeys'
-import { I18n } from '@ngx-translate/i18n-polyfill'
-import { fromEvent } from 'rxjs'
-import { PlatformLocation, ViewportScroller } from '@angular/common'
-import { PluginService } from '@app/core/plugins/plugin.service'
+import { AuthService, MarkdownService, RedirectService, ScreenService, ServerService, ThemeService, User } from '@app/core'
 import { HooksService } from '@app/core/plugins/hooks.service'
-import { NgbModal } from '@ng-bootstrap/ng-bootstrap'
-import { POP_STATE_MODAL_DISMISS } from '@app/shared/misc/constants'
-import { WelcomeModalComponent } from '@app/modal/welcome-modal.component'
+import { PluginService } from '@app/core/plugins/plugin.service'
+import { CustomModalComponent } from '@app/modal/custom-modal.component'
 import { InstanceConfigWarningModalComponent } from '@app/modal/instance-config-warning-modal.component'
-import { UserRole } from '@shared/models'
-import { User } from '@app/shared'
-import { InstanceService } from '@app/shared/instance/instance.service'
+import { WelcomeModalComponent } from '@app/modal/welcome-modal.component'
+import { NgbModal } from '@ng-bootstrap/ng-bootstrap'
+import { peertubeLocalStorage } from '@root-helpers/peertube-web-storage'
+import { getShortLocale, is18nPath } from '@shared/core-utils/i18n'
+import { BroadcastMessageLevel, ServerConfig, UserRole } from '@shared/models'
+import { MenuService } from './core/menu/menu.service'
+import { POP_STATE_MODAL_DISMISS } from './helpers'
+import { InstanceService } from './shared/shared-instance'
 
 @Component({
   selector: 'my-app',
   templateUrl: './app.component.html',
   styleUrls: [ './app.component.scss' ]
 })
-export class AppComponent implements OnInit {
-  @ViewChild('welcomeModal', { static: false }) welcomeModal: WelcomeModalComponent
-  @ViewChild('instanceConfigWarningModal', { static: false }) instanceConfigWarningModal: InstanceConfigWarningModalComponent
+export class AppComponent implements OnInit, AfterViewInit {
+  private static BROADCAST_MESSAGE_KEY = 'app-broadcast-message-dismissed'
 
-  isMenuDisplayed = true
-  isMenuChangedByUser = false
+  @ViewChild('welcomeModal') welcomeModal: WelcomeModalComponent
+  @ViewChild('instanceConfigWarningModal') instanceConfigWarningModal: InstanceConfigWarningModalComponent
+  @ViewChild('customModal') customModal: CustomModalComponent
 
   customCSS: SafeHtml
+  broadcastMessage: { message: string, dismissable: boolean, class: string } | null = null
+
+  private serverConfig: ServerConfig
 
   constructor (
-    private i18n: I18n,
+    @Inject(DOCUMENT) private document: Document,
+    @Inject(LOCALE_ID) private localeId: string,
     private viewportScroller: ViewportScroller,
     private router: Router,
     private authService: AuthService,
@@ -48,20 +52,13 @@ export class AppComponent implements OnInit {
     private themeService: ThemeService,
     private hooks: HooksService,
     private location: PlatformLocation,
-    private modalService: NgbModal
+    private modalService: NgbModal,
+    private markdownService: MarkdownService,
+    public menu: MenuService
   ) { }
 
-  get serverVersion () {
-    return this.serverService.getConfig().serverVersion
-  }
-
-  get serverCommit () {
-    const commit = this.serverService.getConfig().serverCommit || ''
-    return (commit !== '') ? '...' + commit : commit
-  }
-
   get instanceName () {
-    return this.serverService.getConfig().instance.name
+    return this.serverConfig.instance.name
   }
 
   get defaultRoute () {
@@ -70,6 +67,10 @@ export class AppComponent implements OnInit {
 
   ngOnInit () {
     document.getElementById('incompatible-browser').className += ' browser-ok'
+
+    this.serverConfig = this.serverService.getTmpConfig()
+    this.serverService.getConfig()
+        .subscribe(config => this.serverConfig = config)
 
     this.loadPlugins()
     this.themeService.initialize()
@@ -81,45 +82,33 @@ export class AppComponent implements OnInit {
       this.authService.refreshUserInformation()
     }
 
-    // Load custom data from server
-    this.serverService.loadConfig()
-    this.serverService.loadVideoCategories()
-    this.serverService.loadVideoLanguages()
-    this.serverService.loadVideoLicences()
-    this.serverService.loadVideoPrivacies()
-    this.serverService.loadVideoPlaylistPrivacies()
-
-    // Do not display menu on small screens
-    if (this.screenService.isInSmallView()) {
-      this.isMenuDisplayed = false
-    }
-
     this.initRouteEvents()
     this.injectJS()
     this.injectCSS()
+    this.injectBroadcastMessage()
 
     this.initHotkeys()
-
-    fromEvent(window, 'resize')
-      .pipe(debounceTime(200))
-      .subscribe(() => this.onResize())
 
     this.location.onPopState(() => this.modalService.dismissAll(POP_STATE_MODAL_DISMISS))
 
     this.openModalsIfNeeded()
+
+    this.document.documentElement.lang = getShortLocale(this.localeId)
+  }
+
+  ngAfterViewInit () {
+    this.pluginService.initializeCustomModal(this.customModal)
   }
 
   isUserLoggedIn () {
     return this.authService.isLoggedIn()
   }
 
-  toggleMenu () {
-    this.isMenuDisplayed = !this.isMenuDisplayed
-    this.isMenuChangedByUser = true
-  }
+  hideBroadcastMessage () {
+    peertubeLocalStorage.setItem(AppComponent.BROADCAST_MESSAGE_KEY, this.serverConfig.broadcastMessage.message)
 
-  onResize () {
-    this.isMenuDisplayed = window.innerWidth >= 800 && !this.isMenuChangedByUser
+    this.broadcastMessage = null
+    this.screenService.isBroadcastMessageDisplayed = false
   }
 
   private initRouteEvents () {
@@ -129,12 +118,17 @@ export class AppComponent implements OnInit {
     const scrollEvent = eventsObs.pipe(filter((e: Event): e is Scroll => e instanceof Scroll))
 
     scrollEvent.subscribe(e => {
-      if (e.position) {
-        return this.viewportScroller.scrollToPosition(e.position)
+      // scrollToAnchor first to preserve anchor position when using history navigation
+      if (e.anchor) {
+        setTimeout(() => {
+          document.getElementById(e.anchor).scrollIntoView({ behavior: 'smooth', inline: 'nearest' })
+        })
+
+        return
       }
 
-      if (e.anchor) {
-        return this.viewportScroller.scrollToAnchor(e.anchor)
+      if (e.position) {
+        return this.viewportScroller.scrollToPosition(e.position)
       }
 
       if (resetScroll) {
@@ -186,16 +180,47 @@ export class AppComponent implements OnInit {
 
     eventsObs.pipe(
       filter((e: Event): e is GuardsCheckStart => e instanceof GuardsCheckStart),
-      filter(() => this.screenService.isInSmallView())
-    ).subscribe(() => this.isMenuDisplayed = false) // User clicked on a link in the menu, change the page
+      filter(() => this.screenService.isInSmallView() || this.screenService.isInTouchScreen())
+    ).subscribe(() => this.menu.setMenuDisplay(false)) // User clicked on a link in the menu, change the page
+  }
+
+  private injectBroadcastMessage () {
+    concat(
+      this.serverService.getConfig().pipe(first()),
+      this.serverService.configReloaded
+    ).subscribe(async config => {
+      this.broadcastMessage = null
+      this.screenService.isBroadcastMessageDisplayed = false
+
+      const messageConfig = config.broadcastMessage
+
+      if (messageConfig.enabled) {
+        // Already dismissed this message?
+        if (messageConfig.dismissable && localStorage.getItem(AppComponent.BROADCAST_MESSAGE_KEY) === messageConfig.message) {
+          return
+        }
+
+        const classes: { [id in BroadcastMessageLevel]: string } = {
+          info: 'alert-info',
+          warning: 'alert-warning',
+          error: 'alert-danger'
+        }
+
+        this.broadcastMessage = {
+          message: await this.markdownService.completeMarkdownToHTML(messageConfig.message),
+          dismissable: messageConfig.dismissable,
+          class: classes[messageConfig.level]
+        }
+
+        this.screenService.isBroadcastMessageDisplayed = true
+      }
+    })
   }
 
   private injectJS () {
     // Inject JS
-    this.serverService.configLoaded
-        .subscribe(() => {
-          const config = this.serverService.getConfig()
-
+    this.serverService.getConfig()
+        .subscribe(config => {
           if (config.instance.customizations.javascript) {
             try {
               // tslint:disable:no-eval
@@ -209,20 +234,19 @@ export class AppComponent implements OnInit {
 
   private injectCSS () {
     // Inject CSS if modified (admin config settings)
-    this.serverService.configLoaded
-        .pipe(skip(1)) // We only want to subscribe to reloads, because the CSS is already injected by the server
-        .subscribe(() => {
-          const headStyle = document.querySelector('style.custom-css-style')
-          if (headStyle) headStyle.parentNode.removeChild(headStyle)
+    concat(
+      this.serverService.getConfig().pipe(first()),
+      this.serverService.configReloaded
+    ).subscribe(config => {
+      const headStyle = document.querySelector('style.custom-css-style')
+      if (headStyle) headStyle.parentNode.removeChild(headStyle)
 
-          const config = this.serverService.getConfig()
-
-          // We test customCSS if the admin removed the css
-          if (this.customCSS || config.instance.customizations.css) {
-            const styleTag = '<style>' + config.instance.customizations.css + '</style>'
-            this.customCSS = this.domSanitizer.bypassSecurityTrustHtml(styleTag)
-          }
-        })
+      // We test customCSS if the admin removed the css
+      if (this.customCSS || config.instance.customizations.css) {
+        const styleTag = '<style>' + config.instance.customizations.css + '</style>'
+        this.customCSS = this.domSanitizer.bypassSecurityTrustHtml(styleTag)
+      }
+    })
   }
 
   private async loadPlugins () {
@@ -232,25 +256,22 @@ export class AppComponent implements OnInit {
   }
 
   private async openModalsIfNeeded () {
-    this.serverService.configLoaded
+    this.authService.userInformationLoaded
         .pipe(
-          first(),
-          switchMap(() => this.authService.userInformationLoaded),
           map(() => this.authService.getUser()),
           filter(user => user.role === UserRole.ADMINISTRATOR)
-        ).subscribe(user => setTimeout(() => this.openAdminModals(user))) // setTimeout because of ngIf in template
+        ).subscribe(user => setTimeout(() => this._openAdminModalsIfNeeded(user))) // setTimeout because of ngIf in template
   }
 
-  private async openAdminModals (user: User) {
+  private async _openAdminModalsIfNeeded (user: User) {
     if (user.noWelcomeModal !== true) return this.welcomeModal.show()
 
-    const config = this.serverService.getConfig()
-    if (user.noInstanceConfigWarningModal === true || !config.signup.allowed) return
+    if (user.noInstanceConfigWarningModal === true || !this.serverConfig.signup.allowed) return
 
     this.instanceService.getAbout()
       .subscribe(about => {
         if (
-          config.instance.name.toLowerCase() === 'peertube' ||
+          this.serverConfig.instance.name.toLowerCase() === 'peertube' ||
           !about.instance.terms ||
           !about.instance.administrator ||
           !about.instance.maintenanceLifetime
@@ -265,37 +286,37 @@ export class AppComponent implements OnInit {
       new Hotkey(['/', 's'], (event: KeyboardEvent): boolean => {
         document.getElementById('search-video').focus()
         return false
-      }, undefined, this.i18n('Focus the search bar')),
+      }, undefined, $localize`Focus the search bar`),
 
       new Hotkey('b', (event: KeyboardEvent): boolean => {
-        this.toggleMenu()
+        this.menu.toggleMenu()
         return false
-      }, undefined, this.i18n('Toggle the left menu')),
+      }, undefined, $localize`Toggle the left menu`),
 
       new Hotkey('g o', (event: KeyboardEvent): boolean => {
         this.router.navigate([ '/videos/overview' ])
         return false
-      }, undefined, this.i18n('Go to the discover videos page')),
+      }, undefined, $localize`Go to the discover videos page`),
 
       new Hotkey('g t', (event: KeyboardEvent): boolean => {
         this.router.navigate([ '/videos/trending' ])
         return false
-      }, undefined, this.i18n('Go to the trending videos page')),
+      }, undefined, $localize`Go to the trending videos page`),
 
       new Hotkey('g r', (event: KeyboardEvent): boolean => {
         this.router.navigate([ '/videos/recently-added' ])
         return false
-      }, undefined, this.i18n('Go to the recently added videos page')),
+      }, undefined, $localize`Go to the recently added videos page`),
 
       new Hotkey('g l', (event: KeyboardEvent): boolean => {
         this.router.navigate([ '/videos/local' ])
         return false
-      }, undefined, this.i18n('Go to the local videos page')),
+      }, undefined, $localize`Go to the local videos page`),
 
       new Hotkey('g u', (event: KeyboardEvent): boolean => {
         this.router.navigate([ '/videos/upload' ])
         return false
-      }, undefined, this.i18n('Go to the videos upload page'))
+      }, undefined, $localize`Go to the videos upload page`)
     ])
   }
 }

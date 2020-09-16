@@ -1,7 +1,9 @@
-import * as Bluebird from 'bluebird'
-
 export interface PluginSettingsManager {
-  getSetting: (name: string) => Bluebird<string>
+  getSetting: (name: string) => Promise<string | boolean>
 
-  setSetting: (name: string, value: string) => Bluebird<any>
+  getSettings: (names: string[]) => Promise<{ [settingName: string]: string | boolean }>
+
+  setSetting: (name: string, value: string) => Promise<any>
+
+  onSettingsChange: (cb: (names: string[]) => void) => void
 }

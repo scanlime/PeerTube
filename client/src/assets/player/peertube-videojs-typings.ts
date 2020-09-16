@@ -1,28 +1,85 @@
-// FIXME: something weird with our path definition in tsconfig and typings
-// @ts-ignore
-import * as videojs from 'video.js'
-
-import { PeerTubePlugin } from './peertube-plugin'
-import { WebTorrentPlugin } from './webtorrent/webtorrent-plugin'
+import { Config, Level } from 'hls.js'
+import videojs from 'video.js'
+import { VideoFile, VideoPlaylist, VideoPlaylistElement } from '@shared/models'
 import { P2pMediaLoaderPlugin } from './p2p-media-loader/p2p-media-loader-plugin'
-import { PlayerMode } from './peertube-player-manager'
 import { RedundancyUrlManager } from './p2p-media-loader/redundancy-url-manager'
-import { VideoFile } from '@shared/models'
+import { PlayerMode } from './peertube-player-manager'
+import { PeerTubePlugin } from './peertube-plugin'
+import { PlaylistPlugin } from './playlist/playlist-plugin'
+import { EndCardOptions } from './upnext/end-card'
+import { WebTorrentPlugin } from './webtorrent/webtorrent-plugin'
 
-declare namespace videojs {
-  interface Player {
+declare module 'video.js' {
+
+  export interface VideoJsPlayer {
+    srOptions_: HlsjsConfigHandlerOptions
+
+    theaterEnabled: boolean
+
+    // FIXME: add it to upstream typings
+    posterImage: {
+      show (): void
+      hide (): void
+    }
+
+    handleTechSeeked_ (): void
+
+    // Plugins
+
     peertube (): PeerTubePlugin
+
     webtorrent (): WebTorrentPlugin
+
     p2pMediaLoader (): P2pMediaLoaderPlugin
+
+    contextmenuUI (options: any): any
+
+    bezels (): void
+
+    qualityLevels (): QualityLevels
+
+    textTracks (): TextTrackList & {
+      on: Function
+      tracks_: (TextTrack & { id: string, label: string, src: string })[]
+    }
+
+    dock (options: { title: string, description: string }): void
+
+    upnext (options: Partial<EndCardOptions>): void
+
+    playlist (): PlaylistPlugin
   }
 }
 
-interface VideoJSComponentInterface {
-  _player: videojs.Player
+export interface VideoJSTechHLS extends videojs.Tech {
+  hlsProvider: any // FIXME: typings
+}
 
-  new (player: videojs.Player, options?: any): any
+export interface HlsjsConfigHandlerOptions {
+  hlsjsConfig?: Config & { cueHandler: any }// FIXME: typings
+  captionConfig?: any // FIXME: typings
 
-  registerComponent (name: string, obj: any): any
+  levelLabelHandler?: (level: Level) => string
+}
+
+type QualityLevelRepresentation = {
+  id: number
+  height: number
+
+  label?: string
+  width?: number
+  bandwidth?: number
+  bitrate?: number
+
+  enabled?: Function
+  _enabled: boolean
+}
+
+type QualityLevels = QualityLevelRepresentation[] & {
+  selectedIndex: number
+  selectedIndex_: number
+
+  addQualityLevel (representation: QualityLevelRepresentation): void
 }
 
 type VideoJSCaption = {
@@ -51,6 +108,22 @@ type PeerTubePluginOptions = {
   stopTime: number | string
 }
 
+type PlaylistPluginOptions = {
+  elements: VideoPlaylistElement[]
+
+  playlist: VideoPlaylist
+
+  getCurrentPosition: () => number
+
+  onItemClicked: (element: VideoPlaylistElement) => void
+}
+
+type NextPreviousVideoButtonOptions = {
+  type: 'next' | 'previous'
+  handler: Function
+  isDisabled: () => boolean
+}
+
 type WebtorrentPluginOptions = {
   playerElement: HTMLVideoElement
 
@@ -71,15 +144,14 @@ type P2PMediaLoaderPluginOptions = {
 }
 
 type VideoJSPluginOptions = {
+  playlist?: PlaylistPluginOptions
+
   peertube: PeerTubePluginOptions
 
   webtorrent?: WebtorrentPluginOptions
 
   p2pMediaLoader?: P2PMediaLoaderPluginOptions
 }
-
-// videojs typings don't have some method we need
-const videojsUntyped = videojs as any
 
 type LoadedQualityData = {
   qualitySwitchCallback: Function,
@@ -119,17 +191,26 @@ type PlayerNetworkInfo = {
   }
 }
 
+type PlaylistItemOptions = {
+  element: VideoPlaylistElement
+
+  onClicked: Function
+}
+
 export {
   PlayerNetworkInfo,
+  PlaylistItemOptions,
+  NextPreviousVideoButtonOptions,
   ResolutionUpdateData,
   AutoResolutionUpdateData,
-  VideoJSComponentInterface,
-  videojsUntyped,
+  PlaylistPluginOptions,
   VideoJSCaption,
   UserWatching,
   PeerTubePluginOptions,
   WebtorrentPluginOptions,
   P2PMediaLoaderPluginOptions,
   VideoJSPluginOptions,
-  LoadedQualityData
+  LoadedQualityData,
+  QualityLevelRepresentation,
+  QualityLevels
 }

@@ -1,5 +1,20 @@
 import * as express from 'express'
-import { getFormattedObjects, getServerActor } from '../../helpers/utils'
+import { getServerActor } from '@server/models/application/application'
+import { MChannelAccountDefault } from '@server/types/models'
+import { VideoChannelCreate, VideoChannelUpdate } from '../../../shared'
+import { auditLoggerFactory, getAuditIdFromRes, VideoChannelAuditView } from '../../helpers/audit-logger'
+import { resetSequelizeInstance } from '../../helpers/database-utils'
+import { buildNSFWFilter, createReqFiles, getCountVideos, isUserAbleToSearchRemoteURI } from '../../helpers/express-utils'
+import { logger } from '../../helpers/logger'
+import { getFormattedObjects } from '../../helpers/utils'
+import { CONFIG } from '../../initializers/config'
+import { MIMETYPES } from '../../initializers/constants'
+import { sequelizeTypescript } from '../../initializers/database'
+import { setAsyncActorKeys } from '../../lib/activitypub/actor'
+import { sendUpdateActor } from '../../lib/activitypub/send'
+import { updateActorAvatarFile } from '../../lib/avatar'
+import { JobQueue } from '../../lib/job-queue'
+import { createLocalVideoChannel, federateAllVideosOfChannel } from '../../lib/video-channel'
 import {
   asyncMiddleware,
   asyncRetryTransactionMiddleware,
@@ -9,33 +24,20 @@ import {
   paginationValidator,
   setDefaultPagination,
   setDefaultSort,
+  setDefaultVideosSort,
   videoChannelsAddValidator,
   videoChannelsRemoveValidator,
   videoChannelsSortValidator,
   videoChannelsUpdateValidator,
   videoPlaylistsSortValidator
 } from '../../middlewares'
-import { VideoChannelModel } from '../../models/video/video-channel'
-import { videoChannelsNameWithHostValidator, videosSortValidator } from '../../middlewares/validators'
-import { sendUpdateActor } from '../../lib/activitypub/send'
-import { VideoChannelCreate, VideoChannelUpdate } from '../../../shared'
-import { createLocalVideoChannel, federateAllVideosOfChannel } from '../../lib/video-channel'
-import { buildNSFWFilter, createReqFiles, isUserAbleToSearchRemoteURI } from '../../helpers/express-utils'
-import { setAsyncActorKeys } from '../../lib/activitypub'
-import { AccountModel } from '../../models/account/account'
-import { MIMETYPES } from '../../initializers/constants'
-import { logger } from '../../helpers/logger'
-import { VideoModel } from '../../models/video/video'
+import { videoChannelsNameWithHostValidator, videoChannelsOwnSearchValidator, videosSortValidator } from '../../middlewares/validators'
 import { updateAvatarValidator } from '../../middlewares/validators/avatar'
-import { updateActorAvatarFile } from '../../lib/avatar'
-import { auditLoggerFactory, getAuditIdFromRes, VideoChannelAuditView } from '../../helpers/audit-logger'
-import { resetSequelizeInstance } from '../../helpers/database-utils'
-import { JobQueue } from '../../lib/job-queue'
-import { VideoPlaylistModel } from '../../models/video/video-playlist'
 import { commonVideoPlaylistFiltersValidator } from '../../middlewares/validators/videos/video-playlists'
-import { CONFIG } from '../../initializers/config'
-import { sequelizeTypescript } from '../../initializers/database'
-import { MChannelAccountDefault } from '@server/typings/models'
+import { AccountModel } from '../../models/account/account'
+import { VideoModel } from '../../models/video/video'
+import { VideoChannelModel } from '../../models/video/video-channel'
+import { VideoPlaylistModel } from '../../models/video/video-playlist'
 
 const auditLogger = auditLoggerFactory('channels')
 const reqAvatarFile = createReqFiles([ 'avatarfile' ], MIMETYPES.IMAGE.MIMETYPE_EXT, { avatarfile: CONFIG.STORAGE.TMP_DIR })
@@ -47,6 +49,7 @@ videoChannelRouter.get('/',
   videoChannelsSortValidator,
   setDefaultSort,
   setDefaultPagination,
+  videoChannelsOwnSearchValidator,
   asyncMiddleware(listVideoChannels)
 )
 
@@ -96,7 +99,7 @@ videoChannelRouter.get('/:nameWithHost/videos',
   asyncMiddleware(videoChannelsNameWithHostValidator),
   paginationValidator,
   videosSortValidator,
-  setDefaultSort,
+  setDefaultVideosSort,
   setDefaultPagination,
   optionalAuthenticate,
   commonVideosFiltersValidator,
@@ -113,13 +116,18 @@ export {
 
 async function listVideoChannels (req: express.Request, res: express.Response) {
   const serverActor = await getServerActor()
-  const resultList = await VideoChannelModel.listForApi(serverActor.id, req.query.start, req.query.count, req.query.sort)
+  const resultList = await VideoChannelModel.listForApi({
+    actorId: serverActor.id,
+    start: req.query.start,
+    count: req.query.count,
+    sort: req.query.sort
+  })
 
   return res.json(getFormattedObjects(resultList.data, resultList.total))
 }
 
 async function updateVideoChannelAvatar (req: express.Request, res: express.Response) {
-  const avatarPhysicalFile = req.files[ 'avatarfile' ][ 0 ]
+  const avatarPhysicalFile = req.files['avatarfile'][0]
   const videoChannel = res.locals.videoChannel
   const oldVideoChannelAuditKeys = new VideoChannelAuditView(videoChannel.toFormattedJSON())
 
@@ -232,7 +240,6 @@ async function getVideoChannel (req: express.Request, res: express.Response) {
 
   if (videoChannelWithVideos.isOutdated()) {
     JobQueue.Instance.createJob({ type: 'activitypub-refresher', payload: { type: 'actor', url: videoChannelWithVideos.Actor.url } })
-            .catch(err => logger.error('Cannot create AP refresher job for actor %s.', videoChannelWithVideos.Actor.url, { err }))
   }
 
   return res.json(videoChannelWithVideos.toFormattedJSON())
@@ -256,6 +263,7 @@ async function listVideoChannelPlaylists (req: express.Request, res: express.Res
 async function listVideoChannelVideos (req: express.Request, res: express.Response) {
   const videoChannelInstance = res.locals.videoChannel
   const followerActorId = isUserAbleToSearchRemoteURI(res) ? null : undefined
+  const countVideos = getCountVideos(req)
 
   const resultList = await VideoModel.listForApi({
     followerActorId,
@@ -272,7 +280,8 @@ async function listVideoChannelVideos (req: express.Request, res: express.Respon
     nsfw: buildNSFWFilter(res, req.query.nsfw),
     withFiles: false,
     videoChannelId: videoChannelInstance.id,
-    user: res.locals.oauth ? res.locals.oauth.token.User : undefined
+    user: res.locals.oauth ? res.locals.oauth.token.User : undefined,
+    countVideos
   })
 
   return res.json(getFormattedObjects(resultList.data, resultList.total))

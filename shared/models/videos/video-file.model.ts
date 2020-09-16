@@ -1,4 +1,6 @@
-import { VideoConstant, VideoResolution } from '@shared/models'
+import { VideoConstant } from './video-constant.model'
+import { VideoFileMetadata } from './video-file-metadata'
+import { VideoResolution } from './video-resolution.enum'
 
 export interface VideoFile {
   magnetUri: string
@@ -9,4 +11,6 @@ export interface VideoFile {
   fileUrl: string
   fileDownloadUrl: string
   fps: number
+  metadata?: VideoFileMetadata
+  metadataUrl?: string
 }

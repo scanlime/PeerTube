@@ -65,6 +65,16 @@ export const clientActionHookObject = {
   'action:video-watch.video.loaded': true,
   // Fired when the player finished loading
   'action:video-watch.player.loaded': true,
+  // Fired when the video watch page comments(threads) are loaded and load more comments on scroll
+  'action:video-watch.video-threads.loaded': true,
+  // Fired when a user click on 'View x replies' and they're loaded
+  'action:video-watch.video-thread-replies.loaded': true,
+
+  // Fired when the video edit page (upload, URL/torrent import, update) is being initialized
+  'action:video-edit.init': true,
+
+  // Fired when the login page is being initialized
+  'action:login.init': true,
 
   // Fired when the search page is being initialized
   'action:search.init': true,
@@ -73,7 +83,13 @@ export const clientActionHookObject = {
   'action:router.navigation-end': true,
 
   // Fired when the registration page is being initialized
-  'action:signup.register.init': true
+  'action:signup.register.init': true,
+
+  // ####### Embed hooks #######
+  // In embed scope, peertube helpers are not available
+
+  // Fired when the embed loaded the player
+  'action:embed.player.loaded': true
 }
 
 export type ClientActionHookName = keyof typeof clientActionHookObject

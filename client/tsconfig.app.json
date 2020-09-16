@@ -1,5 +1,5 @@
 {
-  "extends": "./tsconfig.json",
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./out-tsc/app",
     "baseUrl": "./",
@@ -12,12 +12,15 @@
     ]
   },
   "files": [
-    "src/main.ts",
     "src/polyfills.ts"
   ],
   "include": [
+    "src/main*.ts",
     "src/**/*.d.ts",
-    "src/shims/*.ts",
-    "../shared/models"
+    "src/shims/*.ts"
+  ],
+  "exclude": [
+    "../node_modules",
+    "../server"
   ]
 }

@@ -1,7 +1,7 @@
 import * as express from 'express'
 import { UserRight } from '../../../../shared/models/users'
 import { logger } from '../../../helpers/logger'
-import { getFormattedObjects, getServerActor } from '../../../helpers/utils'
+import { getFormattedObjects } from '../../../helpers/utils'
 import { SERVER_ACTOR_NAME } from '../../../initializers/constants'
 import { sendAccept, sendReject, sendUndoFollow } from '../../../lib/activitypub/send'
 import {
@@ -24,9 +24,10 @@ import {
 } from '../../../middlewares/validators'
 import { ActorFollowModel } from '../../../models/activitypub/actor-follow'
 import { JobQueue } from '../../../lib/job-queue'
-import { removeRedundancyOf } from '../../../lib/redundancy'
+import { removeRedundanciesOfServer } from '../../../lib/redundancy'
 import { sequelizeTypescript } from '../../../initializers/database'
 import { autoFollowBackIfNeeded } from '../../../lib/activitypub/follow'
+import { getServerActor } from '@server/models/application/application'
 
 const serverFollowsRouter = express.Router()
 serverFollowsRouter.get('/following',
@@ -135,7 +136,6 @@ async function followInstance (req: express.Request, res: express.Response) {
     }
 
     JobQueue.Instance.createJob({ type: 'activitypub-follow', payload })
-      .catch(err => logger.error('Cannot create follow job for %s.', host, err))
   }
 
   return res.status(204).end()
@@ -153,7 +153,7 @@ async function removeFollowing (req: express.Request, res: express.Response) {
     await server.save({ transaction: t })
 
     // Async, could be long
-    removeRedundancyOf(server.id)
+    removeRedundanciesOfServer(server.id)
       .catch(err => logger.error('Cannot remove redundancy of %s.', server.host, err))
 
     await follow.destroy({ transaction: t })

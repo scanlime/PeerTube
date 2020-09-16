@@ -1,16 +1,17 @@
-/* tslint:disable:no-unused-expression */
+/* eslint-disable @typescript-eslint/no-unused-expressions,@typescript-eslint/require-await */
 
 import * as chai from 'chai'
 import 'mocha'
 import {
-  checkVideoFilesWereRemoved, cleanupTests,
+  checkVideoFilesWereRemoved,
+  cleanupTests,
   doubleFollow,
   flushAndRunMultipleServers,
   removeVideo,
   uploadVideo,
   wait
 } from '../../../../shared/extra-utils'
-import { flushTests, killallServers, ServerInfo, setAccessTokensToServers } from '../../../../shared/extra-utils/index'
+import { ServerInfo, setAccessTokensToServers } from '../../../../shared/extra-utils/index'
 import { waitJobs } from '../../../../shared/extra-utils/server/jobs'
 import {
   createVideoCaption,
@@ -36,7 +37,7 @@ describe('Test video captions', function () {
 
     await waitJobs(servers)
 
-    const res = await uploadVideo(servers[ 0 ].url, servers[ 0 ].accessToken, { name: 'my video name' })
+    const res = await uploadVideo(servers[0].url, servers[0].accessToken, { name: 'my video name' })
     videoUUID = res.body.video.uuid
 
     await waitJobs(servers)
@@ -82,13 +83,13 @@ describe('Test video captions', function () {
       const caption1: VideoCaption = res.body.data[0]
       expect(caption1.language.id).to.equal('ar')
       expect(caption1.language.label).to.equal('Arabic')
-      expect(caption1.captionPath).to.equal('/static/video-captions/' + videoUUID + '-ar.vtt')
+      expect(caption1.captionPath).to.equal('/lazy-static/video-captions/' + videoUUID + '-ar.vtt')
       await testCaptionFile(server.url, caption1.captionPath, 'Subtitle good 1.')
 
       const caption2: VideoCaption = res.body.data[1]
       expect(caption2.language.id).to.equal('zh')
       expect(caption2.language.label).to.equal('Chinese')
-      expect(caption2.captionPath).to.equal('/static/video-captions/' + videoUUID + '-zh.vtt')
+      expect(caption2.captionPath).to.equal('/lazy-static/video-captions/' + videoUUID + '-zh.vtt')
       await testCaptionFile(server.url, caption2.captionPath, 'Subtitle good 2.')
     }
   })
@@ -116,7 +117,7 @@ describe('Test video captions', function () {
       const caption1: VideoCaption = res.body.data[0]
       expect(caption1.language.id).to.equal('ar')
       expect(caption1.language.label).to.equal('Arabic')
-      expect(caption1.captionPath).to.equal('/static/video-captions/' + videoUUID + '-ar.vtt')
+      expect(caption1.captionPath).to.equal('/lazy-static/video-captions/' + videoUUID + '-ar.vtt')
       await testCaptionFile(server.url, caption1.captionPath, 'Subtitle good 2.')
     }
   })
@@ -147,7 +148,7 @@ describe('Test video captions', function () {
       const caption1: VideoCaption = res.body.data[0]
       expect(caption1.language.id).to.equal('ar')
       expect(caption1.language.label).to.equal('Arabic')
-      expect(caption1.captionPath).to.equal('/static/video-captions/' + videoUUID + '-ar.vtt')
+      expect(caption1.captionPath).to.equal('/lazy-static/video-captions/' + videoUUID + '-ar.vtt')
 
       const expected = 'WEBVTT FILE\r\n' +
         '\r\n' +
@@ -184,7 +185,7 @@ describe('Test video captions', function () {
 
       expect(caption.language.id).to.equal('zh')
       expect(caption.language.label).to.equal('Chinese')
-      expect(caption.captionPath).to.equal('/static/video-captions/' + videoUUID + '-zh.vtt')
+      expect(caption.captionPath).to.equal('/lazy-static/video-captions/' + videoUUID + '-zh.vtt')
       await testCaptionFile(server.url, caption.captionPath, 'Subtitle good 2.')
     }
   })

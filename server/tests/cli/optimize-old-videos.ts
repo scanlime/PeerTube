@@ -1,4 +1,4 @@
-/* tslint:disable:no-unused-expression */
+/* eslint-disable @typescript-eslint/no-unused-expressions,@typescript-eslint/require-await */
 
 import 'mocha'
 import * as chai from 'chai'
@@ -28,8 +28,6 @@ const expect = chai.expect
 
 describe('Test optimize old videos', function () {
   let servers: ServerInfo[] = []
-  let video1UUID: string
-  let video2UUID: string
 
   before(async function () {
     this.timeout(200000)
@@ -50,10 +48,8 @@ describe('Test optimize old videos', function () {
     }
 
     // Upload two videos for our needs
-    const res1 = await uploadVideo(servers[0].url, servers[0].accessToken, { name: 'video1', fixture: tempFixturePath })
-    video1UUID = res1.body.video.uuid
-    const res2 = await uploadVideo(servers[0].url, servers[0].accessToken, { name: 'video2', fixture: tempFixturePath })
-    video2UUID = res2.body.video.uuid
+    await uploadVideo(servers[0].url, servers[0].accessToken, { name: 'video1', fixture: tempFixturePath })
+    await uploadVideo(servers[0].url, servers[0].accessToken, { name: 'video2', fixture: tempFixturePath })
 
     await waitJobs(servers)
   })

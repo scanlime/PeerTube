@@ -3,7 +3,7 @@
 @import '_miniature';
 
 .margin-content {
-  @include adapt-margin-content-width;
+  @include fluid-videos-miniature-layout;
 }
 
 .section {
@@ -29,4 +29,11 @@
   }
 }
 
-
+@media screen and (max-width: $mobile-view) {
+  .section {
+    .section-title {
+      flex-direction: column;
+      align-items: normal;
+    }
+  }
+}

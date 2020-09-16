@@ -1,11 +1,24 @@
 import * as express from 'express'
+import { move } from 'fs-extra'
 import { extname } from 'path'
+import toInt from 'validator/lib/toInt'
+import { addOptimizeOrMergeAudioJob } from '@server/helpers/video'
+import { createTorrentAndSetInfoHash } from '@server/helpers/webtorrent'
+import { changeVideoChannelShare } from '@server/lib/activitypub/share'
+import { getVideoActivityPubUrl } from '@server/lib/activitypub/url'
+import { getVideoFilePath } from '@server/lib/video-paths'
+import { getServerActor } from '@server/models/application/application'
+import { MVideoDetails, MVideoFullLight } from '@server/types/models'
 import { VideoCreate, VideoPrivacy, VideoState, VideoUpdate } from '../../../../shared'
-import { getVideoFileFPS, getVideoFileResolution } from '../../../helpers/ffmpeg-utils'
-import { logger } from '../../../helpers/logger'
+import { ThumbnailType } from '../../../../shared/models/videos/thumbnail.type'
+import { VideoFilter } from '../../../../shared/models/videos/video-query.type'
 import { auditLoggerFactory, getAuditIdFromRes, VideoAuditView } from '../../../helpers/audit-logger'
-import { getFormattedObjects, getServerActor } from '../../../helpers/utils'
-import { autoBlacklistVideoIfNeeded } from '../../../lib/video-blacklist'
+import { resetSequelizeInstance } from '../../../helpers/database-utils'
+import { buildNSFWFilter, createReqFiles, getCountVideos } from '../../../helpers/express-utils'
+import { getMetadataFromFile, getVideoFileFPS, getVideoFileResolution } from '../../../helpers/ffmpeg-utils'
+import { logger } from '../../../helpers/logger'
+import { getFormattedObjects } from '../../../helpers/utils'
+import { CONFIG } from '../../../initializers/config'
 import {
   DEFAULT_AUDIO_RESOLUTION,
   MIMETYPES,
@@ -14,14 +27,15 @@ import {
   VIDEO_LICENCES,
   VIDEO_PRIVACIES
 } from '../../../initializers/constants'
-import {
-  changeVideoChannelShare,
-  federateVideoIfNeeded,
-  fetchRemoteVideoDescription,
-  getVideoActivityPubUrl
-} from '../../../lib/activitypub'
+import { sequelizeTypescript } from '../../../initializers/database'
+import { sendView } from '../../../lib/activitypub/send/send-view'
+import { federateVideoIfNeeded, fetchRemoteVideoDescription } from '../../../lib/activitypub/videos'
 import { JobQueue } from '../../../lib/job-queue'
+import { Notifier } from '../../../lib/notifier'
+import { Hooks } from '../../../lib/plugins/hooks'
 import { Redis } from '../../../lib/redis'
+import { createVideoMiniatureFromExisting, generateVideoMiniature } from '../../../lib/thumbnail'
+import { autoBlacklistVideoIfNeeded } from '../../../lib/video-blacklist'
 import {
   asyncMiddleware,
   asyncRetryTransactionMiddleware,
@@ -31,7 +45,8 @@ import {
   optionalAuthenticate,
   paginationValidator,
   setDefaultPagination,
-  setDefaultSort,
+  setDefaultVideosSort,
+  videoFileMetadataGetValidator,
   videosAddValidator,
   videosCustomGetValidator,
   videosGetValidator,
@@ -39,33 +54,18 @@ import {
   videosSortValidator,
   videosUpdateValidator
 } from '../../../middlewares'
+import { ScheduleVideoUpdateModel } from '../../../models/video/schedule-video-update'
 import { TagModel } from '../../../models/video/tag'
 import { VideoModel } from '../../../models/video/video'
 import { VideoFileModel } from '../../../models/video/video-file'
 import { abuseVideoRouter } from './abuse'
 import { blacklistRouter } from './blacklist'
-import { videoCommentRouter } from './comment'
-import { rateVideoRouter } from './rate'
-import { ownershipVideoRouter } from './ownership'
-import { VideoFilter } from '../../../../shared/models/videos/video-query.type'
-import { buildNSFWFilter, createReqFiles } from '../../../helpers/express-utils'
-import { ScheduleVideoUpdateModel } from '../../../models/video/schedule-video-update'
 import { videoCaptionsRouter } from './captions'
+import { videoCommentRouter } from './comment'
 import { videoImportsRouter } from './import'
-import { resetSequelizeInstance } from '../../../helpers/database-utils'
-import { move } from 'fs-extra'
+import { ownershipVideoRouter } from './ownership'
+import { rateVideoRouter } from './rate'
 import { watchingRouter } from './watching'
-import { Notifier } from '../../../lib/notifier'
-import { sendView } from '../../../lib/activitypub/send/send-view'
-import { CONFIG } from '../../../initializers/config'
-import { sequelizeTypescript } from '../../../initializers/database'
-import { createVideoMiniatureFromExisting, generateVideoMiniature } from '../../../lib/thumbnail'
-import { ThumbnailType } from '../../../../shared/models/videos/thumbnail.type'
-import { VideoTranscodingPayload } from '../../../lib/job-queue/handlers/video-transcoding'
-import { Hooks } from '../../../lib/plugins/hooks'
-import { MVideoDetails, MVideoFullLight } from '@server/typings/models'
-import { createTorrentAndSetInfoHash } from '@server/helpers/webtorrent'
-import { getVideoFilePath } from '@server/lib/video-paths'
 
 const auditLogger = auditLoggerFactory('videos')
 const videosRouter = express.Router()
@@ -105,7 +105,7 @@ videosRouter.get('/privacies', listVideoPrivacies)
 videosRouter.get('/',
   paginationValidator,
   videosSortValidator,
-  setDefaultSort,
+  setDefaultVideosSort,
   setDefaultPagination,
   optionalAuthenticate,
   commonVideosFiltersValidator,
@@ -128,6 +128,10 @@ videosRouter.get('/:id/description',
   asyncMiddleware(videosGetValidator),
   asyncMiddleware(getVideoDescription)
 )
+videosRouter.get('/:id/metadata/:videoFileId',
+  asyncMiddleware(videoFileMetadataGetValidator),
+  asyncMiddleware(getVideoFileMetadata)
+)
 videosRouter.get('/:id',
   optionalAuthenticate,
   asyncMiddleware(videosCustomGetValidator('only-video-with-rights')),
@@ -135,7 +139,7 @@ videosRouter.get('/:id',
   asyncMiddleware(getVideo)
 )
 videosRouter.post('/:id/views',
-  asyncMiddleware(videosGetValidator),
+  asyncMiddleware(videosCustomGetValidator('only-immutable-attributes')),
   asyncMiddleware(viewVideo)
 )
 
@@ -206,7 +210,8 @@ async function addVideo (req: express.Request, res: express.Response) {
   const videoFile = new VideoFileModel({
     extname: extname(videoPhysicalFile.filename),
     size: videoPhysicalFile.size,
-    videoStreamingPlaylistId: null
+    videoStreamingPlaylistId: null,
+    metadata: await getMetadataFromFile<any>(videoPhysicalFile.path)
   })
 
   if (videoFile.isAudio()) {
@@ -289,25 +294,7 @@ async function addVideo (req: express.Request, res: express.Response) {
   Notifier.Instance.notifyOnNewVideoIfNeeded(videoCreated)
 
   if (video.state === VideoState.TO_TRANSCODE) {
-    // Put uuid because we don't have id auto incremented for now
-    let dataInput: VideoTranscodingPayload
-
-    if (videoFile.isAudio()) {
-      dataInput = {
-        type: 'merge-audio' as 'merge-audio',
-        resolution: DEFAULT_AUDIO_RESOLUTION,
-        videoUUID: videoCreated.uuid,
-        isNewVideo: true
-      }
-    } else {
-      dataInput = {
-        type: 'optimize' as 'optimize',
-        videoUUID: videoCreated.uuid,
-        isNewVideo: true
-      }
-    }
-
-    await JobQueue.Instance.createJob({ type: 'video-transcoding', payload: dataInput })
+    await addOptimizeOrMergeAudioJob(videoCreated, videoFile)
   }
 
   Hooks.runAction('action:api.video.uploaded', { video: videoCreated })
@@ -326,16 +313,15 @@ async function updateVideo (req: express.Request, res: express.Response) {
   const oldVideoAuditView = new VideoAuditView(videoInstance.toFormattedDetailsJSON())
   const videoInfoToUpdate: VideoUpdate = req.body
 
-  const wasPrivateVideo = videoInstance.privacy === VideoPrivacy.PRIVATE
-  const wasNotPrivateVideo = videoInstance.privacy !== VideoPrivacy.PRIVATE
-  const wasUnlistedVideo = videoInstance.privacy === VideoPrivacy.UNLISTED
+  const wasConfidentialVideo = videoInstance.isConfidential()
+  const hadPrivacyForFederation = videoInstance.hasPrivacyForFederation()
 
   // Process thumbnail or create it from the video
-  const thumbnailModel = req.files && req.files['thumbnailfile']
+  const thumbnailModel = req.files?.['thumbnailfile']
     ? await createVideoMiniatureFromExisting(req.files['thumbnailfile'][0].path, videoInstance, ThumbnailType.MINIATURE, false)
     : undefined
 
-  const previewModel = req.files && req.files['previewfile']
+  const previewModel = req.files?.['previewfile']
     ? await createVideoMiniatureFromExisting(req.files['previewfile'][0].path, videoInstance, ThumbnailType.PREVIEW, false)
     : undefined
 
@@ -359,17 +345,15 @@ async function updateVideo (req: express.Request, res: express.Response) {
         videoInstance.originallyPublishedAt = new Date(videoInfoToUpdate.originallyPublishedAt)
       }
 
+      let isNewVideo = false
       if (videoInfoToUpdate.privacy !== undefined) {
+        isNewVideo = videoInstance.isNewVideo(videoInfoToUpdate.privacy)
+
         const newPrivacy = parseInt(videoInfoToUpdate.privacy.toString(), 10)
-        videoInstance.privacy = newPrivacy
+        videoInstance.setPrivacy(newPrivacy)
 
-        // The video was private, and is not anymore -> publish it
-        if (wasPrivateVideo === true && newPrivacy !== VideoPrivacy.PRIVATE) {
-          videoInstance.publishedAt = new Date()
-        }
-
-        // The video was not private, but now it is -> we need to unfederate it
-        if (wasNotPrivateVideo === true && newPrivacy === VideoPrivacy.PRIVATE) {
+        // Unfederate the video if the new privacy is not compatible with federation
+        if (hadPrivacyForFederation && !videoInstance.hasPrivacyForFederation()) {
           await VideoModel.sendDelete(videoInstance, { transaction: t })
         }
       }
@@ -392,7 +376,7 @@ async function updateVideo (req: express.Request, res: express.Response) {
         await videoInstanceUpdated.$set('VideoChannel', res.locals.videoChannel, { transaction: t })
         videoInstanceUpdated.VideoChannel = res.locals.videoChannel
 
-        if (wasPrivateVideo === false) await changeVideoChannelShare(videoInstanceUpdated, oldVideoChannel, t)
+        if (hadPrivacyForFederation === true) await changeVideoChannelShare(videoInstanceUpdated, oldVideoChannel, t)
       }
 
       // Schedule an update in the future?
@@ -414,7 +398,6 @@ async function updateVideo (req: express.Request, res: express.Response) {
         transaction: t
       })
 
-      const isNewVideo = wasPrivateVideo && videoInstanceUpdated.privacy !== VideoPrivacy.PRIVATE
       await federateVideoIfNeeded(videoInstanceUpdated, isNewVideo, t)
 
       auditLogger.update(
@@ -427,11 +410,11 @@ async function updateVideo (req: express.Request, res: express.Response) {
       return videoInstanceUpdated
     })
 
-    if (wasUnlistedVideo || wasPrivateVideo) {
+    if (wasConfidentialVideo) {
       Notifier.Instance.notifyOnNewVideoIfNeeded(videoInstanceUpdated)
     }
 
-    Hooks.runAction('action:api.video.updated', { video: videoInstanceUpdated })
+    Hooks.runAction('action:api.video.updated', { video: videoInstanceUpdated, body: req.body })
   } catch (err) {
     // Force fields we want to update
     // If the transaction is retried, sequelize will think the object has not changed
@@ -456,14 +439,13 @@ async function getVideo (req: express.Request, res: express.Response) {
 
   if (video.isOutdated()) {
     JobQueue.Instance.createJob({ type: 'activitypub-refresher', payload: { type: 'video', url: video.url } })
-      .catch(err => logger.error('Cannot create AP refresher job for video %s.', video.url, { err }))
   }
 
   return res.json(video.toFormattedDetailsJSON())
 }
 
 async function viewVideo (req: express.Request, res: express.Response) {
-  const videoInstance = res.locals.videoAll
+  const videoInstance = res.locals.onlyImmutableVideo
 
   const ip = req.ip
   const exists = await Redis.Instance.doesVideoIPViewExist(ip, videoInstance.uuid)
@@ -498,7 +480,15 @@ async function getVideoDescription (req: express.Request, res: express.Response)
   return res.json({ description })
 }
 
+async function getVideoFileMetadata (req: express.Request, res: express.Response) {
+  const videoFile = await VideoFileModel.loadWithMetadata(toInt(req.params.videoFileId))
+
+  return res.json(videoFile.metadata)
+}
+
 async function listVideos (req: express.Request, res: express.Response) {
+  const countVideos = getCountVideos(req)
+
   const apiOptions = await Hooks.wrapObject({
     start: req.query.start,
     count: req.query.count,
@@ -512,7 +502,8 @@ async function listVideos (req: express.Request, res: express.Response) {
     nsfw: buildNSFWFilter(res, req.query.nsfw),
     filter: req.query.filter as VideoFilter,
     withFiles: false,
-    user: res.locals.oauth ? res.locals.oauth.token.User : undefined
+    user: res.locals.oauth ? res.locals.oauth.token.User : undefined,
+    countVideos
   }, 'filter:api.videos.list.params')
 
   const resultList = await Hooks.wrapPromiseFun(

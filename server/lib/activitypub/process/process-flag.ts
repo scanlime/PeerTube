@@ -1,18 +1,20 @@
-import { ActivityCreate, ActivityFlag, VideoAbuseState } from '../../../../shared'
-import { VideoAbuseObject } from '../../../../shared/models/activitypub/objects'
+import { createAccountAbuse, createVideoAbuse, createVideoCommentAbuse } from '@server/lib/moderation'
+import { AccountModel } from '@server/models/account/account'
+import { VideoModel } from '@server/models/video/video'
+import { VideoCommentModel } from '@server/models/video/video-comment'
+import { abusePredefinedReasonsMap } from '@shared/core-utils/abuse'
+import { AbuseObject, AbuseState, ActivityCreate, ActivityFlag } from '../../../../shared'
+import { getAPId } from '../../../helpers/activitypub'
 import { retryTransactionWrapper } from '../../../helpers/database-utils'
 import { logger } from '../../../helpers/logger'
-import { sequelizeTypescript } from '../../../initializers'
-import { VideoAbuseModel } from '../../../models/video/video-abuse'
-import { getOrCreateVideoAndAccountAndChannel } from '../videos'
-import { Notifier } from '../../notifier'
-import { getAPId } from '../../../helpers/activitypub'
-import { APProcessorOptions } from '../../../typings/activitypub-processor.model'
-import { MActorSignature, MVideoAbuseVideo } from '../../../typings/models'
+import { sequelizeTypescript } from '../../../initializers/database'
+import { APProcessorOptions } from '../../../types/activitypub-processor.model'
+import { MAccountDefault, MActorSignature, MCommentOwnerVideo } from '../../../types/models'
 
 async function processFlagActivity (options: APProcessorOptions<ActivityCreate | ActivityFlag>) {
   const { activity, byActor } = options
-  return retryTransactionWrapper(processCreateVideoAbuse, activity, byActor)
+
+  return retryTransactionWrapper(processCreateAbuse, activity, byActor)
 }
 
 // ---------------------------------------------------------------------------
@@ -23,39 +25,79 @@ export {
 
 // ---------------------------------------------------------------------------
 
-async function processCreateVideoAbuse (activity: ActivityCreate | ActivityFlag, byActor: MActorSignature) {
-  const flag = activity.type === 'Flag' ? activity : (activity.object as VideoAbuseObject)
+async function processCreateAbuse (activity: ActivityCreate | ActivityFlag, byActor: MActorSignature) {
+  const flag = activity.type === 'Flag' ? activity : (activity.object as AbuseObject)
 
   const account = byActor.Account
-  if (!account) throw new Error('Cannot create video abuse with the non account actor ' + byActor.url)
+  if (!account) throw new Error('Cannot create abuse with the non account actor ' + byActor.url)
+
+  const reporterAccount = await AccountModel.load(account.id)
 
   const objects = Array.isArray(flag.object) ? flag.object : [ flag.object ]
 
+  const tags = Array.isArray(flag.tag) ? flag.tag : []
+  const predefinedReasons = tags.map(tag => abusePredefinedReasonsMap[tag.name])
+                                .filter(v => !isNaN(v))
+
+  const startAt = flag.startAt
+  const endAt = flag.endAt
+
   for (const object of objects) {
     try {
-      logger.debug('Reporting remote abuse for video %s.', getAPId(object))
+      const uri = getAPId(object)
 
-      const { video } = await getOrCreateVideoAndAccountAndChannel({ videoObject: object })
+      logger.debug('Reporting remote abuse for object %s.', uri)
 
-      const videoAbuse = await sequelizeTypescript.transaction(async t => {
-        const videoAbuseData = {
-          reporterAccountId: account.id,
-          reason: flag.content,
-          videoId: video.id,
-          state: VideoAbuseState.PENDING
+      await sequelizeTypescript.transaction(async t => {
+
+        const video = await VideoModel.loadByUrlAndPopulateAccount(uri)
+        let videoComment: MCommentOwnerVideo
+        let flaggedAccount: MAccountDefault
+
+        if (!video) videoComment = await VideoCommentModel.loadByUrlAndPopulateAccountAndVideo(uri)
+        if (!videoComment) flaggedAccount = await AccountModel.loadByUrl(uri)
+
+        if (!video && !videoComment && !flaggedAccount) {
+          logger.warn('Cannot flag unknown entity %s.', object)
+          return
         }
 
-        const videoAbuseInstance = await VideoAbuseModel.create(videoAbuseData, { transaction: t }) as MVideoAbuseVideo
-        videoAbuseInstance.Video = video
+        const baseAbuse = {
+          reporterAccountId: reporterAccount.id,
+          reason: flag.content,
+          state: AbuseState.PENDING,
+          predefinedReasons
+        }
 
-        logger.info('Remote abuse for video uuid %s created', flag.object)
+        if (video) {
+          return createVideoAbuse({
+            baseAbuse,
+            startAt,
+            endAt,
+            reporterAccount,
+            transaction: t,
+            videoInstance: video
+          })
+        }
 
-        return videoAbuseInstance
+        if (videoComment) {
+          return createVideoCommentAbuse({
+            baseAbuse,
+            reporterAccount,
+            transaction: t,
+            commentInstance: videoComment
+          })
+        }
+
+        return await createAccountAbuse({
+          baseAbuse,
+          reporterAccount,
+          transaction: t,
+          accountInstance: flaggedAccount
+        })
       })
-
-      Notifier.Instance.notifyOnNewVideoAbuse(videoAbuse)
     } catch (err) {
-      logger.debug('Cannot process report of %s. (Maybe not a video abuse).', getAPId(object), { err })
+      logger.debug('Cannot process report of %s', getAPId(object), { err })
     }
   }
 }

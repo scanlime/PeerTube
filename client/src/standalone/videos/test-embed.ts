@@ -1,14 +1,20 @@
 import './test-embed.scss'
-import { PeerTubePlayer } from '../player/player'
 import { PeerTubeResolution, PlayerEventType } from '../player/definitions'
+import { PeerTubePlayer } from '../player/player'
 
 window.addEventListener('load', async () => {
   const urlParts = window.location.href.split('/')
   const lastPart = urlParts[ urlParts.length - 1 ]
-  const videoId = lastPart.indexOf('?') === -1 ? lastPart : lastPart.split('?')[ 0 ]
+
+  const isPlaylist = window.location.pathname.startsWith('/video-playlists/')
+
+  const elementId = lastPart.indexOf('?') === -1 ? lastPart : lastPart.split('?')[ 0 ]
 
   const iframe = document.createElement('iframe')
-  iframe.src = `/videos/embed/${videoId}?autoplay=1&controls=0&api=1`
+  iframe.src = isPlaylist
+    ? `/videos/embed/${elementId}?api=1`
+    : `/video-playlists/embed/${elementId}?api=1`
+
   const mainElement = document.querySelector('#host')
   mainElement.appendChild(iframe)
 
@@ -29,8 +35,11 @@ window.addEventListener('load', async () => {
   ]
 
   monitoredEvents.forEach(e => {
-    player.addEventListener(e as PlayerEventType, () => console.log(`PLAYER: event '${e}' received`))
+    player.addEventListener(e as PlayerEventType, (param) => console.log(`PLAYER: event '${e}' received`, param))
     console.log(`PLAYER: now listening for event '${e}'`)
+
+    player.getCurrentPosition()
+      .then(position => document.getElementById('playlist-position').innerHTML = position + '')
   })
 
   let playbackRates: number[] = []
@@ -66,6 +75,36 @@ window.addEventListener('load', async () => {
     updateRates()
   })
 
+  const updateCaptions = async () => {
+    const captions = await player.getCaptions()
+
+    const captionEl = document.querySelector('#caption-list')
+    captionEl.innerHTML = ''
+
+    captions.forEach(c => {
+      console.log(c)
+
+      if (c.mode === 'showing') {
+        const itemEl = document.createElement('strong')
+        itemEl.innerText = `${c.label} (active)`
+        itemEl.style.display = 'block'
+        captionEl.appendChild(itemEl)
+      } else {
+        const itemEl = document.createElement('a')
+        itemEl.href = 'javascript:;'
+        itemEl.innerText = c.label
+        itemEl.addEventListener('click', () => {
+          player.setCaption(c.id)
+          updateCaptions()
+        })
+        itemEl.style.display = 'block'
+        captionEl.appendChild(itemEl)
+      }
+    })
+  }
+
+  updateCaptions()
+
   const updateResolutions = ((resolutions: PeerTubeResolution[]) => {
     const resolutionListEl = document.querySelector('#resolution-list')
     resolutionListEl.innerHTML = ''
@@ -93,4 +132,12 @@ window.addEventListener('load', async () => {
     resolutions => updateResolutions(resolutions))
   player.addEventListener('resolutionUpdate',
     resolutions => updateResolutions(resolutions))
+
+  const updateVolume = (volume: number) => {
+    const volumeEl = document.getElementById('volume')
+    volumeEl.innerText = (volume * 100) + '%'
+  }
+
+  player.getVolume().then(volume => updateVolume(volume))
+  player.addEventListener('volumeChange', volume => updateVolume(volume))
 })

@@ -1,6 +1,9 @@
 import * as express from 'express'
 import { body, param, query, ValidationChain } from 'express-validator'
-import { UserRight, VideoChangeOwnershipStatus, VideoPrivacy } from '../../../../shared'
+import { getServerActor } from '@server/models/application/application'
+import { MVideoFullLight } from '@server/types/models'
+import { ServerErrorCode, UserRight, VideoChangeOwnershipStatus, VideoPrivacy } from '../../../../shared'
+import { VideoChangeOwnershipAccept } from '../../../../shared/models/videos/video-change-ownership-accept.model'
 import {
   isBooleanValid,
   isDateValid,
@@ -12,6 +15,8 @@ import {
   toIntOrNull,
   toValueOrNull
 } from '../../../helpers/custom-validators/misc'
+import { isNSFWQueryValid, isNumberArray, isStringArray } from '../../../helpers/custom-validators/search'
+import { checkUserCanTerminateOwnershipChange, doesChangeVideoOwnershipExist } from '../../../helpers/custom-validators/video-ownership'
 import {
   isScheduleVideoUpdatePrivacyValid,
   isVideoCategoryValid,
@@ -27,30 +32,30 @@ import {
   isVideoSupportValid,
   isVideoTagsValid
 } from '../../../helpers/custom-validators/videos'
+import { cleanUpReqFiles } from '../../../helpers/express-utils'
 import { getDurationFromVideoFile } from '../../../helpers/ffmpeg-utils'
 import { logger } from '../../../helpers/logger'
-import { CONSTRAINTS_FIELDS } from '../../../initializers/constants'
-import { authenticatePromiseIfNeeded } from '../../oauth'
-import { areValidationErrors } from '../utils'
-import { cleanUpReqFiles } from '../../../helpers/express-utils'
-import { VideoModel } from '../../../models/video/video'
-import { checkUserCanTerminateOwnershipChange, doesChangeVideoOwnershipExist } from '../../../helpers/custom-validators/video-ownership'
-import { VideoChangeOwnershipAccept } from '../../../../shared/models/videos/video-change-ownership-accept.model'
-import { AccountModel } from '../../../models/account/account'
-import { isNSFWQueryValid, isNumberArray, isStringArray } from '../../../helpers/custom-validators/search'
-import { getServerActor } from '../../../helpers/utils'
+import {
+  checkUserCanManageVideo,
+  doesVideoChannelOfAccountExist,
+  doesVideoExist,
+  doesVideoFileOfVideoExist
+} from '../../../helpers/middlewares'
+import { getVideoWithAttributes } from '../../../helpers/video'
 import { CONFIG } from '../../../initializers/config'
+import { CONSTRAINTS_FIELDS, OVERVIEWS } from '../../../initializers/constants'
 import { isLocalVideoAccepted } from '../../../lib/moderation'
 import { Hooks } from '../../../lib/plugins/hooks'
-import { checkUserCanManageVideo, doesVideoChannelOfAccountExist, doesVideoExist } from '../../../helpers/middlewares'
-import { MVideoFullLight } from '@server/typings/models'
-import { getVideoWithAttributes } from '../../../helpers/video'
+import { AccountModel } from '../../../models/account/account'
+import { VideoModel } from '../../../models/video/video'
+import { authenticatePromiseIfNeeded } from '../../oauth'
+import { areValidationErrors } from '../utils'
 
 const videosAddValidator = getCommonVideoEditAttributes().concat([
   body('videofile')
     .custom((value, { req }) => isVideoFile(req.files)).withMessage(
-      'This file is not supported or too large. Please, make sure it is of the following type: '
-      + CONSTRAINTS_FIELDS.VIDEOS.EXTNAME.join(', ')
+      'This file is not supported or too large. Please, make sure it is of the following type: ' +
+      CONSTRAINTS_FIELDS.VIDEOS.EXTNAME.join(', ')
     ),
   body('name').custom(isVideoNameValid).withMessage('Should have a valid name'),
   body('channelId')
@@ -143,11 +148,16 @@ async function checkVideoFollowConstraints (req: express.Request, res: express.R
 
   return res.status(403)
             .json({
-              error: 'Cannot get this video regarding follow constraints.'
+              errorCode: ServerErrorCode.DOES_NOT_RESPECT_FOLLOW_CONSTRAINTS,
+              error: 'Cannot get this video regarding follow constraints.',
+              originUrl: video.url
             })
 }
 
-const videosCustomGetValidator = (fetchType: 'all' | 'only-video' | 'only-video-with-rights', authenticateInQuery = false) => {
+const videosCustomGetValidator = (
+  fetchType: 'all' | 'only-video' | 'only-video-with-rights' | 'only-immutable-attributes',
+  authenticateInQuery = false
+) => {
   return [
     param('id').custom(isIdOrUUIDValid).not().isEmpty().withMessage('Should have a valid id'),
 
@@ -157,22 +167,22 @@ const videosCustomGetValidator = (fetchType: 'all' | 'only-video' | 'only-video-
       if (areValidationErrors(req, res)) return
       if (!await doesVideoExist(req.params.id, res, fetchType)) return
 
+      // Controllers does not need to check video rights
+      if (fetchType === 'only-immutable-attributes') return next()
+
       const video = getVideoWithAttributes(res)
       const videoAll = video as MVideoFullLight
 
       // Video private or blacklisted
-      if (video.privacy === VideoPrivacy.PRIVATE || videoAll.VideoBlacklist) {
+      if (videoAll.requiresAuth()) {
         await authenticatePromiseIfNeeded(req, res, authenticateInQuery)
 
         const user = res.locals.oauth ? res.locals.oauth.token.User : null
 
         // Only the owner or a user that have blacklist rights can see the video
-        if (
-          !user ||
-          (videoAll.VideoChannel && videoAll.VideoChannel.Account.userId !== user.id && !user.hasRight(UserRight.MANAGE_VIDEO_BLACKLIST))
-        ) {
+        if (!user || !user.canGetVideo(videoAll)) {
           return res.status(403)
-                    .json({ error: 'Cannot get this private or blacklisted video.' })
+                    .json({ error: 'Cannot get this private/internal or blacklisted video.' })
         }
 
         return next()
@@ -194,6 +204,20 @@ const videosCustomGetValidator = (fetchType: 'all' | 'only-video' | 'only-video-
 
 const videosGetValidator = videosCustomGetValidator('all')
 const videosDownloadValidator = videosCustomGetValidator('all', true)
+
+const videoFileMetadataGetValidator = getCommonVideoEditAttributes().concat([
+  param('id').custom(isIdOrUUIDValid).not().isEmpty().withMessage('Should have a valid id'),
+  param('videoFileId').custom(isIdValid).not().isEmpty().withMessage('Should have a valid videoFileId'),
+
+  async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    logger.debug('Checking videoFileMetadataGet parameters', { parameters: req.params })
+
+    if (areValidationErrors(req, res)) return
+    if (!await doesVideoFileOfVideoExist(+req.params.videoFileId, req.params.id, res)) return
+
+    return next()
+  }
+])
 
 const videosRemoveValidator = [
   param('id').custom(isIdOrUUIDValid).not().isEmpty().withMessage('Should have a valid id'),
@@ -248,19 +272,15 @@ const videosTerminateChangeOwnershipValidator = [
     // Check if the user who did the request is able to change the ownership of the video
     if (!checkUserCanTerminateOwnershipChange(res.locals.oauth.token.User, res.locals.videoChangeOwnership, res)) return
 
-    return next()
-  },
-  async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const videoChangeOwnership = res.locals.videoChangeOwnership
 
-    if (videoChangeOwnership.status === VideoChangeOwnershipStatus.WAITING) {
-      return next()
-    } else {
+    if (videoChangeOwnership.status !== VideoChangeOwnershipStatus.WAITING) {
       res.status(403)
-        .json({ error: 'Ownership already accepted or refused' })
-
+         .json({ error: 'Ownership already accepted or refused' })
       return
     }
+
+    return next()
   }
 ]
 
@@ -283,18 +303,31 @@ const videosAcceptChangeOwnershipValidator = [
   }
 ]
 
+const videosOverviewValidator = [
+  query('page')
+    .optional()
+    .isInt({ min: 1, max: OVERVIEWS.VIDEOS.SAMPLES_COUNT })
+    .withMessage('Should have a valid pagination'),
+
+  (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (areValidationErrors(req, res)) return
+
+    return next()
+  }
+]
+
 function getCommonVideoEditAttributes () {
   return [
     body('thumbnailfile')
       .custom((value, { req }) => isVideoImage(req.files, 'thumbnailfile')).withMessage(
-      'This thumbnail file is not supported or too large. Please, make sure it is of the following type: '
-      + CONSTRAINTS_FIELDS.VIDEOS.IMAGE.EXTNAME.join(', ')
-    ),
+        'This thumbnail file is not supported or too large. Please, make sure it is of the following type: ' +
+        CONSTRAINTS_FIELDS.VIDEOS.IMAGE.EXTNAME.join(', ')
+      ),
     body('previewfile')
       .custom((value, { req }) => isVideoImage(req.files, 'previewfile')).withMessage(
-      'This preview file is not supported or too large. Please, make sure it is of the following type: '
-      + CONSTRAINTS_FIELDS.VIDEOS.IMAGE.EXTNAME.join(', ')
-    ),
+        'This preview file is not supported or too large. Please, make sure it is of the following type: ' +
+        CONSTRAINTS_FIELDS.VIDEOS.IMAGE.EXTNAME.join(', ')
+      ),
 
     body('category')
       .optional()
@@ -384,6 +417,10 @@ const commonVideosFiltersValidator = [
   query('filter')
     .optional()
     .custom(isVideoFilterValid).withMessage('Should have a valid filter attribute'),
+  query('skipCount')
+    .optional()
+    .customSanitizer(toBooleanOrNull)
+    .custom(isBooleanValid).withMessage('Should have a valid skip count boolean'),
 
   (req: express.Request, res: express.Response, next: express.NextFunction) => {
     logger.debug('Checking commons video filters query', { parameters: req.query })
@@ -408,6 +445,7 @@ export {
   videosAddValidator,
   videosUpdateValidator,
   videosGetValidator,
+  videoFileMetadataGetValidator,
   videosDownloadValidator,
   checkVideoFollowConstraints,
   videosCustomGetValidator,
@@ -419,7 +457,9 @@ export {
 
   getCommonVideoEditAttributes,
 
-  commonVideosFiltersValidator
+  commonVideosFiltersValidator,
+
+  videosOverviewValidator
 }
 
 // ---------------------------------------------------------------------------

@@ -10,7 +10,7 @@ import { doRequest } from '../../helpers/requests'
 import { checkUrlsSameHost, getAPId } from '../../helpers/activitypub'
 import { getVideoDislikeActivityPubUrl, getVideoLikeActivityPubUrl } from './url'
 import { sendDislike } from './send/send-dislike'
-import { MAccountActor, MActorUrl, MVideo, MVideoAccountLight, MVideoId } from '../../typings/models'
+import { MAccountActor, MActorUrl, MVideo, MVideoAccountLight, MVideoId } from '../../types/models'
 
 async function createRates (ratesUrl: string[], video: MVideo, rate: VideoRateType) {
   let rateCounts = 0
@@ -18,7 +18,7 @@ async function createRates (ratesUrl: string[], video: MVideo, rate: VideoRateTy
   await Bluebird.map(ratesUrl, async rateUrl => {
     try {
       // Fetch url
-      const { body } = await doRequest({
+      const { body } = await doRequest<any>({
         uri: rateUrl,
         json: true,
         activityPub: true
@@ -58,8 +58,6 @@ async function createRates (ratesUrl: string[], video: MVideo, rate: VideoRateTy
     const field = rate === 'like' ? 'likes' : 'dislikes'
     await video.increment(field, { by: rateCounts })
   }
-
-  return
 }
 
 async function sendVideoRateChange (

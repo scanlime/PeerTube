@@ -6,9 +6,9 @@ import { ThumbnailType } from '../../shared/models/videos/thumbnail.type'
 import { processImage } from '../helpers/image-utils'
 import { join } from 'path'
 import { downloadImage } from '../helpers/requests'
-import { MVideoPlaylistThumbnail } from '../typings/models/video/video-playlist'
-import { MVideoFile, MVideoThumbnail } from '../typings/models'
-import { MThumbnail } from '../typings/models/video/thumbnail'
+import { MVideoPlaylistThumbnail } from '../types/models/video/video-playlist'
+import { MVideoFile, MVideoThumbnail } from '../types/models'
+import { MThumbnail } from '../types/models/video/thumbnail'
 import { getVideoFilePath } from './video-paths'
 
 type ImageSize = { height: number, width: number }
@@ -69,7 +69,7 @@ function generateVideoMiniature (video: MVideoThumbnail, videoFile: MVideoFile, 
 function createPlaceholderThumbnail (fileUrl: string, video: MVideoThumbnail, type: ThumbnailType, size: ImageSize) {
   const { filename, height, width, existingThumbnail } = buildMetadataFromVideo(video, type, size)
 
-  const thumbnail = existingThumbnail ? existingThumbnail : new ThumbnailModel()
+  const thumbnail = existingThumbnail || new ThumbnailModel()
 
   thumbnail.filename = filename
   thumbnail.height = height
@@ -142,18 +142,18 @@ function buildMetadataFromVideo (video: MVideoThumbnail, type: ThumbnailType, si
 }
 
 async function createThumbnailFromFunction (parameters: {
-  thumbnailCreator: () => Promise<any>,
-  filename: string,
-  height: number,
-  width: number,
-  type: ThumbnailType,
-  automaticallyGenerated?: boolean,
-  fileUrl?: string,
+  thumbnailCreator: () => Promise<any>
+  filename: string
+  height: number
+  width: number
+  type: ThumbnailType
+  automaticallyGenerated?: boolean
+  fileUrl?: string
   existingThumbnail?: MThumbnail
 }) {
   const { thumbnailCreator, filename, width, height, type, existingThumbnail, automaticallyGenerated = null, fileUrl = null } = parameters
 
-  const thumbnail = existingThumbnail ? existingThumbnail : new ThumbnailModel()
+  const thumbnail = existingThumbnail || new ThumbnailModel()
 
   thumbnail.filename = filename
   thumbnail.height = height

@@ -2,7 +2,7 @@ import { ActivityAnnounce, ActivityFollow, ActivityLike, ActivityUndo, CacheFile
 import { DislikeObject } from '../../../../shared/models/activitypub/objects'
 import { retryTransactionWrapper } from '../../../helpers/database-utils'
 import { logger } from '../../../helpers/logger'
-import { sequelizeTypescript } from '../../../initializers'
+import { sequelizeTypescript } from '../../../initializers/database'
 import { AccountVideoRateModel } from '../../../models/account/account-video-rate'
 import { ActorModel } from '../../../models/activitypub/actor'
 import { ActorFollowModel } from '../../../models/activitypub/actor-follow'
@@ -10,8 +10,8 @@ import { forwardVideoRelatedActivity } from '../send/utils'
 import { getOrCreateVideoAndAccountAndChannel } from '../videos'
 import { VideoShareModel } from '../../../models/video/video-share'
 import { VideoRedundancyModel } from '../../../models/redundancy/video-redundancy'
-import { APProcessorOptions } from '../../../typings/activitypub-processor.model'
-import { MActorSignature } from '../../../typings/models'
+import { APProcessorOptions } from '../../../types/activitypub-processor.model'
+import { MActorSignature } from '../../../types/models'
 
 async function processUndoActivity (options: APProcessorOptions<ActivityUndo>) {
   const { activity, byActor } = options

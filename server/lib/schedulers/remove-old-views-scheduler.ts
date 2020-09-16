@@ -1,10 +1,8 @@
 import { logger } from '../../helpers/logger'
 import { AbstractScheduler } from './abstract-scheduler'
 import { SCHEDULER_INTERVALS_MS } from '../../initializers/constants'
-import { UserVideoHistoryModel } from '../../models/account/user-video-history'
 import { CONFIG } from '../../initializers/config'
-import { isTestInstance } from '../../helpers/core-utils'
-import { VideoViewModel } from '../../models/video/video-views'
+import { VideoViewModel } from '../../models/video/video-view'
 
 export class RemoveOldViewsScheduler extends AbstractScheduler {
 

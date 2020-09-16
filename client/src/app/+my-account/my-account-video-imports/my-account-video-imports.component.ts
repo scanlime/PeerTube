@@ -1,10 +1,8 @@
+import { SortMeta } from 'primeng/api'
 import { Component, OnInit } from '@angular/core'
-import { RestPagination, RestTable } from '@app/shared'
-import { SortMeta } from 'primeng/components/common/sortmeta'
-import { Notifier } from '@app/core'
-import { I18n } from '@ngx-translate/i18n-polyfill'
-import { VideoImport, VideoImportState } from '../../../../../shared/models/videos'
-import { VideoImportService } from '@app/shared/video-import'
+import { Notifier, RestPagination, RestTable } from '@app/core'
+import { VideoImportService } from '@app/shared/shared-main'
+import { VideoImport, VideoImportState } from '@shared/models'
 
 @Component({
   selector: 'my-account-video-imports',
@@ -14,20 +12,35 @@ import { VideoImportService } from '@app/shared/video-import'
 export class MyAccountVideoImportsComponent extends RestTable implements OnInit {
   videoImports: VideoImport[] = []
   totalRecords = 0
-  rowsPerPage = 10
   sort: SortMeta = { field: 'createdAt', order: 1 }
   pagination: RestPagination = { count: this.rowsPerPage, start: 0 }
 
   constructor (
     private notifier: Notifier,
-    private videoImportService: VideoImportService,
-    private i18n: I18n
+    private videoImportService: VideoImportService
   ) {
     super()
   }
 
   ngOnInit () {
     this.initialize()
+  }
+
+  getIdentifier () {
+    return 'MyAccountVideoImportsComponent'
+  }
+
+  getVideoImportStateClass (state: VideoImportState) {
+    switch (state) {
+      case VideoImportState.FAILED:
+        return 'badge-red'
+      case VideoImportState.REJECTED:
+        return 'badge-banned'
+      case VideoImportState.PENDING:
+        return 'badge-yellow'
+      default:
+        return 'badge-green'
+    }
   }
 
   isVideoImportSuccess (videoImport: VideoImport) {

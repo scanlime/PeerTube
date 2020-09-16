@@ -1,7 +1,7 @@
-#!/bin/sh
+#!/bin/bash
 
 set -eu
 
 NODE_ENV=test npm run concurrently -- -k \
-  "npm run watch:client" \
-  "npm run watch:server"
+  "sh scripts/dev/client.sh --skip-server" \
+  "sh scripts/dev/server.sh --skip-client"

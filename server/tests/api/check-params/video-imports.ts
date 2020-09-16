@@ -1,9 +1,8 @@
-/* tslint:disable:no-unused-expression */
+/* eslint-disable @typescript-eslint/no-unused-expressions,@typescript-eslint/require-await */
 
-import { omit } from 'lodash'
 import 'mocha'
+import { omit } from 'lodash'
 import { join } from 'path'
-import { VideoPrivacy } from '../../../../shared/models/videos/video-privacy.enum'
 import {
   cleanupTests,
   createUser,
@@ -23,13 +22,13 @@ import {
   checkBadSortPagination,
   checkBadStartPagination
 } from '../../../../shared/extra-utils/requests/check-api-params'
-import { getMagnetURI, getYoutubeVideoUrl } from '../../../../shared/extra-utils/videos/video-imports'
+import { getMagnetURI, getGoodVideoUrl } from '../../../../shared/extra-utils/videos/video-imports'
+import { VideoPrivacy } from '../../../../shared/models/videos/video-privacy.enum'
 
 describe('Test video imports API validator', function () {
   const path = '/api/v1/videos/imports'
   let server: ServerInfo
   let userAccessToken = ''
-  let accountName: string
   let channelId: number
 
   // ---------------------------------------------------------------
@@ -48,8 +47,7 @@ describe('Test video imports API validator', function () {
 
     {
       const res = await getMyUserInformation(server.url, server.accessToken)
-      channelId = res.body.videoChannels[ 0 ].id
-      accountName = res.body.account.name + '@' + res.body.account.host
+      channelId = res.body.videoChannels[0].id
     }
   })
 
@@ -78,7 +76,7 @@ describe('Test video imports API validator', function () {
 
     before(function () {
       baseCorrectParams = {
-        targetUrl: getYoutubeVideoUrl(),
+        targetUrl: getGoodVideoUrl(),
         name: 'my super name',
         category: 5,
         licence: 1,
@@ -196,7 +194,7 @@ describe('Test video imports API validator', function () {
     it('Should fail with an incorrect thumbnail file', async function () {
       const fields = baseCorrectParams
       const attaches = {
-        'thumbnailfile': join(__dirname, '..', '..', 'fixtures', 'avatar.png')
+        thumbnailfile: join(__dirname, '..', '..', 'fixtures', 'avatar.png')
       }
 
       await makeUploadRequest({ url: server.url, path, token: server.accessToken, fields, attaches })
@@ -205,7 +203,7 @@ describe('Test video imports API validator', function () {
     it('Should fail with a big thumbnail file', async function () {
       const fields = baseCorrectParams
       const attaches = {
-        'thumbnailfile': join(__dirname, '..', '..', 'fixtures', 'avatar-big.png')
+        thumbnailfile: join(__dirname, '..', '..', 'fixtures', 'avatar-big.png')
       }
 
       await makeUploadRequest({ url: server.url, path, token: server.accessToken, fields, attaches })
@@ -214,7 +212,7 @@ describe('Test video imports API validator', function () {
     it('Should fail with an incorrect preview file', async function () {
       const fields = baseCorrectParams
       const attaches = {
-        'previewfile': join(__dirname, '..', '..', 'fixtures', 'avatar.png')
+        previewfile: join(__dirname, '..', '..', 'fixtures', 'avatar.png')
       }
 
       await makeUploadRequest({ url: server.url, path, token: server.accessToken, fields, attaches })
@@ -223,7 +221,7 @@ describe('Test video imports API validator', function () {
     it('Should fail with a big preview file', async function () {
       const fields = baseCorrectParams
       const attaches = {
-        'previewfile': join(__dirname, '..', '..', 'fixtures', 'avatar-big.png')
+        previewfile: join(__dirname, '..', '..', 'fixtures', 'avatar-big.png')
       }
 
       await makeUploadRequest({ url: server.url, path, token: server.accessToken, fields, attaches })
@@ -232,7 +230,7 @@ describe('Test video imports API validator', function () {
     it('Should fail with an invalid torrent file', async function () {
       const fields = omit(baseCorrectParams, 'targetUrl')
       const attaches = {
-        'torrentfile': join(__dirname, '..', '..', 'fixtures', 'avatar-big.png')
+        torrentfile: join(__dirname, '..', '..', 'fixtures', 'avatar-big.png')
       }
 
       await makeUploadRequest({ url: server.url, path, token: server.accessToken, fields, attaches })
@@ -248,15 +246,13 @@ describe('Test video imports API validator', function () {
     it('Should succeed with the correct parameters', async function () {
       this.timeout(30000)
 
-      {
-        await makePostBodyRequest({
-          url: server.url,
-          path,
-          token: server.accessToken,
-          fields: baseCorrectParams,
-          statusCodeExpected: 200
-        })
-      }
+      await makePostBodyRequest({
+        url: server.url,
+        path,
+        token: server.accessToken,
+        fields: baseCorrectParams,
+        statusCodeExpected: 200
+      })
     })
 
     it('Should forbid to import http videos', async function () {
@@ -303,7 +299,7 @@ describe('Test video imports API validator', function () {
 
       fields = omit(fields, 'magnetUri')
       const attaches = {
-        'torrentfile': join(__dirname, '..', '..', 'fixtures', 'video-720p.torrent')
+        torrentfile: join(__dirname, '..', '..', 'fixtures', 'video-720p.torrent')
       }
 
       await makeUploadRequest({ url: server.url, path, token: server.accessToken, fields, attaches, statusCodeExpected: 409 })

@@ -2,7 +2,7 @@ import { CacheFileObject } from '../../../shared/index'
 import { VideoRedundancyModel } from '../../models/redundancy/video-redundancy'
 import { Transaction } from 'sequelize'
 import { VideoStreamingPlaylistType } from '../../../shared/models/videos/video-streaming-playlist.type'
-import { MActorId, MVideoRedundancy, MVideoWithAllFiles } from '@server/typings/models'
+import { MActorId, MVideoRedundancy, MVideoWithAllFiles } from '@server/types/models'
 
 function cacheFileActivityObjectToDBAttributes (cacheFileObject: CacheFileObject, video: MVideoWithAllFiles, byActor: MActorId) {
 
@@ -13,7 +13,7 @@ function cacheFileActivityObjectToDBAttributes (cacheFileObject: CacheFileObject
     if (!playlist) throw new Error('Cannot find HLS playlist of video ' + video.url)
 
     return {
-      expiresOn: new Date(cacheFileObject.expires),
+      expiresOn: cacheFileObject.expires ? new Date(cacheFileObject.expires) : null,
       url: cacheFileObject.id,
       fileUrl: url.href,
       strategy: null,
@@ -30,7 +30,7 @@ function cacheFileActivityObjectToDBAttributes (cacheFileObject: CacheFileObject
   if (!videoFile) throw new Error(`Cannot find video file ${url.height} ${url.fps} of video ${video.url}`)
 
   return {
-    expiresOn: new Date(cacheFileObject.expires),
+    expiresOn: cacheFileObject.expires ? new Date(cacheFileObject.expires) : null,
     url: cacheFileObject.id,
     fileUrl: url.href,
     strategy: null,

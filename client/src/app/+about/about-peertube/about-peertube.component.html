@@ -3,11 +3,11 @@
     What is PeerTube?
   </h1>
 
-  <img class="mascot" width="121px" height="147px" src="/client/assets/images/mascot/default.png" alt="mascot"/>
+  <img class="mascot" width="121px" height="147px" src="/client/assets/images/mascot/default.svg" alt="mascot"/>
 
   <div class="description">
     <p i18n>
-      PeerTube is a self hosted federated (ActivityPub) video streaming platform using P2P directly in the web browser.
+      PeerTube is a self-hosted ActivityPub-federated video streaming platform using P2P directly in your web browser.
     </p>
 
     <p i18n>
@@ -24,10 +24,10 @@
 
     <div class="card">
       <div class="card-body">
-        <h5 class="card-title">
+        <div class="card-title">
           <a i18n target="_blank" rel="noopener noreferrer" href="https://docs.joinpeertube.org/#/use-setup-account">Use PeerTube
             documentation</a>
-        </h5>
+          </div>
 
         <div i18n class="card-text">
           Discover how to setup your account, what is a channel, how to create a playlist and more!
@@ -37,10 +37,10 @@
 
     <div class="card">
       <div class="card-body">
-        <h5 class="card-title">
+        <div class="card-title">
           <a i18n target="_blank" rel="noopener noreferrer" href="https://docs.joinpeertube.org/#/use-third-party-application">PeerTube
             Applications</a>
-        </h5>
+          </div>
 
         <div i18n class="card-text">
           Discover unofficial Android applications or browser addons!
@@ -50,10 +50,10 @@
 
     <div class="card">
       <div class="card-body">
-        <h5 class="card-title">
+        <div class="card-title">
           <a i18n target="_blank" rel="noopener noreferrer" href="https://docs.joinpeertube.org/#/contribute-getting-started">Contribute on
             PeerTube</a>
-        </h5>
+          </div>
 
         <div i18n class="card-text">
           Want to help to improve PeerTube? You can translate the web interface, give your feedback or directly contribute to the code!
@@ -65,15 +65,24 @@
   <div class="privacy-contributors">
     <my-about-peertube-contributors></my-about-peertube-contributors>
 
-    <div class="p2p-privacy">
-      <h3 i18n class="section-title">P2P & Privacy</h3>
+    <div class="p2p-privacy">     
+      <h2 class="section-title">
+        <div class="anchor" id="privacy"></div> <!-- privacy anchor -->
+        <ng-container i18n>P2P & Privacy</ng-container>
+      </h2>
 
       <p i18n>
-        PeerTube uses the BitTorrent protocol to share bandwidth between users.
-        This implies that your IP address is stored in the instance's BitTorrent tracker as long as you download or watch the video.
+        PeerTube uses the BitTorrent protocol to share bandwidth between users by default to help lower the load on the server,
+        but ultimately leaves you the choice to switch back to regular streaming exclusively from the server of the video. What
+        follows applies only if you want to keep using the P2P mode of PeerTube.
       </p>
 
-      <h6 i18n class="p2p-privacy-title">What are the consequences?</h6>
+      <p>
+        The main threat to your privacy induced by BitTorrent lies in your IP address being stored in the instance's BitTorrent 
+        tracker as long as you download or watch the video.
+      </p>
+
+      <h3 i18n class="p2p-privacy-title">What are the consequences?</h3>
 
       <p i18n>
         In theory, someone with enough technical skills could create a script that tracks which IP is downloading which video.
@@ -89,7 +98,7 @@
         <li i18n>
           For each request sent, the tracker returns random peers at a limited number.
           For instance, if there are 1000 peers in the swarm and the tracker sends only 20 peers for each request, there must be at least 50
-          requests sent to know every peers in the swarm
+          requests sent to know every peer in the swarm
         </li>
 
         <li i18n>
@@ -119,15 +128,15 @@
         There are much more effective ways to get that kind of information.
       </p>
 
-      <h6 i18n class="p2p-privacy-title">How does PeerTube compare with YouTube?</h6>
+      <h3 i18n class="p2p-privacy-title">How does PeerTube compare with YouTube?</h3>
 
       <p i18n>
-        The threats to privacy in YouTube are different from PeerTube's.
+        The threats to privacy with YouTube are different from PeerTube's.
         In YouTube's case, the platform gathers a huge amount of your personal information (not only your IP) to analyze them and track you.
         Moreover, YouTube is owned by Google/Alphabet, a company that tracks you across many websites (via AdSense or Google Analytics).
       </p>
 
-      <h6 i18n class="p2p-privacy-title">What can I do to limit the exposure of my IP address?</h6>
+      <h3 i18n class="p2p-privacy-title">What can I do to limit the exposure of my IP address?</h3>
 
       <p i18n>
         Your IP address is public so every time you consult a website, there is a number of actors (in addition to the final website) seeing
@@ -136,22 +145,24 @@
         Thinking that removing P2P from PeerTube will give you back anonymity doesn't make sense.
       </p>
 
-      <h6 i18n class="p2p-privacy-title">What will be done to mitigate this problem?</h6>
+      <h3 i18n class="p2p-privacy-title">What will be done to mitigate this problem?</h3>
 
       <p i18n>
-        PeerTube is in its early stages, and want to deliver the best countermeasures possible by the time the stable is released.
-        In the meantime, we want to test different ideas related to this issue:
+        PeerTube wants to deliver the best countermeasures possible, to give you more choice
+        and render attacks less likely. Here is what we put in place so far:
       </p>
 
       <ul>
-        <li i18n>Set a limit to the number of peers sent by the tracker</li>
-        <li i18n>Set a limit on the request frequency received by the tracker (being tested)</li>
-        <li i18n>Ring a bell if there are unusual requests (being tested)</li>
-        <li i18n>Disable P2P from the administration interface</li>
-        <li i18n>An automatic video redundancy program: we wouldn't know if the IP downloaded the video on purpose or if it was the
-          automatized program
-        </li>
+        <li i18n>We set a limit to the number of peers sent by the tracker</li>
+        <li i18n>We set a limit on the request frequency received by the tracker</li>
+        <li i18n>Allow instance admins to disable P2P from the administration interface</li>
+        <li i18n>Automatic video redundancy from some instances: one doesn't know if the IP downloaded the video on purpose or if it a server</li>
       </ul>
+
+      <p i18n>
+        Ultimately, remember you can always disable P2P by toggling it in the video player, or just by disabling
+        WebRTC in your browser.
+      </p>
     </div>
 
   </div>

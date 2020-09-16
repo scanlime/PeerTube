@@ -1,5 +1,5 @@
 import { exists, isArray, isSafePath } from './misc'
-import * as validator from 'validator'
+import validator from 'validator'
 import { PluginType } from '../../../shared/models/plugins/plugin.type'
 import { CONSTRAINTS_FIELDS } from '../../initializers/constants'
 import { PluginPackageJson } from '../../../shared/models/plugins/plugin-package-json.model'
@@ -8,19 +8,20 @@ import { isUrlValid } from './activitypub/misc'
 const PLUGINS_CONSTRAINTS_FIELDS = CONSTRAINTS_FIELDS.PLUGINS
 
 function isPluginTypeValid (value: any) {
-  return exists(value) && validator.isInt('' + value) && PluginType[value] !== undefined
+  return exists(value) &&
+    (value === PluginType.PLUGIN || value === PluginType.THEME)
 }
 
 function isPluginNameValid (value: string) {
   return exists(value) &&
     validator.isLength(value, PLUGINS_CONSTRAINTS_FIELDS.NAME) &&
-    validator.matches(value, /^[a-z\-]+$/)
+    validator.matches(value, /^[a-z-0-9]+$/)
 }
 
 function isNpmPluginNameValid (value: string) {
   return exists(value) &&
     validator.isLength(value, PLUGINS_CONSTRAINTS_FIELDS.NAME) &&
-    validator.matches(value, /^[a-z\-]+$/) &&
+    validator.matches(value, /^[a-z\-._0-9]+$/) &&
     (value.startsWith('peertube-plugin-') || value.startsWith('peertube-theme-'))
 }
 
@@ -146,8 +147,8 @@ function isPackageJSONValid (packageJSON: PluginPackageJson, pluginType: PluginT
 }
 
 function isLibraryCodeValid (library: any) {
-  return typeof library.register === 'function'
-    && typeof library.unregister === 'function'
+  return typeof library.register === 'function' &&
+    typeof library.unregister === 'function'
 }
 
 export {

@@ -1,31 +1,7 @@
-<div class="row">
-  <div class="sub-menu">
-    <a i18n *ngIf="hasUsersRight()" routerLink="/admin/users" routerLinkActive="active" class="title-page">
-      Users
-    </a>
+<div>
+  <my-top-menu-dropdown [menuEntries]="menuEntries"></my-top-menu-dropdown>
 
-    <a i18n *ngIf="hasServerFollowRight()" routerLink="/admin/follows" routerLinkActive="active" class="title-page">
-      Manage follows
-    </a>
-
-    <a i18n *ngIf="hasVideoAbusesRight() || hasVideoBlacklistRight()" routerLink="/admin/moderation" routerLinkActive="active" class="title-page">
-      Moderation
-    </a>
-
-    <a i18n *ngIf="hasConfigRight()" routerLink="/admin/config" routerLinkActive="active" class="title-page">
-      Configuration
-    </a>
-
-    <a i18n *ngIf="hasPluginsRight()" routerLink="/admin/plugins" routerLinkActive="active" class="title-page">
-      Plugins/Themes
-    </a>
-
-    <a i18n *ngIf="hasJobsRight() || hasLogsRight() || hasDebugRight()" routerLink="/admin/system" routerLinkActive="active" class="title-page">
-      System
-    </a>
-  </div>
-
-  <div class="margin-content">
+  <div class="margin-content" [ngClass]="{ 'offset-content': !isBroadcastMessageDisplayed }">
     <router-outlet></router-outlet>
   </div>
 </div>

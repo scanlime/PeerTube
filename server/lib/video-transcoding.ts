@@ -3,6 +3,7 @@ import { basename, extname as extnameUtil, join } from 'path'
 import {
   canDoQuickTranscode,
   getDurationFromVideoFile,
+  getMetadataFromFile,
   getVideoFileFPS,
   transcode,
   TranscodeOptions,
@@ -16,7 +17,7 @@ import { updateMasterHLSPlaylist, updateSha256Segments } from './hls'
 import { VideoStreamingPlaylistModel } from '../models/video/video-streaming-playlist'
 import { VideoStreamingPlaylistType } from '../../shared/models/videos/video-streaming-playlist.type'
 import { CONFIG } from '../initializers/config'
-import { MStreamingPlaylistFilesVideo, MVideoFile, MVideoWithAllFiles, MVideoWithFile } from '@server/typings/models'
+import { MStreamingPlaylistFilesVideo, MVideoFile, MVideoWithAllFiles, MVideoWithFile } from '@server/types/models'
 import { createTorrentAndSetInfoHash } from '@server/helpers/webtorrent'
 import { generateVideoStreamingPlaylistName, getVideoFilename, getVideoFilePath } from './video-paths'
 
@@ -105,7 +106,7 @@ async function mergeAudioVideofile (video: MVideoWithAllFiles, resolution: Video
   const transcodeDirectory = CONFIG.STORAGE.TMP_DIR
   const newExtname = '.mp4'
 
-  const inputVideoFile = video.getMaxQualityFile()
+  const inputVideoFile = video.getMinQualityFile()
 
   const audioInputPath = getVideoFilePath(video, inputVideoFile)
   const videoTranscodedPath = join(transcodeDirectory, video.id + '-transcoded' + newExtname)
@@ -202,11 +203,12 @@ async function generateHlsPlaylist (video: MVideoWithFile, resolution: VideoReso
 
   newVideoFile.size = stats.size
   newVideoFile.fps = await getVideoFileFPS(videoFilePath)
+  newVideoFile.metadata = await getMetadataFromFile(videoFilePath)
 
   await createTorrentAndSetInfoHash(videoStreamingPlaylist, newVideoFile)
 
-  await newVideoFile.save()
-  videoStreamingPlaylist.VideoFiles = await videoStreamingPlaylist.$get('VideoFiles') as VideoFileModel[]
+  await VideoFileModel.customUpsert(newVideoFile, 'streaming-playlist', undefined)
+  videoStreamingPlaylist.VideoFiles = await videoStreamingPlaylist.$get('VideoFiles')
 
   video.setHLSPlaylist(videoStreamingPlaylist)
 
@@ -230,11 +232,13 @@ export {
 async function onVideoFileTranscoding (video: MVideoWithFile, videoFile: MVideoFile, transcodingPath: string, outputPath: string) {
   const stats = await stat(transcodingPath)
   const fps = await getVideoFileFPS(transcodingPath)
+  const metadata = await getMetadataFromFile(transcodingPath)
 
   await move(transcodingPath, outputPath)
 
   videoFile.size = stats.size
   videoFile.fps = fps
+  videoFile.metadata = metadata
 
   await createTorrentAndSetInfoHash(video, videoFile)
 

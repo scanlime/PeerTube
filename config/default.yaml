@@ -13,7 +13,7 @@ rates_limit:
   api:
     # 50 attempts in 10 seconds
     window: 10 seconds
-    max: 50
+    max: 100
   login:
     # 15 attempts in 5 min
     window: 5 minutes
@@ -33,10 +33,11 @@ rates_limit:
 trust_proxy:
   - 'loopback'
 
-# Your database name will be "peertube"+database.suffix
+# Your database name will be database.name OR "peertube"+database.suffix
 database:
   hostname: 'localhost'
   port: 5432
+  ssl: false
   suffix: '_dev'
   username: 'peertube'
   password: 'peertube'
@@ -52,6 +53,10 @@ redis:
   db: 0
 
 smtp:
+  # smtp or sendmail
+  transport: smtp
+  # Path to sendmail command. Required if you use sendmail transport
+  sendmail: null
   hostname: null
   port: 465
   username: null
@@ -81,19 +86,19 @@ storage:
   captions: 'storage/captions/'
   cache: 'storage/cache/'
   plugins: 'storage/plugins/'
+  # Overridable client files : logo.svg, favicon.png and icons/*.png (PWA) in client/dist/assets/images
+  # Could contain for example assets/images/favicon.png
+  # If the file exists, peertube will serve it
+  # If not, peertube will fallback to the default fil
+  client_overrides: 'storage/client-overrides/'
 
 log:
   level: 'info' # debug/info/warning/error
   rotation:
     enabled : true
-
-search:
-  # Add ability to fetch remote videos/actors by their URI, that may not be federated with your instance
-  # If enabled, the associated group will be able to "escape" from the instance follows
-  # That means they will be able to follow channels, watch videos, list videos of non followed instances
-  remote_uri:
-    users: true
-    anonymous: false
+    maxFileSize: 12MB
+    maxFiles: 20
+  anonymizeIP: false
 
 trending:
   videos:
@@ -122,6 +127,14 @@ redundancy:
 #        min_lifetime: '48 hours'
 #        strategy: 'recently-added' # Cache recently added videos
 #        min_views: 10 # Having at least x views
+
+# Other instances that duplicate your content
+remote_redundancy:
+  videos:
+    # 'nobody': Do not accept remote redundancies
+    # 'anybody': Accept remote redundancies from anybody
+    # 'followings': Accept redundancies from instance followings
+    accept_from: 'anybody'
 
 csp:
   enabled: false
@@ -163,6 +176,10 @@ plugins:
     check_latest_versions_interval: '12 hours' # How often you want to check new plugins/themes versions
     url: 'https://packages.joinpeertube.org'
 
+federation:
+  videos:
+    federate_unlisted: true
+
 cache:
   previews:
     size: 500 # Max number of previews you want to cache
@@ -197,7 +214,7 @@ user:
 # Please, do not disable transcoding since many uploaded videos will not work
 transcoding:
   enabled: true
-  # Allow your users to upload .mkv, .mov, .avi, .flv videos
+  # Allow your users to upload .mkv, .mov, .avi, .wmv, .flv, .f4v, .3g2, .3gp, .mts, m2ts, .mxf, .nut videos
   allow_additional_extensions: true
   # If a user uploads an audio file, PeerTube will create a video by merging the preview file and the audio file
   allow_audio_files: true
@@ -213,6 +230,7 @@ transcoding:
 
   # Generate videos in a WebTorrent format (what we do since the first PeerTube release)
   # If you also enabled the hls format, it will multiply videos storage by 2
+  # If disabled, breaks federation with PeerTube instances < 2.1
   webtorrent:
     enabled: true
 
@@ -230,6 +248,10 @@ import:
   videos:
     http: # Classic HTTP or all sites supported by youtube-dl https://rg3.github.io/youtube-dl/supportedsites.html
       enabled: false
+      # You can use an HTTP/HTTPS/SOCKS proxy with youtube-dl
+      proxy:
+        enabled: false
+        url: ""
     torrent: # Magnet URI or torrent file (use classic TCP/UDP/WebSeed to download the file)
       enabled: false
 
@@ -241,7 +263,7 @@ auto_blacklist:
 
 instance:
   name: 'PeerTube'
-  short_description: 'PeerTube, a federated (ActivityPub) video streaming platform using P2P (BitTorrent) directly in the web browser with WebTorrent and Angular.'
+  short_description: 'PeerTube, an ActivityPub-federated video streaming platform using P2P directly in your web browser.'
   description: 'Welcome to this PeerTube instance!' # Support markdown
   terms: 'No terms for now.' # Support markdown
   code_of_conduct: '' # Supports markdown
@@ -258,7 +280,7 @@ instance:
   # How long do you plan to maintain this instance?
   maintenance_lifetime: ''
 
-  # How will you pay the PeerTube instance server? With you own funds? With users donations? Advertising?
+  # How will you pay the PeerTube instance server? With your own funds? With users donations? Advertising?
   business_model: ''
 
   # If you want to explain on what type of hardware your PeerTube instance runs
@@ -347,7 +369,39 @@ followings:
     # /!\ Don't enable this if you don't have a reactive moderation team /!\
     auto_follow_index:
       enabled: false
-      index_url: 'https://instances.joinpeertube.org'
+      # Host your own using https://framagit.org/framasoft/peertube/instances-peertube#peertube-auto-follow
+      index_url: ''
 
 theme:
   default: 'default'
+
+broadcast_message:
+  enabled: false
+  message: '' # Support markdown
+  level: 'info' # 'info' | 'warning' | 'error'
+  dismissable: false
+
+search:
+  # Add ability to fetch remote videos/actors by their URI, that may not be federated with your instance
+  # If enabled, the associated group will be able to "escape" from the instance follows
+  # That means they will be able to follow channels, watch videos, list videos of non followed instances
+  remote_uri:
+    users: true
+    anonymous: false
+
+  # Use a third party index instead of your local index, only for search results
+  # Useful to discover content outside of your instance
+  # If you enable search_index, you must enable remote_uri search for users
+  # If you do not enable remote_uri search for anonymous user, your instance will redirect the user on the origin instance
+  # instead of loading the video locally
+  search_index:
+    enabled: false
+    # URL of the search index, that should use the same search API and routes
+    # than PeerTube: https://docs.joinpeertube.org/api-rest-reference.html
+    # You should deploy your own with https://framagit.org/framasoft/peertube/search-index,
+    # and can use https://search.joinpeertube.org/ for tests, but keep in mind the latter is an unmoderated search index
+    url: ''
+    # You can disable local search, so users only use the search index
+    disable_local_search: false
+    # If you did not disable local search, you can decide to use the search index by default
+    is_default_search: false

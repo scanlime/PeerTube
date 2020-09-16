@@ -1,13 +1,13 @@
 import { ActivityLike } from '../../../../shared/models/activitypub'
 import { retryTransactionWrapper } from '../../../helpers/database-utils'
-import { sequelizeTypescript } from '../../../initializers'
+import { sequelizeTypescript } from '../../../initializers/database'
 import { AccountVideoRateModel } from '../../../models/account/account-video-rate'
 import { forwardVideoRelatedActivity } from '../send/utils'
 import { getOrCreateVideoAndAccountAndChannel } from '../videos'
 import { getVideoLikeActivityPubUrl } from '../url'
 import { getAPId } from '../../../helpers/activitypub'
-import { APProcessorOptions } from '../../../typings/activitypub-processor.model'
-import { MActorSignature } from '../../../typings/models'
+import { APProcessorOptions } from '../../../types/activitypub-processor.model'
+import { MActorSignature } from '../../../types/models'
 
 async function processLikeActivity (options: APProcessorOptions<ActivityLike>) {
   const { activity, byActor } = options

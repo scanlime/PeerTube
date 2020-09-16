@@ -1,14 +1,15 @@
-import * as path from 'path'
-import * as express from 'express'
 import { diff } from 'deep-object-diff'
-import { chain } from 'lodash'
+import * as express from 'express'
 import * as flatten from 'flat'
+import { chain } from 'lodash'
+import * as path from 'path'
 import * as winston from 'winston'
-import { jsonLoggerFormat, labelFormatter } from './logger'
-import { User, VideoAbuse, VideoChannel, VideoDetails, VideoImport } from '../../shared'
-import { VideoComment } from '../../shared/models/videos/video-comment.model'
+import { AUDIT_LOG_FILENAME } from '@server/initializers/constants'
+import { AdminAbuse, User, VideoChannel, VideoDetails, VideoImport } from '../../shared'
 import { CustomConfig } from '../../shared/models/server/custom-config.model'
+import { VideoComment } from '../../shared/models/videos/video-comment.model'
 import { CONFIG } from '../initializers/config'
+import { jsonLoggerFormat, labelFormatter } from './logger'
 
 function getAuditIdFromRes (res: express.Response) {
   return res.locals.oauth.token.User.username
@@ -29,13 +30,13 @@ const auditLogger = winston.createLogger({
   levels: { audit: 0 },
   transports: [
     new winston.transports.File({
-      filename: path.join(CONFIG.STORAGE.LOG_DIR, 'peertube-audit.log'),
+      filename: path.join(CONFIG.STORAGE.LOG_DIR, AUDIT_LOG_FILENAME),
       level: 'audit',
       maxsize: 5242880,
       maxFiles: 5,
       format: winston.format.combine(
         winston.format.timestamp(),
-        labelFormatter,
+        labelFormatter(),
         winston.format.splat(),
         jsonLoggerFormat
       )
@@ -80,7 +81,8 @@ function auditLoggerFactory (domain: string) {
 }
 
 abstract class EntityAuditView {
-  constructor (private keysToKeep: Array<string>, private prefix: string, private entityInfos: object) { }
+  constructor (private readonly keysToKeep: string[], private readonly prefix: string, private readonly entityInfos: object) { }
+
   toLogKeys (): object {
     return chain(flatten(this.entityInfos, { delimiter: '-', safe: true }))
       .pick(this.keysToKeep)
@@ -120,7 +122,7 @@ const videoKeysToKeep = [
   'downloadEnabled'
 ]
 class VideoAuditView extends EntityAuditView {
-  constructor (private video: VideoDetails) {
+  constructor (private readonly video: VideoDetails) {
     super(videoKeysToKeep, 'video', video)
   }
 }
@@ -131,7 +133,7 @@ const videoImportKeysToKeep = [
   'video-name'
 ]
 class VideoImportAuditView extends EntityAuditView {
-  constructor (private videoImport: VideoImport) {
+  constructor (private readonly videoImport: VideoImport) {
     super(videoImportKeysToKeep, 'video-import', videoImport)
   }
 }
@@ -150,7 +152,7 @@ const commentKeysToKeep = [
   'account-name'
 ]
 class CommentAuditView extends EntityAuditView {
-  constructor (private comment: VideoComment) {
+  constructor (private readonly comment: VideoComment) {
     super(commentKeysToKeep, 'comment', comment)
   }
 }
@@ -179,7 +181,7 @@ const userKeysToKeep = [
   'videoChannels'
 ]
 class UserAuditView extends EntityAuditView {
-  constructor (private user: User) {
+  constructor (private readonly user: User) {
     super(userKeysToKeep, 'user', user)
   }
 }
@@ -205,23 +207,20 @@ const channelKeysToKeep = [
   'ownerAccount-displayedName'
 ]
 class VideoChannelAuditView extends EntityAuditView {
-  constructor (private channel: VideoChannel) {
+  constructor (private readonly channel: VideoChannel) {
     super(channelKeysToKeep, 'channel', channel)
   }
 }
 
-const videoAbuseKeysToKeep = [
+const abuseKeysToKeep = [
   'id',
   'reason',
   'reporterAccount',
-  'video-id',
-  'video-name',
-  'video-uuid',
   'createdAt'
 ]
-class VideoAbuseAuditView extends EntityAuditView {
-  constructor (private videoAbuse: VideoAbuse) {
-    super(videoAbuseKeysToKeep, 'abuse', videoAbuse)
+class AbuseAuditView extends EntityAuditView {
+  constructor (private readonly abuse: AdminAbuse) {
+    super(abuseKeysToKeep, 'abuse', abuse)
   }
 }
 
@@ -252,9 +251,12 @@ class CustomConfigAuditView extends EntityAuditView {
     const infos: any = customConfig
     const resolutionsDict = infos.transcoding.resolutions
     const resolutionsArray = []
-    Object.entries(resolutionsDict).forEach(([resolution, isEnabled]) => {
-      if (isEnabled) resolutionsArray.push(resolution)
-    })
+
+    Object.entries(resolutionsDict)
+          .forEach(([ resolution, isEnabled ]) => {
+            if (isEnabled) resolutionsArray.push(resolution)
+          })
+
     Object.assign({}, infos, { transcoding: { resolutions: resolutionsArray } })
     super(customConfigKeysToKeep, 'config', infos)
   }
@@ -269,6 +271,6 @@ export {
   CommentAuditView,
   UserAuditView,
   VideoAuditView,
-  VideoAbuseAuditView,
+  AbuseAuditView,
   CustomConfigAuditView
 }

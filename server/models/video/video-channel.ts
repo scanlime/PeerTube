@@ -30,7 +30,7 @@ import { buildServerIdsFollowedBy, buildTrigramSearchIndex, createSimilarityAttr
 import { VideoModel } from './video'
 import { CONSTRAINTS_FIELDS, WEBSERVER } from '../../initializers/constants'
 import { ServerModel } from '../server/server'
-import { FindOptions, ModelIndexesOptions, Op } from 'sequelize'
+import { FindOptions, Op, literal, ScopeOptions } from 'sequelize'
 import { AvatarModel } from '../avatar/avatar'
 import { VideoPlaylistModel } from './video-playlist'
 import * as Bluebird from 'bluebird'
@@ -41,33 +41,28 @@ import {
   MChannelAP,
   MChannelFormattable,
   MChannelSummaryFormattable
-} from '../../typings/models/video'
-
-// FIXME: Define indexes here because there is an issue with TS and Sequelize.literal when called directly in the annotation
-const indexes: ModelIndexesOptions[] = [
-  buildTrigramSearchIndex('video_channel_name_trigram', 'name'),
-
-  {
-    fields: [ 'accountId' ]
-  },
-  {
-    fields: [ 'actorId' ]
-  }
-]
+} from '../../types/models/video'
 
 export enum ScopeNames {
   FOR_API = 'FOR_API',
+  SUMMARY = 'SUMMARY',
   WITH_ACCOUNT = 'WITH_ACCOUNT',
   WITH_ACTOR = 'WITH_ACTOR',
   WITH_VIDEOS = 'WITH_VIDEOS',
-  SUMMARY = 'SUMMARY'
+  WITH_STATS = 'WITH_STATS'
 }
 
 type AvailableForListOptions = {
   actorId: number
+  search?: string
+}
+
+type AvailableWithStatsOptions = {
+  daysPrior: number
 }
 
 export type SummaryOptions = {
+  actorRequired?: boolean // Default: true
   withAccount?: boolean // Default: false
   withAccountBlockerIds?: number[]
 }
@@ -81,6 +76,46 @@ export type SummaryOptions = {
   ]
 }))
 @Scopes(() => ({
+  [ScopeNames.FOR_API]: (options: AvailableForListOptions) => {
+    // Only list local channels OR channels that are on an instance followed by actorId
+    const inQueryInstanceFollow = buildServerIdsFollowedBy(options.actorId)
+
+    return {
+      include: [
+        {
+          attributes: {
+            exclude: unusedActorAttributesForAPI
+          },
+          model: ActorModel,
+          where: {
+            [Op.or]: [
+              {
+                serverId: null
+              },
+              {
+                serverId: {
+                  [Op.in]: Sequelize.literal(inQueryInstanceFollow)
+                }
+              }
+            ]
+          }
+        },
+        {
+          model: AccountModel,
+          required: true,
+          include: [
+            {
+              attributes: {
+                exclude: unusedActorAttributesForAPI
+              },
+              model: ActorModel, // Default scope includes avatar and server
+              required: true
+            }
+          ]
+        }
+      ]
+    }
+  },
   [ScopeNames.SUMMARY]: (options: SummaryOptions = {}) => {
     const base: FindOptions = {
       attributes: [ 'id', 'name', 'description', 'actorId' ],
@@ -88,7 +123,7 @@ export type SummaryOptions = {
         {
           attributes: [ 'id', 'preferredUsername', 'url', 'serverId', 'avatarId' ],
           model: ActorModel.unscoped(),
-          required: true,
+          required: options.actorRequired ?? true,
           include: [
             {
               attributes: [ 'host' ],
@@ -115,46 +150,6 @@ export type SummaryOptions = {
 
     return base
   },
-  [ScopeNames.FOR_API]: (options: AvailableForListOptions) => {
-    // Only list local channels OR channels that are on an instance followed by actorId
-    const inQueryInstanceFollow = buildServerIdsFollowedBy(options.actorId)
-
-    return {
-      include: [
-        {
-          attributes: {
-            exclude: unusedActorAttributesForAPI
-          },
-          model: ActorModel,
-          where: {
-            [Op.or]: [
-              {
-                serverId: null
-              },
-              {
-                serverId: {
-                  [ Op.in ]: Sequelize.literal(inQueryInstanceFollow)
-                }
-              }
-            ]
-          }
-        },
-        {
-          model: AccountModel,
-          required: true,
-          include: [
-            {
-              attributes: {
-                exclude: unusedActorAttributesForAPI
-              },
-              model: ActorModel, // Default scope includes avatar and server
-              required: true
-            }
-          ]
-        }
-      ]
-    }
-  },
   [ScopeNames.WITH_ACCOUNT]: {
     include: [
       {
@@ -163,20 +158,66 @@ export type SummaryOptions = {
       }
     ]
   },
+  [ScopeNames.WITH_ACTOR]: {
+    include: [
+      ActorModel
+    ]
+  },
   [ScopeNames.WITH_VIDEOS]: {
     include: [
       VideoModel
     ]
   },
-  [ScopeNames.WITH_ACTOR]: {
-    include: [
-      ActorModel
-    ]
+  [ScopeNames.WITH_STATS]: (options: AvailableWithStatsOptions = { daysPrior: 30 }) => {
+    const daysPrior = parseInt(options.daysPrior + '', 10)
+
+    return {
+      attributes: {
+        include: [
+          [
+            literal('(SELECT COUNT(*) FROM "video" WHERE "channelId" = "VideoChannelModel"."id")'),
+            'videosCount'
+          ],
+          [
+            literal(
+              '(' +
+              `SELECT string_agg(concat_ws('|', t.day, t.views), ',') ` +
+              'FROM ( ' +
+                'WITH ' +
+                  'days AS ( ' +
+                    `SELECT generate_series(date_trunc('day', now()) - '${daysPrior} day'::interval, ` +
+                          `date_trunc('day', now()), '1 day'::interval) AS day ` +
+                  ') ' +
+                  'SELECT days.day AS day, COALESCE(SUM("videoView".views), 0) AS views ' +
+                  'FROM days ' +
+                  'LEFT JOIN (' +
+                    '"videoView" INNER JOIN "video" ON "videoView"."videoId" = "video"."id" ' +
+                    'AND "video"."channelId" = "VideoChannelModel"."id"' +
+                  `) ON date_trunc('day', "videoView"."startDate") = date_trunc('day', days.day) ` +
+                  'GROUP BY day ' +
+                  'ORDER BY day ' +
+                ') t' +
+              ')'
+            ),
+            'viewsPerDay'
+          ]
+        ]
+      }
+    }
   }
 }))
 @Table({
   tableName: 'videoChannel',
-  indexes
+  indexes: [
+    buildTrigramSearchIndex('video_channel_name_trigram', 'name'),
+
+    {
+      fields: [ 'accountId' ]
+    },
+    {
+      fields: [ 'actorId' ]
+    }
+  ]
 })
 export class VideoChannelModel extends Model<VideoChannelModel> {
 
@@ -249,7 +290,7 @@ export class VideoChannelModel extends Model<VideoChannelModel> {
   @BeforeDestroy
   static async sendDeleteIfOwned (instance: VideoChannelModel, options) {
     if (!instance.Actor) {
-      instance.Actor = await instance.$get('Actor', { transaction: options.transaction }) as ActorModel
+      instance.Actor = await instance.$get('Actor', { transaction: options.transaction })
     }
 
     if (instance.Actor.isOwned()) {
@@ -269,11 +310,18 @@ export class VideoChannelModel extends Model<VideoChannelModel> {
     return VideoChannelModel.count(query)
   }
 
-  static listForApi (actorId: number, start: number, count: number, sort: string) {
+  static listForApi (parameters: {
+    actorId: number
+    start: number
+    count: number
+    sort: string
+  }) {
+    const { actorId } = parameters
+
     const query = {
-      offset: start,
-      limit: count,
-      order: getSort(sort)
+      offset: parameters.start,
+      limit: parameters.count,
+      order: getSort(parameters.sort)
     }
 
     const scopes = {
@@ -351,11 +399,28 @@ export class VideoChannelModel extends Model<VideoChannelModel> {
   }
 
   static listByAccount (options: {
-    accountId: number,
-    start: number,
-    count: number,
+    accountId: number
+    start: number
+    count: number
     sort: string
+    withStats?: boolean
+    search?: string
   }) {
+    const escapedSearch = VideoModel.sequelize.escape(options.search)
+    const escapedLikeSearch = VideoModel.sequelize.escape('%' + options.search + '%')
+    const where = options.search
+      ? {
+        [Op.or]: [
+          Sequelize.literal(
+            'lower(immutable_unaccent("VideoChannelModel"."name")) % lower(immutable_unaccent(' + escapedSearch + '))'
+          ),
+          Sequelize.literal(
+            'lower(immutable_unaccent("VideoChannelModel"."name")) LIKE lower(immutable_unaccent(' + escapedLikeSearch + '))'
+          )
+        ]
+      }
+      : null
+
     const query = {
       offset: options.start,
       limit: options.count,
@@ -368,10 +433,20 @@ export class VideoChannelModel extends Model<VideoChannelModel> {
           },
           required: true
         }
-      ]
+      ],
+      where
+    }
+
+    const scopes: string | ScopeOptions | (string | ScopeOptions)[] = [ ScopeNames.WITH_ACTOR ]
+
+    if (options.withStats === true) {
+      scopes.push({
+        method: [ ScopeNames.WITH_STATS, { daysPrior: 30 } as AvailableWithStatsOptions ]
+      })
     }
 
     return VideoChannelModel
+      .scope(scopes)
       .findAndCountAll(query)
       .then(({ rows, count }) => {
         return { total: count, data: rows }
@@ -499,6 +574,23 @@ export class VideoChannelModel extends Model<VideoChannelModel> {
   }
 
   toFormattedJSON (this: MChannelFormattable): VideoChannel {
+    const viewsPerDayString = this.get('viewsPerDay') as string
+    const videosCount = this.get('videosCount') as number
+
+    let viewsPerDay: { date: Date, views: number }[]
+
+    if (viewsPerDayString) {
+      viewsPerDay = viewsPerDayString.split(',')
+        .map(v => {
+          const [ dateString, amount ] = v.split('|')
+
+          return {
+            date: new Date(dateString),
+            views: +amount
+          }
+        })
+    }
+
     const actor = this.Actor.toFormattedJSON()
     const videoChannel = {
       id: this.id,
@@ -508,7 +600,9 @@ export class VideoChannelModel extends Model<VideoChannelModel> {
       isLocal: this.Actor.isOwned(),
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
-      ownerAccount: undefined
+      ownerAccount: undefined,
+      videosCount,
+      viewsPerDay
     }
 
     if (this.Account) videoChannel.ownerAccount = this.Account.toFormattedJSON()

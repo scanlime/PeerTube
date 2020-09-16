@@ -9,7 +9,7 @@ import {
 } from '../../../middlewares'
 import { getFormattedObjects } from '../../../helpers/utils'
 import { UserVideoHistoryModel } from '../../../models/account/user-video-history'
-import { sequelizeTypescript } from '../../../initializers'
+import { sequelizeTypescript } from '../../../initializers/database'
 
 const myVideosHistoryRouter = express.Router()
 
@@ -49,8 +49,6 @@ async function removeUserHistory (req: express.Request, res: express.Response) {
   await sequelizeTypescript.transaction(t => {
     return UserVideoHistoryModel.removeUserHistoryBefore(user, beforeDate, t)
   })
-
-  // Do not send the delete to other instances, we delete OUR copy of this video abuse
 
   return res.type('json').status(204).end()
 }

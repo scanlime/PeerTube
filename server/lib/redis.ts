@@ -6,13 +6,15 @@ import {
   CONTACT_FORM_LIFETIME,
   USER_EMAIL_VERIFY_LIFETIME,
   USER_PASSWORD_RESET_LIFETIME,
+  USER_PASSWORD_CREATE_LIFETIME,
   VIDEO_VIEW_LIFETIME,
-  WEBSERVER
+  WEBSERVER,
+  TRACKER_RATE_LIMITS
 } from '../initializers/constants'
 import { CONFIG } from '../initializers/config'
 
 type CachedRoute = {
-  body: string,
+  body: string
   contentType?: string
   statusCode?: string
 }
@@ -24,7 +26,8 @@ class Redis {
   private client: RedisClient
   private prefix: string
 
-  private constructor () {}
+  private constructor () {
+  }
 
   init () {
     // Already initialized
@@ -49,9 +52,9 @@ class Redis {
     return Object.assign({},
       (CONFIG.REDIS.AUTH && CONFIG.REDIS.AUTH != null) ? { password: CONFIG.REDIS.AUTH } : {},
       (CONFIG.REDIS.DB) ? { db: CONFIG.REDIS.DB } : {},
-      (CONFIG.REDIS.HOSTNAME && CONFIG.REDIS.PORT) ?
-      { host: CONFIG.REDIS.HOSTNAME, port: CONFIG.REDIS.PORT } :
-      { path: CONFIG.REDIS.SOCKET }
+      (CONFIG.REDIS.HOSTNAME && CONFIG.REDIS.PORT)
+        ? { host: CONFIG.REDIS.HOSTNAME, port: CONFIG.REDIS.PORT }
+        : { path: CONFIG.REDIS.SOCKET }
     )
   }
 
@@ -63,7 +66,7 @@ class Redis {
     return this.prefix
   }
 
-  /************* Forgot password *************/
+  /* ************ Forgot password ************ */
 
   async setResetPasswordVerificationString (userId: number) {
     const generatedString = await generateRandomString(32)
@@ -73,11 +76,23 @@ class Redis {
     return generatedString
   }
 
+  async setCreatePasswordVerificationString (userId: number) {
+    const generatedString = await generateRandomString(32)
+
+    await this.setValue(this.generateResetPasswordKey(userId), generatedString, USER_PASSWORD_CREATE_LIFETIME)
+
+    return generatedString
+  }
+
+  async removePasswordVerificationString (userId: number) {
+    return this.removeValue(this.generateResetPasswordKey(userId))
+  }
+
   async getResetPasswordLink (userId: number) {
     return this.getValue(this.generateResetPasswordKey(userId))
   }
 
-  /************* Email verification *************/
+  /* ************ Email verification ************ */
 
   async setVerifyEmailVerificationString (userId: number) {
     const generatedString = await generateRandomString(32)
@@ -91,7 +106,7 @@ class Redis {
     return this.getValue(this.generateVerifyEmailKey(userId))
   }
 
-  /************* Contact form per IP *************/
+  /* ************ Contact form per IP ************ */
 
   async setContactFormIp (ip: string) {
     return this.setValue(this.generateContactFormKey(ip), '1', CONTACT_FORM_LIFETIME)
@@ -101,7 +116,7 @@ class Redis {
     return this.exists(this.generateContactFormKey(ip))
   }
 
-  /************* Views per IP *************/
+  /* ************ Views per IP ************ */
 
   setIPVideoView (ip: string, videoUUID: string) {
     return this.setValue(this.generateViewKey(ip, videoUUID), '1', VIDEO_VIEW_LIFETIME)
@@ -111,7 +126,17 @@ class Redis {
     return this.exists(this.generateViewKey(ip, videoUUID))
   }
 
-  /************* API cache *************/
+  /* ************ Tracker IP block ************ */
+
+  setTrackerBlockIP (ip: string) {
+    return this.setValue(this.generateTrackerBlockIPKey(ip), '1', TRACKER_RATE_LIMITS.BLOCK_IP_LIFETIME)
+  }
+
+  async doesTrackerBlockIPExist (ip: string) {
+    return this.exists(this.generateTrackerBlockIPKey(ip))
+  }
+
+  /* ************ API cache ************ */
 
   async getCachedRoute (req: express.Request) {
     const cached = await this.getObject(this.generateCachedRouteKey(req))
@@ -120,17 +145,17 @@ class Redis {
   }
 
   setCachedRoute (req: express.Request, body: any, lifetime: number, contentType?: string, statusCode?: number) {
-    const cached: CachedRoute = Object.assign({}, {
-      body: body.toString()
-    },
-    (contentType) ? { contentType } : null,
-    (statusCode) ? { statusCode: statusCode.toString() } : null
+    const cached: CachedRoute = Object.assign(
+      {},
+      { body: body.toString() },
+      (contentType) ? { contentType } : null,
+      (statusCode) ? { statusCode: statusCode.toString() } : null
     )
 
     return this.setObject(this.generateCachedRouteKey(req), cached, lifetime)
   }
 
-  /************* Video views *************/
+  /* ************ Video views ************ */
 
   addVideoView (videoId: number) {
     const keyIncr = this.generateVideoViewKey(videoId)
@@ -173,7 +198,7 @@ class Redis {
     ])
   }
 
-  /************* Keys generation *************/
+  /* ************ Keys generation ************ */
 
   generateCachedRouteKey (req: express.Request) {
     return req.method + '-' + req.originalUrl
@@ -203,11 +228,15 @@ class Redis {
     return `views-${videoUUID}-${ip}`
   }
 
+  private generateTrackerBlockIPKey (ip: string) {
+    return `tracker-block-ip-${ip}`
+  }
+
   private generateContactFormKey (ip: string) {
     return 'contact-form-' + ip
   }
 
-  /************* Redis helpers *************/
+  /* ************ Redis helpers ************ */
 
   private getValue (key: string) {
     return new Promise<string>((res, rej) => {
@@ -265,7 +294,17 @@ class Redis {
     })
   }
 
-  private setObject (key: string, obj: { [ id: string ]: string }, expirationMilliseconds: number) {
+  private removeValue (key: string) {
+    return new Promise<void>((res, rej) => {
+      this.client.del(this.prefix + key, err => {
+        if (err) return rej(err)
+
+        return res()
+      })
+    })
+  }
+
+  private setObject (key: string, obj: { [id: string]: string }, expirationMilliseconds: number) {
     return new Promise<void>((res, rej) => {
       this.client.hmset(this.prefix + key, obj, (err, ok) => {
         if (err) return rej(err)
@@ -282,7 +321,7 @@ class Redis {
   }
 
   private getObject (key: string) {
-    return new Promise<{ [ id: string ]: string }>((res, rej) => {
+    return new Promise<{ [id: string]: string }>((res, rej) => {
       this.client.hgetall(this.prefix + key, (err, value) => {
         if (err) return rej(err)
 
