@@ -84,7 +84,7 @@ $ cd /var/www/peertube && sudo -u peertube cp peertube-latest/config/production.
 Then edit the `config/production.yaml` file according to your webserver
 configuration.
 
-**PeerTube does not support webserver host change**. Keep in mind your domain name is definitive after your first PeerTube start.
+**PeerTube does not support webserver host change**. Even though [PeerTube CLI can help you to switch hostname](https://docs.joinpeertube.org/#/maintain-tools?id=update-hostjs) there's no official support for that since it is a risky operation that might result in unforeseen errors.
 
 ### Webserver
 
@@ -100,7 +100,8 @@ Then set the domain for the webserver configuration file.
 Replace `[peertube-domain]` with the domain for the peertube server.
 
 ```
-$ sudo sed -i 's/peertube.example.com/[peertube-domain]/g' /etc/nginx/sites-available/peertube
+$ sudo sed -i 's/${WEBSERVER_HOST}/[peertube-domain]/g' /etc/nginx/sites-available/peertube
+$ sudo sed -i 's/${PEERTUBE_HOST}/localhost:9000/g' /etc/nginx/sites-available/peertube
 ```
 
 Then modify the webserver configuration file. Please pay attention to the `alias` keys of the static locations.
@@ -140,6 +141,8 @@ $ sudo pkg install dehydrated
 ```
 
 ### TCP/IP Tuning
+
+A lot of your instance's raw performance is dependent on a properly tuned machine and more specifically, reverse-proxy. We provide support for Nginx and spent a lot of time putting sane defaults in it, but we strongly advise you to follow up with instructions in https://github.com/denji/nginx-tuning as needed.
 
 **On Linux**
 
@@ -237,8 +240,7 @@ to your own administrator password, although it must be 6 characters or more.
 
 Now your instance is up you can:
 
- * Subscribe to the mailing list for PeerTube administrators: https://framalistes.org/sympa/subscribe/peertube-admin
- * Add you instance to the public PeerTube instances index if you want to: https://instances.peertu.be/
+ * Add your instance to the public PeerTube instances index if you want to: https://instances.joinpeertube.org/
  * Check [available CLI tools](/support/doc/tools.md)
 
 ## Upgrade

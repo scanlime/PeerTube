@@ -25,6 +25,11 @@ describe('Test comments notifications', function () {
   let userNotifications: UserNotification[] = []
   let emails: object[] = []
 
+  const commentText = '**hello** <a href="https://joinpeertube.org">world</a>, <h1>what do you think about peertube?</h1>'
+  const expectedHtml = '<strong style="-ms-text-size-adjust: 100%; -webkit-text-size-adjust: 100%;">hello</strong> ' +
+  '<a href="https://joinpeertube.org" target="_blank" rel="noopener noreferrer" style="-ms-text-size-adjust: 100%; ' +
+  '-webkit-text-size-adjust: 100%; text-decoration: none; color: #f2690d;">world</a>, </p>what do you think about peertube?'
+
   before(async function () {
     this.timeout(120000)
 
@@ -165,6 +170,20 @@ describe('Test comments notifications', function () {
 
       await checkNewCommentOnMyVideo(baseParams, uuid, commentId, threadId, 'presence')
     })
+
+    it('Should convert markdown in comment to html', async function () {
+      this.timeout(10000)
+
+      const resVideo = await uploadVideo(servers[0].url, userAccessToken, { name: 'cool video' })
+      const uuid = resVideo.body.video.uuid
+
+      await addVideoCommentThread(servers[0].url, servers[0].accessToken, uuid, commentText)
+
+      await waitJobs(servers)
+
+      const latestEmail = emails[emails.length - 1]
+      expect(latestEmail['html']).to.contain(expectedHtml)
+    })
   })
 
   describe('Mention notifications', function () {
@@ -298,6 +317,23 @@ describe('Test comments notifications', function () {
       const commentId = tree.children[0].comment.id
 
       await checkCommentMention(baseParams, uuid, commentId, server1ThreadId, 'super root 2 name', 'presence')
+    })
+
+    it('Should convert markdown in comment to html', async function () {
+      this.timeout(10000)
+
+      const resVideo = await uploadVideo(servers[0].url, servers[0].accessToken, { name: 'super video' })
+      const uuid = resVideo.body.video.uuid
+
+      const resThread = await addVideoCommentThread(servers[0].url, servers[0].accessToken, uuid, '@user_1 hello 1')
+      const threadId = resThread.body.comment.id
+
+      await addVideoCommentReply(servers[0].url, servers[0].accessToken, uuid, threadId, '@user_1 ' + commentText)
+
+      await waitJobs(servers)
+
+      const latestEmail = emails[emails.length - 1]
+      expect(latestEmail['html']).to.contain(expectedHtml)
     })
   })
 

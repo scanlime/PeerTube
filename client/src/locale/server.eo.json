@@ -31,6 +31,8 @@
     "Published": "Publikigita",
     "To transcode": "Transkodota",
     "To import": "Enportota",
+    "Waiting for livestream": "Waiting for livestream",
+    "Livestream ended": "Livestream ended",
     "Pending": "Okazonta",
     "Success": "Sukcesis",
     "Failed": "Malsukcesis",
@@ -240,5 +242,7 @@
     "Yoruba": "Joruba",
     "Zhuang": "Ĉuanga",
     "Chinese": "Ĉina",
-    "Zulu": "Zulua"
+    "Zulu": "Zulua",
+    "Normal mode": "Normal mode",
+    "Theater mode": "Theater mode"
 }

@@ -1,21 +1,23 @@
 import * as Bull from 'bull'
+import { publishAndFederateIfNeeded } from '@server/lib/video'
+import { getVideoFilePath } from '@server/lib/video-paths'
+import { MVideoFullLight, MVideoUUID, MVideoWithFile } from '@server/types/models'
 import {
   MergeAudioTranscodingPayload,
   NewResolutionTranscodingPayload,
   OptimizeTranscodingPayload,
   VideoTranscodingPayload
 } from '../../../../shared'
-import { logger } from '../../../helpers/logger'
-import { VideoModel } from '../../../models/video/video'
-import { JobQueue } from '../job-queue'
-import { federateVideoIfNeeded } from '../../activitypub/videos'
 import { retryTransactionWrapper } from '../../../helpers/database-utils'
-import { sequelizeTypescript } from '../../../initializers/database'
-import { computeResolutionsToTranscode } from '../../../helpers/ffmpeg-utils'
-import { generateHlsPlaylist, mergeAudioVideofile, optimizeOriginalVideofile, transcodeNewResolution } from '../../video-transcoding'
-import { Notifier } from '../../notifier'
+import { computeResolutionsToTranscode } from '../../../helpers/ffprobe-utils'
+import { logger } from '../../../helpers/logger'
 import { CONFIG } from '../../../initializers/config'
-import { MVideoFullLight, MVideoUUID, MVideoWithFile } from '@server/types/models'
+import { sequelizeTypescript } from '../../../initializers/database'
+import { VideoModel } from '../../../models/video/video'
+import { federateVideoIfNeeded } from '../../activitypub/videos'
+import { Notifier } from '../../notifier'
+import { generateHlsPlaylist, mergeAudioVideofile, optimizeOriginalVideofile, transcodeNewResolution } from '../../video-transcoding'
+import { JobQueue } from '../job-queue'
 
 async function processVideoTranscoding (job: Bull.Job) {
   const payload = job.data as VideoTranscodingPayload
@@ -29,7 +31,20 @@ async function processVideoTranscoding (job: Bull.Job) {
   }
 
   if (payload.type === 'hls') {
-    await generateHlsPlaylist(video, payload.resolution, payload.copyCodecs, payload.isPortraitMode || false)
+    const videoFileInput = payload.copyCodecs
+      ? video.getWebTorrentFile(payload.resolution)
+      : video.getMaxQualityFile()
+
+    const videoOrStreamingPlaylist = videoFileInput.getVideoOrStreamingPlaylist()
+    const videoInputPath = getVideoFilePath(videoOrStreamingPlaylist, videoFileInput)
+
+    await generateHlsPlaylist({
+      video,
+      videoInputPath,
+      resolution: payload.resolution,
+      copyCodecs: payload.copyCodecs,
+      isPortraitMode: payload.isPortraitMode || false
+    })
 
     await retryTransactionWrapper(onHlsPlaylistGenerationSuccess, video)
   } else if (payload.type === 'new-resolution') {
@@ -84,7 +99,7 @@ async function onVideoFileOptimizerSuccess (videoArg: MVideoWithFile, payload: O
     if (!videoDatabase) return undefined
 
     // Create transcoding jobs if there are enabled resolutions
-    const resolutionsEnabled = computeResolutionsToTranscode(videoFileResolution)
+    const resolutionsEnabled = computeResolutionsToTranscode(videoFileResolution, 'vod')
     logger.info(
       'Resolutions computed for video %s and origin file resolution of %d.', videoDatabase.uuid, videoFileResolution,
       { resolutions: resolutionsEnabled }
@@ -158,27 +173,5 @@ function createHlsJobIfEnabled (payload?: { videoUUID: string, resolution: numbe
     }
 
     return JobQueue.Instance.createJob({ type: 'video-transcoding', payload: hlsTranscodingPayload })
-  }
-}
-
-async function publishAndFederateIfNeeded (video: MVideoUUID) {
-  const { videoDatabase, videoPublished } = await sequelizeTypescript.transaction(async t => {
-    // Maybe the video changed in database, refresh it
-    const videoDatabase = await VideoModel.loadAndPopulateAccountAndServerAndTags(video.uuid, t)
-    // Video does not exist anymore
-    if (!videoDatabase) return undefined
-
-    // We transcoded the video file in another format, now we can publish it
-    const videoPublished = await videoDatabase.publishIfNeededAndSave(t)
-
-    // If the video was not published, we consider it is a new one for other instances
-    await federateVideoIfNeeded(videoDatabase, videoPublished, t)
-
-    return { videoDatabase, videoPublished }
-  })
-
-  if (videoPublished) {
-    Notifier.Instance.notifyOnNewVideoIfNeeded(videoDatabase)
-    Notifier.Instance.notifyOnVideoPublishedAfterTranscoding(videoDatabase)
   }
 }

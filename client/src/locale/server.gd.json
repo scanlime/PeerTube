@@ -31,6 +31,8 @@
     "Published": "Foillsichear",
     "To transcode": "Ri thar-chòdachadh",
     "To import": "Ri ion-phortadh",
+    "Waiting for livestream": "Waiting for livestream",
+    "Livestream ended": "Livestream ended",
     "Pending": "Ri dhèanamh",
     "Success": "Deiseil",
     "Failed": "Dh’fhàillig leis",
@@ -240,5 +242,7 @@
     "Yoruba": "Yoruba",
     "Zhuang": "Zhuang",
     "Chinese": "Sìnis",
-    "Zulu": "Zulu"
+    "Zulu": "Zulu",
+    "Normal mode": "Normal mode",
+    "Theater mode": "Theater mode"
 }

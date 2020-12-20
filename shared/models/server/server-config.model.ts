@@ -98,6 +98,21 @@ export interface ServerConfig {
     enabledResolutions: number[]
   }
 
+  live: {
+    enabled: boolean
+
+    maxDuration: number
+    maxInstanceLives: number
+    maxUserLives: number
+    allowReplay: boolean
+
+    transcoding: {
+      enabled: boolean
+
+      enabledResolutions: number[]
+    }
+  }
+
   import: {
     videos: {
       http: {

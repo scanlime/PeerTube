@@ -2,8 +2,10 @@
 
 import 'mocha'
 import { expect } from 'chai'
+import { Video, VideoDetails } from '../../../shared'
 import {
   addVideoChannel,
+  areHttpImportTestsDisabled,
   buildAbsoluteFixturePath,
   cleanupTests,
   createUser,
@@ -17,11 +19,11 @@ import {
   removeVideo,
   ServerInfo,
   setAccessTokensToServers,
+  testHelloWorldRegisteredSettings,
   uploadVideoAndGetId,
   userLogin,
   waitJobs
 } from '../../../shared/extra-utils'
-import { Video, VideoDetails } from '../../../shared'
 import { getYoutubeVideoUrl } from '../../../shared/extra-utils/videos/video-imports'
 
 describe('Test CLI wrapper', function () {
@@ -112,6 +114,8 @@ describe('Test CLI wrapper', function () {
     })
 
     it('Should import a video', async function () {
+      if (areHttpImportTestsDisabled()) return
+
       this.timeout(60000)
 
       const env = getEnvCli(server)
@@ -122,6 +126,8 @@ describe('Test CLI wrapper', function () {
     })
 
     it('Should have imported the video', async function () {
+      if (areHttpImportTestsDisabled()) return
+
       this.timeout(60000)
 
       await waitJobs([ server ])
@@ -144,6 +150,8 @@ describe('Test CLI wrapper', function () {
     })
 
     it('Should import and override some imported attributes', async function () {
+      if (areHttpImportTestsDisabled()) return
+
       this.timeout(60000)
 
       const env = getEnvCli(server)
@@ -196,6 +204,10 @@ describe('Test CLI wrapper', function () {
 
       const env = getEnvCli(server)
       await execCLI(`${env} ${cmd} plugins install --npm-name peertube-plugin-hello-world`)
+    })
+
+    it('Should have registered settings', async function () {
+      await testHelloWorldRegisteredSettings(server)
     })
 
     it('Should list installed plugins', async function () {
