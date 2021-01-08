@@ -7,7 +7,7 @@ This guide requires [docker](https://www.docker.com/community-edition) and
 
 ### Install
 
-**PeerTube does not support webserver host change**. Keep in mind your domain 
+**PeerTube does not support webserver host change**. Keep in mind your domain
 name is definitive after your first PeerTube start.
 
 #### Go to your workdir
@@ -21,18 +21,18 @@ cd /your/peertube/directory
 #### Get the latest Compose file
 
 ```shell
-curl https://raw.githubusercontent.com/chocobozzz/PeerTube/master/support/docker/production/docker-compose.yml > docker-compose.yml
+curl https://raw.githubusercontent.com/chocobozzz/PeerTube/develop/support/docker/production/docker-compose.yml > docker-compose.yml
 ```
 
-View the source of the file you're about to download: [docker-compose.yml](https://github.com/Chocobozzz/PeerTube/blob/master/support/docker/production/docker-compose.yml)
+View the source of the file you're about to download: [docker-compose.yml](https://github.com/Chocobozzz/PeerTube/blob/develop/support/docker/production/docker-compose.yml)
 
 #### Get the latest env_file
 
 ```shell
-curl https://raw.githubusercontent.com/Chocobozzz/PeerTube/master/support/docker/production/.env > .env
+curl https://raw.githubusercontent.com/Chocobozzz/PeerTube/develop/support/docker/production/.env > .env
 ```
 
-View the source of the file you're about to download: [.env](https://github.com/Chocobozzz/PeerTube/blob/master/support/docker/production/.env)
+View the source of the file you're about to download: [.env](https://github.com/Chocobozzz/PeerTube/blob/develop/support/docker/production/.env)
 
 #### Tweak the `docker-compose.yml` file there according to your needs
 
@@ -46,24 +46,41 @@ $EDITOR ./docker-compose.yml
 $EDITOR ./.env
 ```
 
-In the downloaded example [.env](https://github.com/Chocobozzz/PeerTube/blob/master/support/docker/production/.env), you must replace:
+In the downloaded example [.env](https://github.com/Chocobozzz/PeerTube/blob/develop/support/docker/production/.env), you must replace:
 - `<MY POSTGRES USERNAME>`
 - `<MY POSTGRES PASSWORD>`
 - `<MY DOMAIN>` without 'https://'
 - `<MY EMAIL ADDRESS>`
 
 Other environment variables are used in
-[/support/docker/production/config/custom-environment-variables.yaml](https://github.com/Chocobozzz/PeerTube/blob/master/support/docker/production/config/custom-environment-variables.yaml) and can be
+[/support/docker/production/config/custom-environment-variables.yaml](https://github.com/Chocobozzz/PeerTube/blob/develop/support/docker/production/config/custom-environment-variables.yaml) and can be
 intuited from usage.
 
-#### Testing local Docker setup
+#### Webserver
 
-To test locally your Docker setup, you must add your domain (`<MY DOMAIN>`) in `/etc/hosts`:
-```
-127.0.0.1       localhost   mydomain.tld
+*The docker compose file includes a configured web server. You can skip this part and comment the appropriate section in the docker compose if you use another webserver/proxy.*
+
+Install the template that the nginx container will use.
+The container will generate the configuration by replacing `${WEBSERVER_HOST}` and `${PEERTUBE_HOST}` using your docker compose env file.
+
+```shell
+mkdir -p docker-volume/nginx
+curl https://raw.githubusercontent.com/Chocobozzz/PeerTube/develop/support/nginx/peertube > docker-volume/nginx/peertube
 ```
 
-#### You can use the regular `up` command to set it up
+You need to manually generate the first SSL/TLS certificate using Let's Encrypt:
+
+```shell
+mkdir -p docker-volume/certbot
+docker run -it --rm --name certbot -p 80:80 -v "$(pwd)/docker-volume/certbot/conf:/etc/letsencrypt" certbot/certbot certonly --standalone
+```
+
+A dedicated container in the docker-compose will automatically renew this certificate and reload nginx.
+
+
+#### Test your setup
+
+Run your containers:
 
 ```shell
 docker-compose up
@@ -84,7 +101,7 @@ peertube_1  | [example.com:443] 2019-11-16 04:26:06.083 info: User password: abc
 
 [DKIM](https://en.wikipedia.org/wiki/DomainKeys_Identified_Mail) signature sending and RSA keys generation are enabled by the default Postfix image `mwader/postfix-relay` with [OpenDKIM](http://www.opendkim.org/).
 
-Run `cat ./docker-volume/opendkim/keys/*/*.txt` to display your DKIM DNS TXT Record containing the public key to configure to your domain : 
+Run `cat ./docker-volume/opendkim/keys/*/*.txt` to display your DKIM DNS TXT Record containing the public key to configure to your domain :
 
 ```bash
 $ cat ./docker-volume/opendkim/keys/*/*.txt
@@ -96,11 +113,11 @@ peertube._domainkey.mydomain.tld.	IN	TXT	( "v=DKIM1; h=sha256; k=rsa; "
 
 ### Administrator password
 
-See the production guide ["Administrator" section](https://docs.joinpeertube.org/#/install-any-os?id=administrator)
+See the production guide ["Administrator" section](https://docs.joinpeertube.org/install-any-os?id=administrator)
 
 ### What now?
 
-See the production guide ["What now" section](https://docs.joinpeertube.org/#/install-any-os?id=what-now).
+See the production guide ["What now" section](https://docs.joinpeertube.org/install-any-os?id=what-now).
 
 ### Upgrade
 
@@ -124,4 +141,4 @@ $ docker build . -f ./support/docker/production/Dockerfile.buster
 
 ## Development
 
-We don't have a Docker image for development. See [the CONTRIBUTING guide](https://github.com/Chocobozzz/PeerTube/blob/master/.github/CONTRIBUTING.md#develop) for more information on how you can hack PeerTube!
+We don't have a Docker image for development. See [the CONTRIBUTING guide](https://github.com/Chocobozzz/PeerTube/blob/develop/.github/CONTRIBUTING.md#develop) for more information on how you can hack PeerTube!
