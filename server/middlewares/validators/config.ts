@@ -15,8 +15,8 @@ const customConfigUpdateValidator = [
   body('instance.shortDescription').exists().withMessage('Should have a valid instance short description'),
   body('instance.description').exists().withMessage('Should have a valid instance description'),
   body('instance.terms').exists().withMessage('Should have a valid instance terms'),
-  body('instance.defaultClientRoute').exists().withMessage('Should have a valid instance default client route'),
   body('instance.defaultNSFWPolicy').custom(isUserNSFWPolicyValid).withMessage('Should have a valid NSFW policy'),
+  body('instance.defaultClientRoute').exists().withMessage('Should have a valid instance default client route'),
   body('instance.customizations.css').exists().withMessage('Should have a valid instance CSS customization'),
   body('instance.customizations.javascript').exists().withMessage('Should have a valid instance JavaScript customization'),
 
@@ -45,6 +45,7 @@ const customConfigUpdateValidator = [
   body('transcoding.resolutions.480p').isBoolean().withMessage('Should have a valid transcoding 480p resolution enabled boolean'),
   body('transcoding.resolutions.720p').isBoolean().withMessage('Should have a valid transcoding 720p resolution enabled boolean'),
   body('transcoding.resolutions.1080p').isBoolean().withMessage('Should have a valid transcoding 1080p resolution enabled boolean'),
+  body('transcoding.resolutions.1440p').isBoolean().withMessage('Should have a valid transcoding 1440p resolution enabled boolean'),
   body('transcoding.resolutions.2160p').isBoolean().withMessage('Should have a valid transcoding 2160p resolution enabled boolean'),
 
   body('transcoding.webtorrent.enabled').isBoolean().withMessage('Should have a valid webtorrent transcoding enabled boolean'),
@@ -52,6 +53,9 @@ const customConfigUpdateValidator = [
 
   body('import.videos.http.enabled').isBoolean().withMessage('Should have a valid import video http enabled boolean'),
   body('import.videos.torrent.enabled').isBoolean().withMessage('Should have a valid import video torrent enabled boolean'),
+
+  body('trending.videos.algorithms.default').exists().withMessage('Should have a valid default trending algorithm'),
+  body('trending.videos.algorithms.enabled').exists().withMessage('Should have a valid array of enabled trending algorithms'),
 
   body('followers.instance.enabled').isBoolean().withMessage('Should have a valid followers of instance boolean'),
   body('followers.instance.manualApproval').isBoolean().withMessage('Should have a valid manual approval boolean'),
@@ -75,6 +79,7 @@ const customConfigUpdateValidator = [
   body('live.transcoding.resolutions.480p').isBoolean().withMessage('Should have a valid transcoding 480p resolution enabled boolean'),
   body('live.transcoding.resolutions.720p').isBoolean().withMessage('Should have a valid transcoding 720p resolution enabled boolean'),
   body('live.transcoding.resolutions.1080p').isBoolean().withMessage('Should have a valid transcoding 1080p resolution enabled boolean'),
+  body('live.transcoding.resolutions.1440p').isBoolean().withMessage('Should have a valid transcoding 1440p resolution enabled boolean'),
   body('live.transcoding.resolutions.2160p').isBoolean().withMessage('Should have a valid transcoding 2160p resolution enabled boolean'),
 
   body('search.remoteUri.users').isBoolean().withMessage('Should have a remote URI search for users boolean'),

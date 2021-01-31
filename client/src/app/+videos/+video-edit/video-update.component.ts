@@ -17,6 +17,7 @@ import { hydrateFormFromVideo } from './shared/video-edit-utils'
 })
 export class VideoUpdateComponent extends FormReactive implements OnInit {
   video: VideoEdit
+  videoDetails: VideoDetails
   userVideoChannels: SelectChannelItem[] = []
   videoCaptions: VideoCaptionEdit[] = []
   liveVideo: LiveVideo
@@ -47,16 +48,13 @@ export class VideoUpdateComponent extends FormReactive implements OnInit {
         .pipe(map(data => data.videoData))
         .subscribe(({ video, videoChannels, videoCaptions, liveVideo }) => {
           this.video = new VideoEdit(video)
+          this.videoDetails = video
+
           this.userVideoChannels = videoChannels
           this.videoCaptions = videoCaptions
           this.liveVideo = liveVideo
 
           this.schedulePublicationPossible = this.video.privacy === VideoPrivacy.PRIVATE
-
-          const videoFiles = (video as VideoDetails).getFiles()
-          if (videoFiles.length > 1) { // Already transcoded
-            this.waitTranscodingEnabled = false
-          }
 
           // FIXME: Angular does not detect the change inside this subscription, so use the patched setTimeout
           setTimeout(() => {
@@ -106,6 +104,18 @@ export class VideoUpdateComponent extends FormReactive implements OnInit {
     return this.form.valid
   }
 
+  isWaitTranscodingEnabled () {
+    if (this.videoDetails.getFiles().length > 1) { // Already transcoded
+      return false
+    }
+
+    if (this.liveVideo && this.form.value['saveReplay'] !== true) {
+      return false
+    }
+
+    return true
+  }
+
   update () {
     if (this.checkForm() === false
       || this.isUpdatingVideo === true) {
@@ -113,11 +123,6 @@ export class VideoUpdateComponent extends FormReactive implements OnInit {
     }
 
     this.video.patch(this.form.value)
-
-    const liveVideoUpdate: LiveVideoUpdate = {
-      saveReplay: this.form.value.saveReplay,
-      permanentLive: this.form.value.permanentLive
-    }
 
     this.loadingBar.useRef().start()
     this.isUpdatingVideo = true
@@ -130,6 +135,16 @@ export class VideoUpdateComponent extends FormReactive implements OnInit {
 
           switchMap(() => {
             if (!this.liveVideo) return of(undefined)
+
+            const liveVideoUpdate: LiveVideoUpdate = {
+              saveReplay: !!this.form.value.saveReplay,
+              permanentLive: !!this.form.value.permanentLive
+            }
+
+            // Don't update live attributes if they did not change
+            const liveChanged = Object.keys(liveVideoUpdate)
+              .some(key => this.liveVideo[key] !== liveVideoUpdate[key])
+            if (!liveChanged) return of(undefined)
 
             return this.liveVideoService.updateLive(this.video.id, liveVideoUpdate)
           })

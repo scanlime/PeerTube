@@ -65,9 +65,11 @@ function updateCustomSubConfig (url: string, token: string, newConfig: DeepParti
       languages: [ 'en', 'es' ],
       categories: [ 1, 2 ],
 
-      defaultClientRoute: '/videos/recently-added',
       isNSFW: true,
       defaultNSFWPolicy: 'blur',
+
+      defaultClientRoute: '/videos/recently-added',
+
       customizations: {
         javascript: 'alert("coucou")',
         css: 'body { background-color: red; }'
@@ -110,6 +112,7 @@ function updateCustomSubConfig (url: string, token: string, newConfig: DeepParti
       allowAdditionalExtensions: true,
       allowAudioFiles: true,
       threads: 1,
+      profile: 'default',
       resolutions: {
         '0p': false,
         '240p': false,
@@ -117,6 +120,7 @@ function updateCustomSubConfig (url: string, token: string, newConfig: DeepParti
         '480p': true,
         '720p': false,
         '1080p': false,
+        '1440p': false,
         '2160p': false
       },
       webtorrent: {
@@ -135,12 +139,14 @@ function updateCustomSubConfig (url: string, token: string, newConfig: DeepParti
       transcoding: {
         enabled: true,
         threads: 4,
+        profile: 'default',
         resolutions: {
           '240p': true,
           '360p': true,
           '480p': true,
           '720p': true,
           '1080p': true,
+          '1440p': true,
           '2160p': true
         }
       }
@@ -152,6 +158,14 @@ function updateCustomSubConfig (url: string, token: string, newConfig: DeepParti
         },
         torrent: {
           enabled: false
+        }
+      }
+    },
+    trending: {
+      videos: {
+        algorithms: {
+          enabled: [ 'hot', 'most-viewed', 'most-liked' ],
+          default: 'hot'
         }
       }
     },

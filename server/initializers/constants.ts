@@ -72,7 +72,7 @@ const SORTABLE_COLUMNS = {
   FOLLOWERS: [ 'createdAt', 'state', 'score' ],
   FOLLOWING: [ 'createdAt', 'redundancyAllowed', 'state' ],
 
-  VIDEOS: [ 'name', 'duration', 'createdAt', 'publishedAt', 'originallyPublishedAt', 'views', 'likes', 'trending' ],
+  VIDEOS: [ 'name', 'duration', 'createdAt', 'publishedAt', 'originallyPublishedAt', 'views', 'likes', 'trending', 'hot' ],
 
   // Don't forget to update peertube-search-index with the same values
   VIDEOS_SEARCH: [ 'name', 'duration', 'createdAt', 'publishedAt', 'originallyPublishedAt', 'views', 'likes', 'match' ],
@@ -179,6 +179,12 @@ const REPEAT_JOBS: { [ id: string ]: EveryRepeatOptions | CronRepeatOptions } = 
     cron: randomInt(1, 20) + ' * * * *' // Between 1-20 minutes past the hour
   }
 }
+const JOB_PRIORITY = {
+  TRANSCODING: {
+    OPTIMIZER: 10,
+    NEW_RESOLUTION: 100
+  }
+}
 
 const BROADCAST_CONCURRENCY = 10 // How many requests in parallel we do in activitypub-http-broadcast job
 const CRAWL_REQUEST_CONCURRENCY = 1 // How many requests in parallel to fetch remote data (likes, shares...)
@@ -195,7 +201,7 @@ const SCHEDULER_INTERVALS_MS = {
   autoFollowIndexInstances: 60000 * 60 * 24, // 1 day
   removeOldViews: 60000 * 60 * 24, // 1 day
   removeOldHistory: 60000 * 60 * 24, // 1 day
-  updateInboxStats: 1000 * 60 * 5 // 5 minutes
+  updateInboxStats: 1000 * 60// 1 minute
 }
 
 // ---------------------------------------------------------------------------
@@ -258,7 +264,7 @@ const CONSTRAINTS_FIELDS = {
     DESCRIPTION: { min: 3, max: 10000 }, // Length
     SUPPORT: { min: 3, max: 1000 }, // Length
     IMAGE: {
-      EXTNAME: [ '.jpg', '.jpeg' ],
+      EXTNAME: [ '.png', '.jpg', '.jpeg', '.webp' ],
       FILE_SIZE: {
         max: 2 * 1024 * 1024 // 2MB
       }
@@ -268,8 +274,6 @@ const CONSTRAINTS_FIELDS = {
     DURATION: { min: 0 }, // Number
     TAGS: { min: 0, max: 5 }, // Number of total tags
     TAG: { min: 2, max: 30 }, // Length
-    THUMBNAIL: { min: 2, max: 30 },
-    THUMBNAIL_DATA: { min: 0, max: 20000 }, // Bytes
     VIEWS: { min: 0 },
     LIKES: { min: 0 },
     DISLIKES: { min: 0 },
@@ -292,7 +296,7 @@ const CONSTRAINTS_FIELDS = {
     PRIVATE_KEY: { min: 10, max: 5000 }, // Length
     URL: { min: 3, max: 2000 }, // Length
     AVATAR: {
-      EXTNAME: [ '.png', '.jpeg', '.jpg', '.gif' ],
+      EXTNAME: [ '.png', '.jpeg', '.jpg', '.gif', '.webp' ],
       FILE_SIZE: {
         max: 2 * 1024 * 1024 // 2MB
       }
@@ -337,17 +341,6 @@ const VIDEO_TRANSCODING_FPS: VideoTranscodingFPS = {
   KEEP_ORIGIN_FPS_RESOLUTION_MIN: 720 // We keep the original FPS on high resolutions (720 minimum)
 }
 
-const VIDEO_TRANSCODING_ENCODERS = {
-  VIDEO: [ 'libx264' ],
-
-  // Try the first one, if not available try the second one etc
-  AUDIO: [
-    // we favor VBR, if a good AAC encoder is available
-    'libfdk_aac',
-    'aac'
-  ]
-}
-
 const DEFAULT_AUDIO_RESOLUTION = VideoResolution.H_480P
 
 const VIDEO_RATE_TYPES: { [ id: string ]: VideoRateType } = {
@@ -356,8 +349,11 @@ const VIDEO_RATE_TYPES: { [ id: string ]: VideoRateType } = {
 }
 
 const FFMPEG_NICE: { [ id: string ]: number } = {
-  THUMBNAIL: 2, // 2 just for don't blocking servers
-  TRANSCODING: 15
+  // parent process defaults to niceness = 0
+  // reminder: lower = higher priority, max value is 19, lowest is -20
+  LIVE: 5, // prioritize over VOD and THUMBNAIL
+  THUMBNAIL: 10,
+  VOD: 15
 }
 
 const VIDEO_CATEGORIES = {
@@ -637,6 +633,7 @@ const VIDEO_LIVE = {
   SEGMENTS_LIST_SIZE: 15, // 15 maximum segments in live playlist
   REPLAY_DIRECTORY: 'replay',
   EDGE_LIVE_DELAY_SEGMENTS_NOTIFICATION: 4,
+  MAX_SOCKET_WAITING_DATA: 1024 * 1000 * 100, // 100MB
   RTMP: {
     CHUNK_SIZE: 60000,
     GOP_CACHE: true,
@@ -649,7 +646,8 @@ const VIDEO_LIVE = {
 const MEMOIZE_TTL = {
   OVERVIEWS_SAMPLE: 1000 * 3600 * 4, // 4 hours
   INFO_HASH_EXISTS: 1000 * 3600 * 12, // 12 hours
-  LIVE_ABLE_TO_UPLOAD: 1000 * 60 // 1 minute
+  LIVE_ABLE_TO_UPLOAD: 1000 * 60, // 1 minute
+  LIVE_CHECK_SOCKET_HEALTH: 1000 * 60 // 1 minute
 }
 
 const MEMOIZE_LENGTH = {
@@ -741,6 +739,7 @@ if (isTestInstance() === true) {
   ACTIVITY_PUB.VIDEO_PLAYLIST_REFRESH_INTERVAL = 10 * 1000 // 10 seconds
 
   CONSTRAINTS_FIELDS.ACTORS.AVATAR.FILE_SIZE.max = 100 * 1024 // 100KB
+  CONSTRAINTS_FIELDS.VIDEOS.IMAGE.FILE_SIZE.max = 400 * 1024 // 400KB
 
   SCHEDULER_INTERVALS_MS.actorFollowScores = 1000
   SCHEDULER_INTERVALS_MS.removeOldJobs = 10000
@@ -818,7 +817,6 @@ export {
   ACTOR_FOLLOW_SCORE,
   PREVIEWS_SIZE,
   REMOTE_SCHEME,
-  VIDEO_TRANSCODING_ENCODERS,
   FOLLOW_STATES,
   DEFAULT_USER_THEME_NAME,
   SERVER_ACTOR_NAME,
@@ -848,6 +846,7 @@ export {
   VIDEO_STATES,
   QUEUE_CONCURRENCY,
   VIDEO_RATE_TYPES,
+  JOB_PRIORITY,
   VIDEO_TRANSCODING_FPS,
   FFMPEG_NICE,
   ABUSE_STATES,

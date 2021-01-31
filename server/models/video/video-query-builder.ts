@@ -32,6 +32,8 @@ export type BuildVideosQueryOptions = {
   videoPlaylistId?: number
 
   trendingDays?: number
+  hot?: boolean
+
   user?: MUserAccountId
   historyOfUser?: MUserId
 
@@ -239,16 +241,52 @@ function buildListQuery (model: typeof Model, options: BuildVideosQueryOptions) 
     }
   }
 
-  // We don't exclude results in this if so if we do a count we don't need to add this complex clauses
-  if (options.trendingDays && options.isCount !== true) {
-    const viewsGteDate = new Date(new Date().getTime() - (24 * 3600 * 1000) * options.trendingDays)
+  // We don't exclude results in this so if we do a count we don't need to add this complex clause
+  if (options.isCount !== true) {
+    if (options.trendingDays) {
+      const viewsGteDate = new Date(new Date().getTime() - (24 * 3600 * 1000) * options.trendingDays)
 
-    joins.push('LEFT JOIN "videoView" ON "video"."id" = "videoView"."videoId" AND "videoView"."startDate" >= :viewsGteDate')
-    replacements.viewsGteDate = viewsGteDate
+      joins.push('LEFT JOIN "videoView" ON "video"."id" = "videoView"."videoId" AND "videoView"."startDate" >= :viewsGteDate')
+      replacements.viewsGteDate = viewsGteDate
 
-    attributes.push('COALESCE(SUM("videoView"."views"), 0) AS "videoViewsSum"')
+      attributes.push('COALESCE(SUM("videoView"."views"), 0) AS "score"')
 
-    group = 'GROUP BY "video"."id"'
+      group = 'GROUP BY "video"."id"'
+    } else if (options.hot) {
+      /**
+       * "Hotness" is a measure based on absolute view/comment/like/dislike numbers,
+       * with fixed weights only applied to their log values.
+       *
+       * This algorithm gives little chance for an old video to have a good score,
+       * for which recent spikes in interactions could be a sign of "hotness" and
+       * justify a better score. However there are multiple ways to achieve that
+       * goal, which is left for later. Yes, this is a TODO :)
+       *
+       * notes:
+       *  - weights and base score are in number of half-days.
+       *  - all comments are counted, regardless of being written by the video author or not
+       * see https://github.com/reddit-archive/reddit/blob/master/r2/r2/lib/db/_sorts.pyx#L47-L58
+       */
+      const weights = {
+        like: 3,
+        dislike: 3,
+        view: 1 / 12,
+        comment: 2 // a comment takes more time than a like to do, but can be done multiple times
+      }
+
+      joins.push('LEFT JOIN "videoComment" ON "video"."id" = "videoComment"."videoId"')
+
+      attributes.push(
+        `LOG(GREATEST(1, "video"."likes" - 1)) * ${weights.like} ` + // likes (+)
+        `- LOG(GREATEST(1, "video"."dislikes" - 1)) * ${weights.dislike} ` + // dislikes (-)
+        `+ LOG("video"."views" + 1) * ${weights.view} ` + // views (+)
+        `+ LOG(GREATEST(1, COUNT(DISTINCT "videoComment"."id"))) * ${weights.comment} ` + // comments (+)
+        '+ (SELECT EXTRACT(epoch FROM "video"."publishedAt") / 47000) ' + // base score (in number of half-days)
+        'AS "score"'
+      )
+
+      group = 'GROUP BY "video"."id"'
+    }
   }
 
   if (options.historyOfUser) {
@@ -372,8 +410,8 @@ function buildOrder (value: string) {
 
   if (field.toLowerCase() === 'random') return 'ORDER BY RANDOM()'
 
-  if (field.toLowerCase() === 'trending') { // Sort by aggregation
-    return `ORDER BY "videoViewsSum" ${direction}, "video"."views" ${direction}`
+  if ([ 'trending', 'hot' ].includes(field.toLowerCase())) { // Sort by aggregation
+    return `ORDER BY "score" ${direction}, "video"."views" ${direction}`
   }
 
   let firstSort: string
@@ -472,6 +510,8 @@ function wrapForAPIResults (baseQuery: string, replacements: any, options: Build
       '"VideoFiles"."videoId"': '"VideoFiles.videoId"',
 
       '"VideoStreamingPlaylists"."id"': '"VideoStreamingPlaylists.id"',
+      '"VideoStreamingPlaylists"."playlistUrl"': '"VideoStreamingPlaylists.playlistUrl"',
+      '"VideoStreamingPlaylists"."type"': '"VideoStreamingPlaylists.type"',
       '"VideoStreamingPlaylists->VideoFiles"."id"': '"VideoStreamingPlaylists.VideoFiles.id"',
       '"VideoStreamingPlaylists->VideoFiles"."createdAt"': '"VideoStreamingPlaylists.VideoFiles.createdAt"',
       '"VideoStreamingPlaylists->VideoFiles"."updatedAt"': '"VideoStreamingPlaylists.VideoFiles.updatedAt"',
@@ -480,6 +520,7 @@ function wrapForAPIResults (baseQuery: string, replacements: any, options: Build
       '"VideoStreamingPlaylists->VideoFiles"."extname"': '"VideoStreamingPlaylists.VideoFiles.extname"',
       '"VideoStreamingPlaylists->VideoFiles"."infoHash"': '"VideoStreamingPlaylists.VideoFiles.infoHash"',
       '"VideoStreamingPlaylists->VideoFiles"."fps"': '"VideoStreamingPlaylists.VideoFiles.fps"',
+      '"VideoStreamingPlaylists->VideoFiles"."videoStreamingPlaylistId"': '"VideoStreamingPlaylists.VideoFiles.videoStreamingPlaylistId"',
       '"VideoStreamingPlaylists->VideoFiles"."videoId"': '"VideoStreamingPlaylists.VideoFiles.videoId"'
     })
   }

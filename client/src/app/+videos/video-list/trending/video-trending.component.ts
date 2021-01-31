@@ -1,22 +1,27 @@
-import { Component, OnDestroy, OnInit } from '@angular/core'
+import { Component, ComponentFactoryResolver, Injector, OnDestroy, OnInit } from '@angular/core'
 import { ActivatedRoute, Router } from '@angular/router'
-import { AuthService, LocalStorageService, Notifier, ScreenService, ServerService, UserService } from '@app/core'
+import { AuthService, LocalStorageService, Notifier, RedirectService, ScreenService, ServerService, UserService } from '@app/core'
 import { HooksService } from '@app/core/plugins/hooks.service'
 import { immutableAssign } from '@app/helpers'
 import { VideoService } from '@app/shared/shared-main'
 import { AbstractVideoList } from '@app/shared/shared-video-miniature'
 import { VideoSortField } from '@shared/models'
+import { Subscription } from 'rxjs'
+import { VideoTrendingHeaderComponent } from './video-trending-header.component'
 
 @Component({
-  selector: 'my-videos-trending',
-  styleUrls: [ '../../shared/shared-video-miniature/abstract-video-list.scss' ],
-  templateUrl: '../../shared/shared-video-miniature/abstract-video-list.html'
+  selector: 'my-videos-hot',
+  styleUrls: [ '../../../shared/shared-video-miniature/abstract-video-list.scss' ],
+  templateUrl: '../../../shared/shared-video-miniature/abstract-video-list.html'
 })
 export class VideoTrendingComponent extends AbstractVideoList implements OnInit, OnDestroy {
+  HeaderComponent = VideoTrendingHeaderComponent
   titlePage: string
   defaultSort: VideoSortField = '-trending'
 
   useUserVideoPreferences = true
+
+  private algorithmChangeSub: Subscription
 
   constructor (
     protected router: Router,
@@ -27,10 +32,15 @@ export class VideoTrendingComponent extends AbstractVideoList implements OnInit,
     protected userService: UserService,
     protected screenService: ScreenService,
     protected storageService: LocalStorageService,
+    protected cfr: ComponentFactoryResolver,
     private videoService: VideoService,
     private hooks: HooksService
   ) {
     super()
+
+    this.defaultSort = this.parseAlgorithm(RedirectService.DEFAULT_TRENDING_ALGORITHM)
+
+    this.headerComponentInjector = this.getInjector()
   }
 
   ngOnInit () {
@@ -38,22 +48,19 @@ export class VideoTrendingComponent extends AbstractVideoList implements OnInit,
 
     this.generateSyndicationList()
 
-    this.serverService.getConfig().subscribe(
-      config => {
-        const trendingDays = config.trending.videos.intervalDays
+    this.algorithmChangeSub = this.route.queryParams.subscribe(
+      queryParams => {
+        const algorithm = queryParams['alg'] || RedirectService.DEFAULT_TRENDING_ALGORITHM
 
-        if (trendingDays === 1) {
-          this.titlePage = $localize`Trending for the last 24 hours`
-          this.titleTooltip = $localize`Trending videos are those totalizing the greatest number of views during the last 24 hours`
-        } else {
-          this.titlePage = `Trending for the last ${trendingDays} days`
-          this.titleTooltip = `Trending videos are those totalizing the greatest number of views during the last ${trendingDays} days`
-        }
-      })
+        this.sort = this.parseAlgorithm(algorithm)
+        this.reloadVideos()
+      }
+    )
   }
 
   ngOnDestroy () {
     super.ngOnDestroy()
+    if (this.algorithmChangeSub) this.algorithmChangeSub.unsubscribe()
   }
 
   getVideosObservable (page: number) {
@@ -78,5 +85,27 @@ export class VideoTrendingComponent extends AbstractVideoList implements OnInit,
 
   generateSyndicationList () {
     this.syndicationItems = this.videoService.getVideoFeedUrls(this.sort, undefined, this.categoryOneOf)
+  }
+
+  getInjector () {
+    return Injector.create({
+      providers: [{
+        provide: 'data',
+        useValue: {
+          model: this.defaultSort
+        }
+      }]
+    })
+  }
+
+  private parseAlgorithm (algorithm: string): VideoSortField {
+    switch (algorithm) {
+      case 'most-viewed':
+        return '-trending'
+      case 'most-liked':
+        return '-likes'
+      default:
+        return '-' + algorithm as VideoSortField
+    }
   }
 }

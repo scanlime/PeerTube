@@ -3,13 +3,14 @@ import { copy, stat } from 'fs-extra'
 import { extname } from 'path'
 import { createTorrentAndSetInfoHash } from '@server/helpers/webtorrent'
 import { getVideoFilePath } from '@server/lib/video-paths'
+import { UserModel } from '@server/models/account/user'
 import { MVideoFile, MVideoWithFile } from '@server/types/models'
 import { VideoFileImportPayload } from '@shared/models'
 import { getVideoFileFPS, getVideoFileResolution } from '../../../helpers/ffprobe-utils'
 import { logger } from '../../../helpers/logger'
 import { VideoModel } from '../../../models/video/video'
 import { VideoFileModel } from '../../../models/video/video-file'
-import { publishNewResolutionIfNeeded } from './video-transcoding'
+import { onNewWebTorrentFileResolution } from './video-transcoding'
 
 async function processVideoFileImport (job: Bull.Job) {
   const payload = job.data as VideoFileImportPayload
@@ -24,7 +25,9 @@ async function processVideoFileImport (job: Bull.Job) {
 
   await updateVideoFile(video, payload.filePath)
 
-  await publishNewResolutionIfNeeded(video)
+  const user = await UserModel.loadByChannelActorId(video.VideoChannel.actorId)
+  await onNewWebTorrentFileResolution(video, user)
+
   return video
 }
 
