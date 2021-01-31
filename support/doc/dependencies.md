@@ -1,5 +1,7 @@
 # Dependencies
 
+Follow the below guides, and check their versions match [required external dependencies versions](https://github.com/Chocobozzz/PeerTube/blob/master/package.json#7). You can check them automatically via `sudo npx engineslist`.
+
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
@@ -7,6 +9,7 @@
 - [Debian / Ubuntu and derivatives](#debian--ubuntu-and-derivatives)
 - [Arch Linux](#arch-linux)
 - [CentOS 7](#centos-7)
+- [CentOS 8](#centos-8)
 - [Fedora](#fedora)
 - [FreeBSD](#freebsd)
 - [macOS](#macos)

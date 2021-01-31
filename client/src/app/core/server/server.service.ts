@@ -74,6 +74,17 @@ export class ServerService {
         enabled: true
       }
     },
+    live: {
+      enabled: false,
+      allowReplay: true,
+      maxDuration: null,
+      maxInstanceLives: -1,
+      maxUserLives: -1,
+      transcoding: {
+        enabled: false,
+        enabledResolutions: []
+      }
+    },
     avatar: {
       file: {
         size: { max: 0 },
